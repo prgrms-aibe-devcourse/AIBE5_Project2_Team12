@@ -1,0 +1,27 @@
+logging:
+  level:
+    com.generic4.itda: debug
+    org.springframework.web.servlet: debug
+    org.hibernate.type.descriptor.sql.BasicBinder: trace
+
+spring:
+  h2.console.enabled: true
+
+  config:
+    import: optional:file:.env.properties
+
+  datasource:
+    driver-class-name: ${DRIVER_CLASS_NAME}
+    url: ${POSTGRES_URL}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        default_batch_fetch_size: 100
+        format_sql: true
+    show-sql: true
