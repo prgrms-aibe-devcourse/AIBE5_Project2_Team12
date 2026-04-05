@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>회원가입</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --line: #d8e0ea;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --accent: #0f766e;
+      --accent-dark: #115e59;
+      --danger: #b91c1c;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: radial-gradient(circle at top left, rgba(15, 118, 110, 0.12), transparent 28%),
+      linear-gradient(180deg, #f8fafc 0%, var(--bg) 100%);
+      color: var(--text);
+      font-family: "Pretendard", "Noto Sans KR", sans-serif;
+    }
+
+    .card {
+      width: min(100%, 520px);
+      padding: 32px;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: var(--panel);
+      box-shadow: 0 18px 44px rgba(15, 23, 42, 0.08);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+    }
+
+    .lead {
+      margin: 0 0 24px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    form {
+      display: grid;
+      gap: 16px;
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+    }
+
+    label {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      font-size: 15px;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.12);
+    }
+
+    .hint {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .error {
+      font-size: 13px;
+      color: var(--danger);
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    .button {
+      border: none;
+      border-radius: 12px;
+      background: var(--accent);
+      color: #fff;
+      padding: 12px 18px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .button:hover {
+      background: var(--accent-dark);
+    }
+
+    .link {
+      color: var(--accent-dark);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    @media (max-width: 640px) {
+      .card {
+        padding: 24px;
+        border-radius: 16px;
+      }
+
+      .actions {
+        flex-direction: column-reverse;
+        align-items: stretch;
+      }
+
+      .button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+<section class="card">
+  <h1>회원가입</h1>
+  <p class="lead">이메일과 기본 프로필 정보만 입력하면 바로 가입할 수 있습니다. 기업 회원 전환은 추후 검증 절차에서 처리합니다.</p>
+
+  <form th:action="@{/signup}" th:object="${signUpForm}" method="post">
+    <div class="error" th:if="${#fields.hasGlobalErrors()}" th:each="err : ${#fields.globalErrors()}"
+         th:text="${err}"></div>
+
+    <div class="field">
+      <label for="email">이메일</label>
+      <input id="email" type="email" th:field="*{email}" placeholder="name@example.com" autocomplete="email">
+      <div class="error" th:errors="*{email}"></div>
+    </div>
+
+    <div class="field">
+      <label for="password">비밀번호</label>
+      <input id="password" type="password" th:field="*{password}" placeholder="8자 이상 입력" autocomplete="new-password">
+      <div class="error" th:errors="*{password}"></div>
+    </div>
+
+    <div class="field">
+      <label for="name">이름</label>
+      <input id="name" type="text" th:field="*{name}" placeholder="이름 입력" autocomplete="name">
+      <div class="error" th:errors="*{name}"></div>
+    </div>
+
+    <div class="field">
+      <label for="nickname">닉네임</label>
+      <input id="nickname" type="text" th:field="*{nickname}" placeholder="비워두면 이름을 사용합니다.">
+      <div class="hint">선택 입력입니다.</div>
+      <div class="error" th:errors="*{nickname}"></div>
+    </div>
+
+    <div class="field">
+      <label for="phone">연락처</label>
+      <input id="phone" type="text" th:field="*{phone}" placeholder="010-1234-5678" autocomplete="tel">
+      <div class="error" th:errors="*{phone}"></div>
+    </div>
+
+    <div class="actions">
+      <a class="link" th:href="@{/login}">이미 계정이 있나요?</a>
+      <button class="button" type="submit">가입하기</button>
+    </div>
+  </form>
+</section>
+</body>
+</html>
