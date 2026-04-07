@@ -1,7 +1,5 @@
 package com.generic4.itda.domain;
 
-import static org.springframework.util.StringUtils.hasText;
-
 import com.generic4.itda.domain.constant.UserRole;
 import com.generic4.itda.domain.constant.UserStatus;
 import com.generic4.itda.domain.constant.UserType;
@@ -30,6 +28,7 @@ import org.hibernate.annotations.CacheConcurrencyStrategy;
 import org.hibernate.annotations.NaturalId;
 import org.hibernate.annotations.NaturalIdCache;
 import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 
 @Cacheable
 @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
@@ -91,8 +90,8 @@ public class Member extends BaseTimeEntity {
 
         this.email = email;
         this.hashedPassword = hashedPassword;
-        this.name = name;
-        this.nickname = (nickname != null && !nickname.isBlank()) ? nickname : name;
+        this.name = name.trim();
+        this.nickname = StringUtils.hasText(nickname) ? nickname.trim() : name.trim();
         this.phone = phone;
         this.role = role != null ? role : UserRole.USER;
         this.type = type != null ? type : UserType.INDIVIDUAL;
@@ -117,11 +116,11 @@ public class Member extends BaseTimeEntity {
 
     public static Member create(String email, String hashedPassword, String name, String nickname, String phone) {
         return Member.builder()
-                .email(new Email(email.trim()))
+                .email(new Email(email))
                 .hashedPassword(hashedPassword)
-                .name(name.trim())
-                .nickname(hasText(nickname) ? nickname.trim() : null)
-                .phone(new Phone(phone.trim()))
+                .name(name)
+                .nickname(StringUtils.hasText(nickname) ? nickname : null)
+                .phone(new Phone(phone))
                 .role(UserRole.USER)
                 .type(UserType.INDIVIDUAL)
                 .status(UserStatus.ACTIVE)
@@ -130,7 +129,7 @@ public class Member extends BaseTimeEntity {
 
     public void changeHashedPassword(String hashedPassword) {
         Assert.hasText(hashedPassword, "비밀번호는 필수값입니다.");
-        this.hashedPassword = hashedPassword;
+        this.hashedPassword = hashedPassword.trim();
     }
 
     public void delete() {
@@ -144,8 +143,8 @@ public class Member extends BaseTimeEntity {
     public void update(String name, String nickname, String phone) {
         Assert.hasText(name, "이름은 필수값입니다.");
         this.name = name.trim();
-        this.nickname = (nickname != null && !nickname.isBlank()) ? nickname : name;
-        this.phone = new Phone(phone.trim());
+        this.nickname = (nickname != null && !nickname.isBlank()) ? nickname.trim() : name.trim();
+        this.phone = new Phone(phone);
     }
 
     // TODO - 사업자 등록 편의 메서드
