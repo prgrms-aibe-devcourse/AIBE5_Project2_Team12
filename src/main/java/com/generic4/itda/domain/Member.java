@@ -127,4 +127,26 @@ public class Member extends BaseTimeEntity {
                 .status(UserStatus.ACTIVE)
                 .build();
     }
+
+    public void changeHashedPassword(String hashedPassword) {
+        Assert.hasText(hashedPassword, "비밀번호는 필수값입니다.");
+        this.hashedPassword = hashedPassword;
+    }
+
+    public void delete() {
+        this.status = UserStatus.INACTIVE;
+    }
+
+    public void restore() {
+        this.status = UserStatus.ACTIVE;
+    }
+
+    public void update(String name, String nickname, String phone) {
+        Assert.hasText(name, "이름은 필수값입니다.");
+        this.name = name.trim();
+        this.nickname = (nickname != null && !nickname.isBlank()) ? nickname : name;
+        this.phone = new Phone(phone.trim());
+    }
+
+    // TODO - 사업자 등록 편의 메서드
 }
