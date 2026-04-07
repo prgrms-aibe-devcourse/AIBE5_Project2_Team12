@@ -22,7 +22,7 @@ public class Email {
     public Email(String value) {
         Assert.hasText(value, "이메일은 필수값입니다.");
         Assert.isTrue(value.matches(EMAIL_REGEX), "이메일 형식이 올바르지 않습니다.");
-        this.value = value;
+        this.value = value.trim();
     }
 
     @Override

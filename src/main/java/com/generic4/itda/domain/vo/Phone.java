@@ -30,7 +30,7 @@ public class Phone {
 
         Assert.isTrue(normalized.matches(NORMALIZED_PHONE_REGEX), "지원하지 않는 연락처 형식입니다.");
 
-        this.value = normalized;
+        this.value = normalized.trim();
     }
 
     private String normalize(String value) {
