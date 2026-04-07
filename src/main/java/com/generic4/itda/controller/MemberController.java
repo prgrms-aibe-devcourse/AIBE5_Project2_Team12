@@ -41,7 +41,7 @@ public class MemberController {
             return "signup";
         }
 
-        return "redirect:/login?signupSuccess";
+        return "redirect:/login?signupSuccess=true";
     }
 
     @GetMapping("/login")
