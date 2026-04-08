@@ -29,6 +29,17 @@ class CareerPayloadTest {
         assertThat(violations).isEmpty();
     }
 
+    @DisplayName("경력이 없으면 빈 목록으로도 검증에 성공한다")
+    @Test
+    void validateCareerPayloadWithEmptyItems() {
+        CareerPayload payload = new CareerPayload();
+        payload.setItems(List.of());
+
+        Set<ConstraintViolation<CareerPayload>> violations = validator.validate(payload);
+
+        assertThat(violations).isEmpty();
+    }
+
     @DisplayName("종료 연월이 시작 연월보다 빠르면 검증에 실패한다")
     @Test
     void failWhenEndYearMonthIsBeforeStartYearMonth() {
