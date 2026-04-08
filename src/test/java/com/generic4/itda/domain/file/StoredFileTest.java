@@ -1,4 +1,4 @@
-package com.generic4.itda.domain;
+package com.generic4.itda.domain.file;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

@@ -1,6 +1,6 @@
 package com.generic4.itda.fixture;
 
-import com.generic4.itda.domain.Member;
+import com.generic4.itda.domain.member.Member;
 
 public class MemberFixture {
 

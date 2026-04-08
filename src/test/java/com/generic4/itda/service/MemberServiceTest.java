@@ -7,10 +7,10 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 
-import com.generic4.itda.domain.Member;
-import com.generic4.itda.domain.constant.UserRole;
-import com.generic4.itda.domain.constant.UserStatus;
-import com.generic4.itda.domain.constant.UserType;
+import com.generic4.itda.domain.member.Member;
+import com.generic4.itda.domain.member.UserRole;
+import com.generic4.itda.domain.member.UserStatus;
+import com.generic4.itda.domain.member.UserType;
 import com.generic4.itda.dto.member.MemberSignUpForm;
 import com.generic4.itda.exception.DuplicateEmailException;
 import com.generic4.itda.repository.MemberRepository;

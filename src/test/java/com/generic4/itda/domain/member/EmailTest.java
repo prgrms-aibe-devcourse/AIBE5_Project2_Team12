@@ -1,4 +1,4 @@
-package com.generic4.itda.domain.vo;
+package com.generic4.itda.domain.member;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -19,7 +19,7 @@ class EmailTest {
     class CreateEmail {
 
         @ParameterizedTest(name = "[{index}] {0}")
-        @MethodSource("com.generic4.itda.domain.vo.EmailTest#validEmailSource")
+        @MethodSource("com.generic4.itda.domain.member.EmailTest#validEmailSource")
         @DisplayName("정상적인 이메일이면 Email 객체를 생성한다")
         void createEmailWithValidValue(String input) {
             // when
@@ -30,7 +30,7 @@ class EmailTest {
         }
 
         @ParameterizedTest(name = "[{index}] {0}")
-        @MethodSource("com.generic4.itda.domain.vo.EmailTest#invalidEmailSource")
+        @MethodSource("com.generic4.itda.domain.member.EmailTest#invalidEmailSource")
         @DisplayName("유효하지 않은 이메일이면 예외가 발생한다")
         void throwExceptionWhenInvalidEmail(String input) {
             // when & then

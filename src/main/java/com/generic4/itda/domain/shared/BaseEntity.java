@@ -1,4 +1,4 @@
-package com.generic4.itda.domain;
+package com.generic4.itda.domain.shared;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;

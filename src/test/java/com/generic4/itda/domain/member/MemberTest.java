@@ -1,13 +1,9 @@
-package com.generic4.itda.domain;
+package com.generic4.itda.domain.member;
 
 import static com.generic4.itda.fixture.MemberFixture.createMember;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.generic4.itda.domain.constant.UserRole;
-import com.generic4.itda.domain.constant.UserStatus;
-import com.generic4.itda.domain.constant.UserType;
-import com.generic4.itda.domain.vo.Email;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Named;

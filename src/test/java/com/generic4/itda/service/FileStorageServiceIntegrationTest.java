@@ -3,7 +3,7 @@ package com.generic4.itda.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.generic4.itda.annotation.IntegrationTest;
-import com.generic4.itda.domain.StoredFile;
+import com.generic4.itda.domain.file.StoredFile;
 import com.generic4.itda.repository.StoredFileRepository;
 import java.io.IOException;
 import java.io.UncheckedIOException;

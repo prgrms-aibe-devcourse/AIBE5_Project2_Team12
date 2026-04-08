@@ -1,9 +1,9 @@
 package com.generic4.itda.dto.security;
 
-import com.generic4.itda.domain.Member;
-import com.generic4.itda.domain.constant.UserRole;
-import com.generic4.itda.domain.constant.UserStatus;
-import com.generic4.itda.domain.constant.UserType;
+import com.generic4.itda.domain.member.Member;
+import com.generic4.itda.domain.member.UserRole;
+import com.generic4.itda.domain.member.UserStatus;
+import com.generic4.itda.domain.member.UserType;
 import java.util.Collection;
 import java.util.List;
 import lombok.AccessLevel;

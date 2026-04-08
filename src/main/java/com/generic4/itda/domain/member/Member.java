@@ -1,10 +1,6 @@
-package com.generic4.itda.domain;
+package com.generic4.itda.domain.member;
 
-import com.generic4.itda.domain.constant.UserRole;
-import com.generic4.itda.domain.constant.UserStatus;
-import com.generic4.itda.domain.constant.UserType;
-import com.generic4.itda.domain.vo.Email;
-import com.generic4.itda.domain.vo.Phone;
+import com.generic4.itda.domain.shared.BaseTimeEntity;
 import jakarta.persistence.Cacheable;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;

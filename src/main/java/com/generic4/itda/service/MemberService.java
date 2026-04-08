@@ -1,6 +1,6 @@
 package com.generic4.itda.service;
 
-import com.generic4.itda.domain.Member;
+import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.dto.member.MemberSignUpForm;
 import com.generic4.itda.exception.DuplicateEmailException;
 import com.generic4.itda.repository.MemberRepository;

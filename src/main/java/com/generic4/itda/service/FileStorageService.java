@@ -1,7 +1,7 @@
 package com.generic4.itda.service;
 
 import com.generic4.itda.config.file.FileUploadProperties;
-import com.generic4.itda.domain.StoredFile;
+import com.generic4.itda.domain.file.StoredFile;
 import com.generic4.itda.repository.StoredFileRepository;
 import java.io.IOException;
 import java.io.InputStream;

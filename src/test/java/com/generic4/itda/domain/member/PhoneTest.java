@@ -1,4 +1,4 @@
-package com.generic4.itda.domain.vo;
+package com.generic4.itda.domain.member;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -19,7 +19,7 @@ class PhoneTest {
     class CreatePhone {
 
         @ParameterizedTest(name = "[{index}] {0}")
-        @MethodSource("com.generic4.itda.domain.vo.PhoneTest#validPhoneSource")
+        @MethodSource("com.generic4.itda.domain.member.PhoneTest#validPhoneSource")
         @DisplayName("정상적인 전화번호이면 정규화되어 저장된다")
         void createPhoneWithValidValue(String input, String expected) {
             // when
@@ -30,7 +30,7 @@ class PhoneTest {
         }
 
         @ParameterizedTest(name = "[{index}] {0}")
-        @MethodSource("com.generic4.itda.domain.vo.PhoneTest#invalidPhoneSource")
+        @MethodSource("com.generic4.itda.domain.member.PhoneTest#invalidPhoneSource")
         @DisplayName("유효하지 않은 전화번호이면 예외가 발생한다")
         void throwExceptionWhenInvalidPhone(String input) {
             // when & then

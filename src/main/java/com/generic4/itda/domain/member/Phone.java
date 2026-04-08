@@ -1,4 +1,4 @@
-package com.generic4.itda.domain.vo;
+package com.generic4.itda.domain.member;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
