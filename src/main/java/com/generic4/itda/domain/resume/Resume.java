@@ -55,7 +55,7 @@ public class Resume extends BaseEntity {
 
     @Builder
     private Resume(Member member, String introduction, Byte careerYears, CareerPayload career,
-            WorkType preferredWorkType, boolean publiclyVisible, boolean aiMatchingEnabled) {
+            WorkType preferredWorkType, Boolean publiclyVisible, Boolean aiMatchingEnabled) {
         Assert.notNull(member, "회원은 필수값입니다.");
         Assert.hasText(introduction, "자기소개는 필수값입니다.");
         Assert.notNull(careerYears, "경력 연차는 필수값입니다.");
@@ -67,7 +67,40 @@ public class Resume extends BaseEntity {
         this.careerYears = careerYears;
         this.career = career;
         this.preferredWorkType = preferredWorkType == null ? WorkType.SITE : preferredWorkType;
-        this.publiclyVisible = publiclyVisible;
-        this.aiMatchingEnabled = aiMatchingEnabled;
+        this.publiclyVisible = publiclyVisible == null || publiclyVisible;
+        this.aiMatchingEnabled = aiMatchingEnabled == null || aiMatchingEnabled;
+    }
+
+    public static Resume create(Member member, String introduction, Byte careerYears, CareerPayload career,
+            WorkType preferredWorkType, Boolean publiclyVisible, Boolean aiMatchingEnabled) {
+        return Resume.builder()
+                .member(member)
+                .introduction(introduction)
+                .careerYears(careerYears)
+                .career(career)
+                .preferredWorkType(preferredWorkType)
+                .publiclyVisible(publiclyVisible)
+                .aiMatchingEnabled(aiMatchingEnabled)
+                .build();
+    }
+
+    public void update(String introduction, Byte careerYears, CareerPayload career, WorkType workType) {
+        Assert.hasText(introduction, "자기소개는 필수값입니다.");
+        Assert.notNull(careerYears, "경력 연차는 필수값입니다.");
+        Assert.isTrue(careerYears >= 0, "경력 연차는 음수일 수 없습니다.");
+        Assert.notNull(career, "경력은 필수값입니다.");
+
+        this.introduction = introduction;
+        this.careerYears = careerYears;
+        this.career = career;
+        this.preferredWorkType = workType == null ? WorkType.SITE : workType;
+    }
+
+    public void togglePubliclyVisible() {
+        this.publiclyVisible = !this.publiclyVisible;
+    }
+
+    public void toggleAiMatchingEnabled() {
+        this.aiMatchingEnabled = !this.aiMatchingEnabled;
     }
 }
