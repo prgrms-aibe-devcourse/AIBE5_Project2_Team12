@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 
 import com.generic4.itda.config.file.FileUploadProperties;
@@ -216,6 +217,73 @@ class FileStorageServiceTest {
         then(storedFileRepository).should().save(any(StoredFile.class));
     }
 
+    @Test
+    @DisplayName("저장된 프로필 이미지 삭제 시 메타정보와 실제 파일을 함께 제거한다")
+    void deleteStoredProfileImage() throws IOException {
+        StoredFile storedFile = createStoredFile("avatar.png", "stored-avatar.png", "/files/profile/stored-avatar.png",
+                "image/png", 10L);
+        Path savedFilePath = createSavedFile("profile", storedFile.getStoredName(), "profile-image");
+
+        fileStorageService.delete(storedFile);
+
+        assertThat(Files.exists(savedFilePath)).isFalse();
+        then(storedFileRepository).should().delete(storedFile);
+    }
+
+    @Test
+    @DisplayName("실제 파일이 이미 없어도 메타정보 삭제는 수행한다")
+    void deleteMetadataWhenPhysicalFileIsMissing() {
+        StoredFile storedFile = createStoredFile("proposal.pdf", "stored-proposal.pdf",
+                "/files/proposal/stored-proposal.pdf", "application/pdf", 10L);
+
+        fileStorageService.delete(storedFile);
+
+        assertThat(Files.exists(tempDir.resolve("proposal").resolve(storedFile.getStoredName()))).isFalse();
+        then(storedFileRepository).should().delete(storedFile);
+    }
+
+    @Test
+    @DisplayName("지원하지 않는 파일 요청 경로는 삭제할 수 없다")
+    void failDeleteWhenFileUrlIsUnsupported() {
+        StoredFile storedFile = createStoredFile("avatar.png", "stored-avatar.png", "/files/unknown/stored-avatar.png",
+                "image/png", 10L);
+
+        assertThatThrownBy(() -> fileStorageService.delete(storedFile))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("지원하지 않는 파일 요청 경로입니다.");
+
+        then(storedFileRepository).should(never()).delete(any(StoredFile.class));
+    }
+
+    @Test
+    @DisplayName("파일 요청 경로와 저장 파일 이름이 다르면 삭제할 수 없다")
+    void failDeleteWhenFileUrlAndStoredNameDoNotMatch() {
+        StoredFile storedFile = createStoredFile("avatar.png", "stored-avatar.png", "/files/profile/another.png",
+                "image/png", 10L);
+
+        assertThatThrownBy(() -> fileStorageService.delete(storedFile))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("파일 요청 경로와 저장 파일 이름이 일치하지 않습니다.");
+
+        then(storedFileRepository).should(never()).delete(any(StoredFile.class));
+    }
+
+    @Test
+    @DisplayName("메타정보 삭제가 실패하면 실제 파일은 유지한다")
+    void keepPhysicalFileWhenMetadataDeleteFails() throws IOException {
+        StoredFile storedFile = createStoredFile("resume.pdf", "stored-resume.pdf", "/files/resume/stored-resume.pdf",
+                "application/pdf", 10L);
+        Path savedFilePath = createSavedFile("resume", storedFile.getStoredName(), "resume");
+        RuntimeException deleteException = new RuntimeException("db delete failure");
+        willThrow(deleteException).given(storedFileRepository).delete(storedFile);
+
+        assertThatThrownBy(() -> fileStorageService.delete(storedFile))
+                .isSameAs(deleteException);
+
+        assertThat(Files.exists(savedFilePath)).isTrue();
+        then(storedFileRepository).should().delete(storedFile);
+    }
+
     private void assertNoSavedFiles(String directoryName) {
         Path directory = tempDir.resolve(directoryName);
 
@@ -233,5 +301,18 @@ class FileStorageServiceTest {
     private void stubSaveReturnsArgument() {
         given(storedFileRepository.save(any(StoredFile.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
+    }
+
+    private Path createSavedFile(String directoryName, String storedName, String content) throws IOException {
+        Path directory = tempDir.resolve(directoryName);
+        Files.createDirectories(directory);
+        Path savedFilePath = directory.resolve(storedName);
+        Files.writeString(savedFilePath, content);
+        return savedFilePath;
+    }
+
+    private StoredFile createStoredFile(String originalName, String storedName, String fileUrl, String contentType,
+            Long size) {
+        return StoredFile.create(originalName, storedName, fileUrl, contentType, size);
     }
 }

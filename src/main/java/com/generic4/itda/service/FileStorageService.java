@@ -12,6 +12,7 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -34,6 +35,16 @@ public class FileStorageService {
 
     public StoredFile storeResumeFile(MultipartFile multipartFile) {
         return store(multipartFile, fileUploadProperties.getResumeDirectory(), "/files/resume");
+    }
+
+    @Transactional
+    public void delete(StoredFile storedFile) {
+        Assert.notNull(storedFile, "삭제할 파일 메타정보는 필수값입니다.");
+
+        Path targetPath = resolveTargetPath(storedFile);
+
+        storedFileRepository.delete(storedFile);
+        deletePhysicalFile(targetPath);
     }
 
     private StoredFile store(MultipartFile multipartFile, Path directory, String fileUrlBasePath) {
@@ -89,6 +100,14 @@ public class FileStorageService {
         }
     }
 
+    private void deletePhysicalFile(Path targetPath) {
+        try {
+            Files.deleteIfExists(targetPath);
+        } catch (IOException e) {
+            throw new IllegalStateException("파일 삭제에 실패했습니다.", e);
+        }
+    }
+
     private String generateStoredFilename(String originalFilename) {
         String extension = extractExtension(originalFilename);
         return UUID.randomUUID().toString() + extension;
@@ -117,5 +136,30 @@ public class FileStorageService {
 
     private String buildFileUrl(String fileUrlBasePath, String storedName) {
         return fileUrlBasePath + "/" + storedName;
+    }
+
+    private Path resolveTargetPath(StoredFile storedFile) {
+        String fileUrl = storedFile.getFileUrl();
+        String storedName = storedFile.getStoredName();
+        Assert.isTrue(fileUrl.endsWith("/" + storedName), "파일 요청 경로와 저장 파일 이름이 일치하지 않습니다.");
+
+        Path baseDirectory = resolveBaseDirectory(fileUrl).toAbsolutePath().normalize();
+        Path targetPath = baseDirectory.resolve(storedName).normalize();
+        Assert.isTrue(targetPath.startsWith(baseDirectory), "잘못된 파일명입니다.");
+
+        return targetPath;
+    }
+
+    private Path resolveBaseDirectory(String fileUrl) {
+        if (fileUrl.startsWith("/files/profile/")) {
+            return fileUploadProperties.getProfileImageDirectory();
+        }
+        if (fileUrl.startsWith("/files/proposal/")) {
+            return fileUploadProperties.getProposalDirectory();
+        }
+        if (fileUrl.startsWith("/files/resume/")) {
+            return fileUploadProperties.getResumeDirectory();
+        }
+        throw new IllegalArgumentException("지원하지 않는 파일 요청 경로입니다.");
     }
 }
