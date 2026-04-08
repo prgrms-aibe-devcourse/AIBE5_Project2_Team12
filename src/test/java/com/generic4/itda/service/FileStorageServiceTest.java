@@ -2,9 +2,14 @@ package com.generic4.itda.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
 
 import com.generic4.itda.config.file.FileUploadProperties;
 import com.generic4.itda.domain.StoredFile;
+import com.generic4.itda.repository.StoredFileRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -13,12 +18,19 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
+@ExtendWith(MockitoExtension.class)
 class FileStorageServiceTest {
 
     @TempDir
     Path tempDir;
+
+    @Mock
+    private StoredFileRepository storedFileRepository;
 
     private FileStorageService fileStorageService;
 
@@ -30,12 +42,14 @@ class FileStorageServiceTest {
         fileUploadProperties.setProposalDir("proposal");
         fileUploadProperties.setResumeDir("resume");
 
-        fileStorageService = new FileStorageService(fileUploadProperties);
+        fileStorageService = new FileStorageService(fileUploadProperties, storedFileRepository);
     }
 
     @Test
     @DisplayName("프로필 이미지를 저장하면 파일과 공개 URL을 함께 반환한다")
     void storeProfileImageWithPublicFileUrl() throws IOException {
+        stubSaveReturnsArgument();
+
         MockMultipartFile multipartFile = new MockMultipartFile(
                 "profileImage",
                 "C:\\fakepath\\avatar.PNG",
@@ -51,11 +65,14 @@ class FileStorageServiceTest {
         assertThat(storedFile.getFileUrl()).isEqualTo("/files/profile/" + storedFile.getStoredName());
         assertThat(Files.exists(savedFilePath)).isTrue();
         assertThat(Files.readString(savedFilePath)).isEqualTo("profile-image");
+        then(storedFileRepository).should().save(any(StoredFile.class));
     }
 
     @Test
     @DisplayName("제안서 파일을 저장하면 proposal 공개 URL을 반환한다")
     void storeProposalFileWithPublicFileUrl() {
+        stubSaveReturnsArgument();
+
         MockMultipartFile multipartFile = new MockMultipartFile(
                 "proposalFile",
                 "proposal.pdf",
@@ -67,11 +84,14 @@ class FileStorageServiceTest {
 
         assertThat(storedFile.getFileUrl()).isEqualTo("/files/proposal/" + storedFile.getStoredName());
         assertThat(Files.exists(tempDir.resolve("proposal").resolve(storedFile.getStoredName()))).isTrue();
+        then(storedFileRepository).should().save(any(StoredFile.class));
     }
 
     @Test
     @DisplayName("이력서 파일을 저장하면 resume 공개 URL을 반환한다")
     void storeResumeFileWithPublicFileUrl() {
+        stubSaveReturnsArgument();
+
         MockMultipartFile multipartFile = new MockMultipartFile(
                 "resumeFile",
                 "resume.docx",
@@ -83,6 +103,7 @@ class FileStorageServiceTest {
 
         assertThat(storedFile.getFileUrl()).isEqualTo("/files/resume/" + storedFile.getStoredName());
         assertThat(Files.exists(tempDir.resolve("resume").resolve(storedFile.getStoredName()))).isTrue();
+        then(storedFileRepository).should().save(any(StoredFile.class));
     }
 
     @Test
@@ -100,6 +121,7 @@ class FileStorageServiceTest {
                 .hasMessage("빈 파일은 업로드할 수 없습니다.");
 
         assertNoSavedFiles("profile");
+        then(storedFileRepository).should(never()).save(any(StoredFile.class));
     }
 
     @Test
@@ -117,6 +139,7 @@ class FileStorageServiceTest {
                 .hasMessage("확장자가 없는 파일은 업로드할 수 없습니다.");
 
         assertNoSavedFiles("profile");
+        then(storedFileRepository).should(never()).save(any(StoredFile.class));
     }
 
     @Test
@@ -134,6 +157,7 @@ class FileStorageServiceTest {
                 .hasMessage("확장자가 없는 파일은 업로드할 수 없습니다.");
 
         assertNoSavedFiles("resume");
+        then(storedFileRepository).should(never()).save(any(StoredFile.class));
     }
 
     @Test
@@ -151,6 +175,7 @@ class FileStorageServiceTest {
                 .hasMessage("확장자가 없는 파일은 업로드할 수 없습니다.");
 
         assertNoSavedFiles("proposal");
+        then(storedFileRepository).should(never()).save(any(StoredFile.class));
     }
 
     @Test
@@ -168,6 +193,27 @@ class FileStorageServiceTest {
                 .hasMessage("컨텐츠 타입은 필수값입니다.");
 
         assertNoSavedFiles("profile");
+        then(storedFileRepository).should(never()).save(any(StoredFile.class));
+    }
+
+    @Test
+    @DisplayName("메타정보 저장에 실패하면 저장된 파일을 정리한다")
+    void cleanupSavedFileWhenMetadataSaveFails() {
+        MockMultipartFile multipartFile = new MockMultipartFile(
+                "profileImage",
+                "avatar.png",
+                "image/png",
+                "profile-image".getBytes(StandardCharsets.UTF_8)
+        );
+        RuntimeException saveException = new RuntimeException("db save failure");
+
+        given(storedFileRepository.save(any(StoredFile.class))).willThrow(saveException);
+
+        assertThatThrownBy(() -> fileStorageService.storeProfileImage(multipartFile))
+                .isSameAs(saveException);
+
+        assertNoSavedFiles("profile");
+        then(storedFileRepository).should().save(any(StoredFile.class));
     }
 
     private void assertNoSavedFiles(String directoryName) {
@@ -182,5 +228,10 @@ class FileStorageServiceTest {
         } catch (IOException e) {
             throw new IllegalStateException("저장 디렉토리 검증에 실패했습니다.", e);
         }
+    }
+
+    private void stubSaveReturnsArgument() {
+        given(storedFileRepository.save(any(StoredFile.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
     }
 }

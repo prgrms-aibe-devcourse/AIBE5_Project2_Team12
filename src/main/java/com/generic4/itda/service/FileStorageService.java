@@ -2,6 +2,7 @@ package com.generic4.itda.service;
 
 import com.generic4.itda.config.file.FileUploadProperties;
 import com.generic4.itda.domain.StoredFile;
+import com.generic4.itda.repository.StoredFileRepository;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -21,6 +22,7 @@ public class FileStorageService {
     private static final Pattern SAFE_EXTENSION_PATTERN = Pattern.compile("\\.[A-Za-z0-9]{1,10}");
 
     private final FileUploadProperties fileUploadProperties;
+    private final StoredFileRepository storedFileRepository;
 
     public StoredFile storeProfileImage(MultipartFile multipartFile) {
         return store(multipartFile, fileUploadProperties.getProfileImageDirectory(), "/files/profile");
@@ -55,13 +57,20 @@ public class FileStorageService {
             throw new IllegalStateException("파일 저장에 실패했습니다.", e);
         }
 
-        return StoredFile.create(
+        StoredFile storedFile = StoredFile.create(
                 originalName,
                 storedName,
                 buildFileUrl(fileUrlBasePath, storedName),
                 contentType,
                 multipartFile.getSize()
         );
+
+        try {
+            return storedFileRepository.save(storedFile);
+        } catch (RuntimeException e) {
+            deleteSavedFileQuietly(targetPath, e);
+            throw e;
+        }
     }
 
     private void createDirectoryIfNotExist(Path directory) {
@@ -69,6 +78,14 @@ public class FileStorageService {
             Files.createDirectories(directory);
         } catch (IOException e) {
             throw new IllegalStateException("업로드 디렉토리 생성에 실패했습니다.", e);
+        }
+    }
+
+    private void deleteSavedFileQuietly(Path targetPath, RuntimeException cause) {
+        try {
+            Files.deleteIfExists(targetPath);
+        } catch (IOException cleanupException) {
+            cause.addSuppressed(cleanupException);
         }
     }
 
