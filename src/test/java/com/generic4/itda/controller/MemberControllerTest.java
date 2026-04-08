@@ -52,9 +52,9 @@ class MemberControllerTest {
                         .param("password", "password123!")
                         .param("name", "홍길동")
                         .param("nickname", "길동")
-                        .param("phone", "010-1234-5678"))
+                .param("phone", "010-1234-5678"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/login?signupSuccess"));
+                .andExpect(redirectedUrl("/login?signupSuccess=true"));
 
         then(memberService).should().signUp(any());
     }
