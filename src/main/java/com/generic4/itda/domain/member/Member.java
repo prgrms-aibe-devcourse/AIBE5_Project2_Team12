@@ -12,7 +12,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
-import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -92,22 +91,6 @@ public class Member extends BaseTimeEntity {
         this.role = role != null ? role : UserRole.USER;
         this.type = type != null ? type : UserType.INDIVIDUAL;
         this.status = status != null ? status : UserStatus.ACTIVE;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (!(o instanceof Member member)) {
-            return false;
-        }
-        return this.getId() != null && Objects.equals(this.getId(), member.getId());
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hashCode(this.getId());
     }
 
     public static Member create(String email, String hashedPassword, String name, String nickname, String phone) {
