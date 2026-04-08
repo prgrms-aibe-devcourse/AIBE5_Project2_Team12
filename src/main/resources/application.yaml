@@ -25,3 +25,10 @@ spring:
         default_batch_fetch_size: 100
         format_sql: true
     show-sql: true
+
+file:
+  upload:
+    base-path: ${FILE_UPLOAD_PATH}
+    profile-image-dir: profile
+    proposal-dir: proposal
+    resume-dir: resume
