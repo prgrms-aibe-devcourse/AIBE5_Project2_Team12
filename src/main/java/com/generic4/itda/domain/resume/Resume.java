@@ -53,7 +53,7 @@ public class Resume extends BaseEntity {
 
     private boolean aiMatchingEnabled;
 
-    @Builder
+    @Builder(access = AccessLevel.PRIVATE)
     private Resume(Member member, String introduction, Byte careerYears, CareerPayload career,
             WorkType preferredWorkType, Boolean publiclyVisible, Boolean aiMatchingEnabled) {
         Assert.notNull(member, "회원은 필수값입니다.");

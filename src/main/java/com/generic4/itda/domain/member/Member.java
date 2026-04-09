@@ -75,7 +75,7 @@ public class Member extends BaseTimeEntity {
 
     // 프로필 메모 추가 여부
 
-    @Builder
+    @Builder(access = AccessLevel.PRIVATE)
     private Member(Email email, String hashedPassword, String name, String nickname, Phone phone, UserRole role,
             UserType type, UserStatus status) {
         Assert.notNull(email, "email은 필수값입니다.");

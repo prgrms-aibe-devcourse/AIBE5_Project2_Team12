@@ -1,7 +1,6 @@
 package com.generic4.itda.domain.file;
 
 import com.generic4.itda.domain.shared.BaseEntity;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -39,7 +38,7 @@ public class StoredFile extends BaseEntity {
     @Column(nullable = false)
     private Long size;
 
-    @Builder
+    @Builder(access = AccessLevel.PRIVATE)
     private StoredFile(String originalName, String storedName, String fileUrl, String contentType, Long size) {
         Assert.hasText(originalName, "원본 파일 이름은 필수값입니다.");
         Assert.hasText(storedName, "저장 파일 이름은 필수값입니다.");
