@@ -1,7 +1,7 @@
 # IT-da 구현 백로그
 
 이 문서는 [project-overview.md](./project-overview.md)와 [domain-spec.md](./domain-spec.md)를 기준으로 MVP 구현 순서를 정리한 실행 백로그다.
-목표는 "지금 바로 손을 댈 수 있는 순서"를 만드는 것이다.
+2026-04-10 기준으로는 현재 ERD 초안과 불일치하지 않게 범위를 다시 정리했다.
 
 ## 1. 구현 원칙
 
@@ -9,114 +9,150 @@
 - 한 번에 AI 기능까지 다 붙이지 않고, 도메인과 상태 모델을 먼저 고정한다.
 - 추천 엔진은 처음부터 벡터 DB를 전제로 하지 않는다.
 - 제안서, 매칭, 추천은 각각 독립적으로 검증 가능한 단계로 쪼갠다.
+- ERD에 없는 확장 설계는 현재 백로그에 넣지 않는다.
 
-## 2. 선행 결정
-
-아래 결정이 선행되어야 한다.
-
-- `DONE` 상태의 제안서 수정 중 어떤 변경을 material edit로 볼지 여부
+## 2. 현재 전제
 
 이번 백로그는 아래 가정으로 작성한다.
 
 - 모든 활성 회원은 클라이언트 기능을 사용할 수 있다.
 - `Resume`가 존재하면 프리랜서 기능을 사용할 수 있다.
+- 현재 ERD에는 `members.memo`, `resumes.status`, `resumes.writing_status`, `resumes.portfolio_url`, `profile_image`, `resume_attachments`가 존재한다.
 - AI 추천 노출은 `Resume.aiMatchingEnabled`로 제어하고, 직접 지원 허용 여부와는 분리한다.
+- `proposal.total_budget_*`는 전체 프로젝트 예산이다.
 - `proposal_position.unit_budget_*`는 1인 기준 예산이다.
-- `DONE` 제안서의 material edit는 다시 `WRITING`으로 되돌리고, non-material edit는 `DONE`을 유지한다.
-- MVP에서는 별도 `project` 테이블 없이 `matching`이 참여 이력을 관리한다.
-- 클라이언트의 매칭 요청은 시작 승인으로 간주하지 않고, `ACTIVE` 전이는 양측의 별도 시작 승인 이후에만 허용한다.
+- `proposal.status`는 `WRITING`, `MATCHING`, `COMPLETE`다.
+- `proposal_position.status`는 `OPEN`, `FULL`, `CLOSED`다.
+- `matching`은 `status` 단일 필드와 `contract_date`, `complete_date`만 가진다.
+- 현재 ERD에는 `proposal_position_skill`, `proposal_attachments`, `initiator_type`, `participation_status`가 없다.
+- 양측 시작 승인 / 종료 승인 모델은 현재 MVP 백로그에 포함하지 않는다.
+- `StoredFile.contentType`은 ERD 표현과 현재 코드 표현이 다르므로 구현 전에 한 번 더 맞춰야 한다.
 
 ## 3. 단계별 계획
 
-## Phase 1. 프리랜서 진입 조건과 추천 입력 기초 정리
+### Phase 1. 프리랜서 진입 조건과 추천 입력 기초 정리
 
 목표는 제안서와 매칭이 붙을 수 있는 최소한의 사용자 축을 만드는 것이다.
 
 작업 항목은 아래와 같다.
 
 - `Resume` 존재 여부 기반 프리랜서 진입 규칙 정리
+- `Member.memo` 반영 여부와 노출 범위 정리
+- `Resume.status`, `Resume.writingStatus`, `Resume.portfolioUrl` 반영
+- `ProfileImage`, `ResumeAttachment` 엔티티/리포지토리 추가
 - 프리랜서 전용 화면/서비스 접근 제어 구현
 - `resume_skill` 엔티티, 리포지토리, 테스트 추가
 - 기존 `Resume`와 연결되는 스킬 등록 API 또는 서비스 추가
-
-의존성은 아래와 같다.
-
-- 이후 추천 엔진, 지원, 요청 로직은 이 단계가 끝나야 자연스럽다.
+- `StoredFile.contentType` 표현 정리
 
 검증은 아래와 같다.
 
 - 회원 생성 테스트
 - 프리랜서 이력서 + 스킬 등록 테스트
+- 프로필 이미지 / 이력서 첨부 연결 테스트
 - 중복 스킬 등록 방지 테스트
+- `publiclyVisible`, `aiMatchingEnabled` 해석 테스트
+- `status`, `writingStatus`가 추천 노출 조건에 미치는 영향 테스트
 
-## Phase 2. 직무 마스터와 제안서 초안 저장
+### Phase 2. 직무 마스터와 제안서 도메인 구현
 
-목표는 클라이언트가 제안서를 작성하고 저장할 수 있는 도메인을 여는 것이다.
+목표는 클라이언트가 ERD 기준 제안서를 작성하고 저장할 수 있게 하는 것이다.
 
 작업 항목은 아래와 같다.
 
 - `Position` 엔티티 및 초기 시드 설계
+- `PositionSkill` 엔티티, 리포지토리, 테스트 추가
 - `Proposal` 엔티티, 리포지토리, 테스트 추가
 - `ProposalPosition` 엔티티, 리포지토리, 테스트 추가
-- `ProposalPositionSkill` 엔티티, 리포지토리, 테스트 추가
-- 제안서 저장/수정/제출 서비스 추가
-- `WRITING`과 `DONE` 상태 전이 규칙 구현
+- 제안서 저장/수정/모집 시작 서비스 추가
+- `WRITING`, `MATCHING`, `COMPLETE` 상태 전이 규칙 구현
 
 권장 API 범위는 아래와 같다.
 
 - 제안서 생성
 - 제안서 임시 저장
-- 제안서 제출
+- 제안서 모집 시작
+- 제안서 완료 처리
 - 제안서 조회
 - 제안서 포지션 추가/수정/삭제
 
 검증은 아래와 같다.
 
-- 제안서 저장 및 제출 테스트
-- 최소 1개 포지션 없이 제출 불가 테스트
-- 예산, 정원, 상태 검증 테스트
-- 같은 포지션 마스터를 여러 줄 등록할 수 있는 테스트
+- 제안서 저장 및 상태 전이 테스트
+- 예산, 인원, 상태 검증 테스트
+- `MATCHING` 상태 진입 전 최소 입력 검증 테스트
+- 같은 직무 마스터를 여러 줄 등록할 수 있는지 여부를 ERD 원본과 맞춰 테스트
 
-## Phase 3. 제안서 파일과 화면 흐름 연결
+### Phase 3. AI 브리프를 현재 스키마에 연결
 
-목표는 기존 파일 저장 기반을 제안서 도메인에 연결하는 것이다.
+목표는 자유 입력을 현재 ERD 기준 제안서 필드에 매핑하는 것이다.
 
 작업 항목은 아래와 같다.
 
-- `proposal_attachments` 설계 반영
-- 제안서 파일 업로드 연결
-- 클라이언트 대시보드에서 제안서 목록/상세/수정 화면 연결
-- 30초 로컬 자동 저장 정책을 프론트에 반영
-- 명시적 저장과 제출을 분리
+- AI 브리프 요청/응답 DTO 정의
+- 외부 LLM API 연동 어댑터 추가
+- 응답을 `Proposal`, `ProposalPosition` 구조로 변환
+- `description`, `work_type`, `work_place`, `expected_period`, `position_id`, `head_count`, `unit_budget_*` 매핑 로직 구현
+- 실패 시 수동 입력 fallback 구현
+
+중요한 제약은 아래와 같다.
+
+- 현재 ERD에는 `raw_input_text`, `overview`가 없다.
+- 현재 ERD에는 `proposal_position_skill`이 없다.
+- 따라서 AI 브리프 결과 중 상세 요구사항은 `description` 텍스트와 `position_id` 선택 중심으로 흡수해야 한다.
 
 검증은 아래와 같다.
 
-- 제안서 파일 업로드 테스트
+- 응답 파싱 단위 테스트
+- LLM 실패 시 fallback 테스트
+- 구조화 결과를 현재 스키마에 맞게 저장 가능한 형태로 변환하는 테스트
+
+### Phase 4. 제안서 화면과 기본 운영 흐름 연결
+
+목표는 클라이언트가 실제로 제안서를 작성하고 관리할 수 있게 하는 것이다.
+
+작업 항목은 아래와 같다.
+
+- 클라이언트 대시보드에서 제안서 목록/상세/수정 화면 연결
+- `WRITING`, `MATCHING`, `COMPLETE` 상태 배지와 액션 연결
+- 제안서 포지션 반복 입력 UI 연결
+- AI 브리프 생성 버튼과 수동 입력 fallback 연결
+- 추천 결과 진입 조건을 `MATCHING` 상태에 맞춰 연결
+
+검증은 아래와 같다.
+
 - 목록/상세/수정 페이지 수동 확인
-- material edit / non-material edit 상태 처리 검증
+- `WRITING -> MATCHING -> COMPLETE` 흐름 수동 검증
+- 추천 진입 가능 상태 검증
 
-## Phase 4. 매칭 MVP
+### Phase 5. 매칭 MVP
 
-목표는 요청, 지원, 수락, 거절, 참여 이력 상태를 완성하는 것이다.
+목표는 요청, 수락, 진행, 완료를 현재 ERD 기준 단일 상태 모델로 구현하는 것이다.
 
 작업 항목은 아래와 같다.
 
 - `Matching` 엔티티, 리포지토리, 테스트 추가
-- `initiator_type`, `status`, `participation_status` 구현
-- 시작 승인/종료 승인 필드 및 상태 전이 구현
+- `status`, `contract_date`, `complete_date` 구현
 - 클라이언트 요청 플로우 구현
 - 프리랜서 직접 지원 플로우 구현
 - 수락/거절/취소 처리 구현
+- 진행 시작 / 완료 처리 구현
 - 연락처 공개 시점 제어 구현
 - 정원 도달 시 추가 요청 차단 구현
+
+현재 모델의 제약은 아래와 같다.
+
+- `initiator_type`이 없으므로 요청 주체는 API 엔드포인트나 감사 로그에서 구분해야 한다.
+- `participation_status`가 없으므로 요청 처리와 진행 상태가 `matching.status` 하나에 모두 들어간다.
 
 권장 API 범위는 아래와 같다.
 
 - 후보 요청 생성
 - 프리랜서 지원 생성
 - 요청 수락/거절
-- 시작 승인 / 종료 승인
-- 참여 상태 전환
+- 요청 취소
+- 진행 시작
+- 완료 처리
 - 매칭 목록 조회
 
 검증은 아래와 같다.
@@ -124,29 +160,10 @@
 - 동일 `proposal_position + resume` 활성 매칭 중복 방지 테스트
 - 수락 시 정원 재검증 테스트
 - 수락 전 연락처 비노출 테스트
-- 클라이언트 매칭 요청만으로 `ACTIVE` 전환 불가 테스트
-- 양측 동의 전 `ACTIVE` 전환 불가 테스트
-- 한쪽만 종료 승인한 상태에서 `COMPLETED` 전환 불가 테스트
+- `FULL`, `CLOSED` 상태에서 신규 매칭 생성 불가 테스트
+- `status` 단일 필드 전이 테스트
 
-## Phase 5. AI 브리프 MVP
-
-목표는 자유 입력을 제안서 초안으로 바꾸는 것이다.
-
-작업 항목은 아래와 같다.
-
-- AI 브리프 요청/응답 DTO 정의
-- 외부 LLM API 연동 어댑터 추가
-- 응답을 `Proposal`, `ProposalPosition`, `ProposalPositionSkill` 구조로 변환
-- 실패 시 수동 입력 fallback 구현
-- AI 브리프 결과 저장 전략 정의
-
-검증은 아래와 같다.
-
-- 응답 파싱 단위 테스트
-- LLM 실패 시 fallback 테스트
-- 구조화 결과를 저장 가능한 형태로 변환하는 테스트
-
-## Phase 6. 추천 엔진 MVP
+### Phase 6. 추천 엔진 MVP
 
 목표는 제출된 제안서에 대해 Top 3 추천을 만드는 것이다.
 
@@ -159,22 +176,29 @@
 - Top 3에 대한 LLM 설명 생성 연결
 - 추천 결과 조회 API 구현
 
-하드 필터 기준은 아래를 우선한다.
+현재 하드 필터 기준은 아래를 우선한다.
 
+- `resume.status = ACTIVE`
+- `resume.writing_status = DONE`
 - `publiclyVisible = true`
 - `aiMatchingEnabled = true`
-- `work_type`
+- `preferred_work_type`와 `proposal.work_type`
 - `career_years`
-- 필수 스킬
+- `position_skill.importance = ESSENTIAL`
+
+현재 모델의 제약은 아래와 같다.
+
+- `proposal_position_skill`이 없어서 실제 모집 단위별 커스텀 스킬 요구사항을 정규화해 비교할 수 없다.
+- 추천 근거의 normalized source는 당분간 `position_skill`이 된다.
 
 검증은 아래와 같다.
 
 - 하드 필터 테스트
 - 점수 계산 테스트
 - 캐시 적중/무효화 테스트
-- 제안서 수정 시 재계산 트리거 테스트
+- 제안서 `MATCHING` 전환 시 추천 가능 테스트
 
-## Phase 7. 운영 화면과 품질 관리
+### Phase 7. 운영 화면과 품질 관리
 
 목표는 운영자가 데이터 품질과 추천 품질을 점검할 수 있게 하는 것이다.
 
@@ -188,32 +212,46 @@
 
 이 단계는 MVP 핵심 기능이 안정화된 뒤 진행해도 된다.
 
-## 4. 병렬화 가능한 작업
+## 4. 현재 ERD 기준 보류 항목
+
+현재 ERD에 없어서 이번 백로그에서 제외한 항목은 아래와 같다.
+
+- `proposal_attachments`
+- `proposal_position_skill`
+- `proposal_position`의 상세 요구사항 필드
+- `matching.initiator_type`
+- `matching.participation_status`
+- 양측 시작 승인 / 종료 승인
+- `DONE -> WRITING` 재오픈 규칙
+
+이 항목들은 ERD가 바뀌는 시점에 다시 백로그로 올린다.
+
+## 5. 병렬화 가능한 작업
 
 아래 작업은 병렬화 가능하다.
 
 - `Position` 시드 준비와 `Proposal` 엔티티 구현
 - `resume_skill` 구현과 추천 점수 함수 설계
-- 제안서 파일 첨부 연결과 제안서 화면 UI 작업
+- 제안서 화면 UI 작업과 AI 브리프 DTO 정의
 
 아래 작업은 병렬화하면 안 된다.
 
-- `Matching` 수락 규칙 구현 전 추천 결과 확정 로직 작성
-- `ProposalPositionSkill` 없이 추천 점수 계산 구현
+- `PositionSkill` 없이 추천 점수 계산 구현
+- `ProposalPosition` 상태 모델 구현 전 매칭 수락 규칙 구현
 
-## 5. 첫 구현 순서
+## 6. 첫 구현 순서
 
 가장 먼저 손대야 할 실제 구현 순서는 아래와 같다.
 
 1. `Resume` 기반 프리랜서 진입 규칙 반영
 2. `resume_skill` 추가
-3. `Position`, `Proposal`, `ProposalPosition`, `ProposalPositionSkill` 엔티티 추가
-4. 제안서 저장/제출 서비스 구현
+3. `Position`, `PositionSkill`, `Proposal`, `ProposalPosition` 엔티티 추가
+4. 제안서 저장/모집 시작 서비스 구현
 5. `Matching` 구현
 
 즉, 첫 코드 작업은 AI가 아니라 도메인 테이블과 상태 모델이다.
 
-## 6. 권장 검증 순서
+## 7. 권장 검증 순서
 
 검증은 아래 순서를 권장한다.
 
@@ -228,22 +266,23 @@
 - AI 연동 이전에도 제안서와 매칭 도메인은 자체적으로 완결되어야 한다.
 - 추천 품질 문제와 도메인 무결성 문제를 분리해서 볼 수 있다.
 
-## 7. 주요 리스크
+## 8. 주요 리스크
 
 현재 기준 주요 리스크는 아래와 같다.
 
 - `Resume` 존재 여부, 공개 노출 여부, AI 추천 노출 여부를 같은 의미로 잘못 해석하면 화면과 권한 설계가 흔들린다.
-- `position_skill`과 `proposal_position_skill`의 역할을 분리하지 않으면 추천 근거가 흔들린다.
-- `matching.status`와 `participation_status`를 섞으면 상태 전이 버그가 빠르게 늘어난다.
+- `proposal_position_skill`이 없는 상태에서 `position_skill`만으로 추천을 수행하면 포지션별 요구사항 표현력이 부족해진다.
+- `Resume.status`, `Resume.writingStatus`, `profile_image`, `resume_attachments`를 늦게 반영하면 이력서 화면 구조와 추천 필터 조건이 다시 흔들릴 수 있다.
+- `matching.status` 하나에 요청 처리와 진행 이력을 모두 넣으면 상태 전이 버그가 빠르게 늘어난다.
 - `proposal_position` 정원 수락 경쟁은 동시성 문제를 만든다.
-- 제안서 수정 중 material edit 분류가 느슨하면 오래된 추천 결과가 남고, 너무 넓으면 UX가 거칠어진다.
+- `MATCHING` 상태 제안서의 수정 정책이 현재 ERD에 없어서 UX 규칙을 따로 정해야 한다.
 
-## 8. 완료 기준
+## 9. 완료 기준
 
 이번 백로그 기준 MVP 핵심 완료 조건은 아래와 같다.
 
 - 프리랜서가 이력서와 스킬을 등록할 수 있다.
-- 클라이언트가 제안서를 작성하고 제출할 수 있다.
+- 클라이언트가 제안서를 작성하고 `MATCHING` 상태로 전환할 수 있다.
 - 제안서 안에 여러 `proposal_position`을 둘 수 있다.
 - 제안서 제출 시 추천 가능한 입력 구조가 DB에 저장된다.
 - 클라이언트 요청과 프리랜서 지원이 `matching`으로 관리된다.

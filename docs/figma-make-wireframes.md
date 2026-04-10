@@ -27,20 +27,19 @@ Product summary:
 - The system recommends top freelancer candidates.
 - The client compares recommended candidates and direct applicants, then sends a matching request.
 - A freelancer manages a resume/profile, can enable or disable AI recommendation inclusion, can apply directly to projects, and can accept or reject matching requests.
-- After matching is accepted, the relationship is managed through participation states rather than a separate project runtime entity.
+- There is no separate project runtime entity in MVP. Matching records handle request, acceptance, in-progress, and completion states directly.
 
 Critical domain constraints:
 - Any active member can act as a client.
 - A member with a resume can also act as a freelancer.
 - Resume.publiclyVisible controls search and list visibility.
 - Resume.aiMatchingEnabled controls inclusion in AI recommendations only. It does not block direct applications.
-- Proposal status is WRITING or DONE.
-- Recommendation is available only when proposal status is DONE.
-- If recommendation-impacting proposal inputs change after DONE, the proposal should visually return to WRITING until resubmitted.
+- Proposal status is WRITING, MATCHING, or COMPLETE.
+- Recommendation and applicant comparison are available when proposal status is MATCHING.
 - Proposal has total project budget.
 - Proposal position has per-person unit budget and headcount.
-- There is no separate project entity in MVP. Matching records manage post-match participation history.
-- Participation states are DISCUSSING, ACTIVE, COMPLETED.
+- Proposal position status is OPEN, FULL, or CLOSED.
+- Matching uses a single status flow rather than a separate participation_status field.
 
 Visual and UX constraints:
 - Desktop-first web application.
@@ -71,24 +70,20 @@ Create these 6 screens as separate frames in one file:
 - Top bar with page title, search, user menu.
 - KPI cards: 작성 중 제안서, 제출 완료 제안서, 진행 중 매칭, 종료된 참여.
 - Primary CTA: "새 프로젝트 만들기".
-- Proposal list with title, WRITING/DONE status, number of positions, total budget, last modified date, recommendation readiness, actions.
+- Proposal list with title, WRITING/MATCHING/COMPLETE status, number of positions, total budget, last modified date, recommendation readiness, actions.
 - Clear first-time empty state.
 
 3. AI brief editor / proposal editing
 - Two-column layout.
 - Left: large free-text input, helper text, AI 브리프 생성 button, save state, last saved time, proposal status.
-- Right: structured proposal form with title, overview, total budget, repeatable proposal positions.
+- Right: structured proposal form with title, description, total budget, project work type, work place, expected period, and repeatable proposal positions.
 - Each proposal position block should include:
   - 직무 선택
-  - 모집 단위 제목
-  - 요구사항 요약
   - 모집 인원
   - 1인 기준 예산 범위
-  - 근무 형태
-  - 경력 범위
-  - 요구 스킬 chips with importance
-- Bottom actions: 임시 저장, 제출, 추천 보기.
-- Show inline notice that recommendation is disabled while WRITING.
+  - 모집 상태
+- Bottom actions: 임시 저장, 매칭 시작, 추천 보기.
+- Show inline notice that recommendation is disabled while WRITING and becomes available in MATCHING.
 - Show fallback hint for AI generation failure.
 
 4. Recommendation results / candidate comparison
@@ -116,12 +111,12 @@ Create these 6 screens as separate frames in one file:
 - Public visibility toggle and AI recommendation inclusion toggle must be clearly separated.
 - Include helper text stating that AI recommendation inclusion only affects AI recommendation, not direct applications.
 
-6. Matching detail / participation management
-- Header with proposal title, proposal position title, freelancer nickname, matching status badge, participation status badge.
-- Left column: matching lifecycle stepper (요청 전송, 수락, 확정, 거절), participation status card (논의중, 시작, 종료), state transition controls.
+6. Matching detail / matching management
+- Header with proposal title, proposal position title, freelancer nickname, matching status badge.
+- Left column: matching lifecycle stepper (요청 전송, 수락, 진행중, 완료, 거절/취소), current state card, state transition controls.
 - Right column: summary cards for contact visibility, budget info, work type, required skills, and an activity log / memo area.
 - Make it explicit that contact information is hidden before acceptance and visible after matching acceptance.
-- Make it explicit that this screen manages participation history through matching because MVP has no separate project entity.
+- Make it explicit that this screen manages the whole matching lifecycle because MVP has no separate project entity.
 
 Output expectations:
 - Create all 6 frames in one coherent system.
@@ -135,18 +130,18 @@ Output expectations:
 ```text
 Create low-fidelity product wireframes for an AI-based freelancer matching platform named IT-da.
 
-The product connects IT project clients and IT freelancers. A client writes a project with a single free-text input, AI structures it into a proposal, the system recommends top freelancer candidates, and the client compares candidates and sends a matching request. A freelancer can register a resume/profile, opt into AI recommendation exposure, apply directly to projects, and accept or reject matching requests. After matching is accepted, the relationship is managed through participation states: DISCUSSING, ACTIVE, COMPLETED.
+The product connects IT project clients and IT freelancers. A client writes a project with a single free-text input, AI structures it into a proposal, the system recommends top freelancer candidates, and the client compares candidates and sends a matching request. A freelancer can register a resume/profile, opt into AI recommendation exposure, apply directly to projects, and accept or reject matching requests. There is no separate project runtime entity in MVP, so the matching record handles proposal, acceptance, progress, and completion lifecycle states directly.
 
 Important domain constraints:
 - Any active member can act as a client.
 - A member with a resume can also act as a freelancer.
 - Resume.publiclyVisible controls search/list visibility.
 - Resume.aiMatchingEnabled controls inclusion in AI recommendation only, not direct application.
-- There is no separate project runtime entity in MVP. Matching records handle post-match participation history.
-- Proposal status is WRITING or DONE.
-- If recommendation-impacting inputs change after DONE, treat the proposal as WRITING again until resubmitted.
+- There is no separate project runtime entity in MVP. Matching records handle lifecycle history directly.
+- Proposal status is WRITING, MATCHING, or COMPLETE.
 - Proposal has total project budget.
 - Proposal position has per-person unit budget and headcount.
+- Proposal position status is OPEN, FULL, or CLOSED.
 
 Design requirements:
 - Desktop-first web application wireframes.
@@ -168,7 +163,7 @@ MVP 기준 추천 화면은 아래 6개다.
 3. AI 브리프 작성 / 제안서 편집
 4. 추천 결과 / 후보 비교
 5. 프리랜서 프로필 / 이력서 관리
-6. 매칭 상세 / 참여 상태 관리
+6. 매칭 상세 / 매칭 상태 관리
 
 ## 5. 화면별 프롬프트
 
@@ -226,22 +221,22 @@ Required layout:
 - Main dashboard content with:
   - KPI summary cards:
     - 작성 중 제안서
-    - 제출 완료 제안서
+    - 매칭 중 제안서
     - 진행 중 매칭
-    - 종료된 참여
+    - 완료된 제안서
   - "새 프로젝트 만들기" primary button
   - Proposal list table or card list
 
 Each proposal item should show:
 - 제목
-- 상태 badge: WRITING or DONE
+- 상태 badge: WRITING or MATCHING or COMPLETE
 - 포지션 수
 - 전체 예산 범위
 - 마지막 수정일
 - 추천 상태 summary such as:
-  - 추천 전
-  - 추천 가능
-  - 수정 필요
+  - 작성 중
+  - 매칭 진행 중
+  - 완료
 - actions:
   - 편집
   - 추천 보기
@@ -275,33 +270,32 @@ Required layout:
   - save status area showing:
     - 로컬 자동 저장
     - 마지막 저장 시각
-    - 제안서 상태 badge: WRITING or DONE
+    - 제안서 상태 badge: WRITING or MATCHING or COMPLETE
 - Right column:
   - structured form generated by AI
   - fields for:
     - 프로젝트 제목
-    - 개요
+    - 프로젝트 설명
     - 전체 예산 범위
+    - 전체 근무 형태
+    - 근무 장소
+    - 예상 기간
     - 포지션 섹션 repeatable list
 
 Each proposal position block should include:
 - 직무 선택
-- 모집 단위 제목
-- 요구사항 요약
 - 모집 인원
 - 1인 기준 예산 범위
-- 근무 형태
-- 경력 범위
-- 요구 스킬 chips with importance
+- 모집 상태
 
 Bottom actions:
 - 임시 저장
-- 제출
+- 매칭 시작
 - 추천 보기
 
 Important state hints:
-- Show that recommendation is enabled only when status is DONE.
-- If key fields are modified after DONE, display an inline notice that the proposal returns to WRITING until resubmitted.
+- Show that recommendation is enabled only when status is MATCHING.
+- Add helper text that current ERD does not store raw input text separately after structured save.
 - Include a small fallback area for "AI 생성 실패 시 수동 입력 가능".
 
 Wireframe rules:
@@ -418,14 +412,14 @@ Wireframe rules:
 - Keep the distinction between visibility and AI recommendation eligibility explicit.
 ```
 
-### 4.6 매칭 상세 / 참여 상태 관리
+### 4.6 매칭 상세 / 매칭 상태 관리
 
 ```text
 Create a low-fidelity desktop wireframe for the IT-da matching detail screen.
 
 Purpose:
 - Manage the relationship after a matching request is sent or accepted.
-- Show the difference between matching request state and post-match participation state.
+- Show the full lifecycle with one matching status field.
 
 Required layout:
 - Page header with:
@@ -433,24 +427,24 @@ Required layout:
   - proposal position title
   - freelancer nickname
   - matching status badge
-  - participation status badge
 - Main 2-column layout.
 
 Left column:
 - Timeline or stepper for matching lifecycle:
   - 요청 전송
   - 수락
-  - 확정
-  - 거절
-- Participation state card:
-  - 논의중
-  - 시작
-  - 종료
+  - 진행중
+  - 완료
+  - 거절 / 취소
+- Current state card:
+  - 현재 매칭 상태
+  - contract_date
+  - complete_date
 - State transition controls:
   - 요청 취소
   - 수락 대기
-  - 시작 요청
-  - 종료 요청
+  - 진행 시작
+  - 완료 처리
 
 Right column:
 - Summary cards for:
@@ -464,8 +458,7 @@ Right column:
 
 Important state rules to reflect:
 - Contact information is hidden before acceptance and visible only after matching is accepted.
-- There is no separate project entity in MVP; this screen manages participation history through matching.
-- Participation states are DISCUSSING, ACTIVE, COMPLETED.
+- There is no separate project entity in MVP; this screen manages matching lifecycle through one status field.
 
 Wireframe rules:
 - Make state history and current next action obvious.
