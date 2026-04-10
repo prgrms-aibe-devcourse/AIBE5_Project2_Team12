@@ -54,6 +54,8 @@
 - `Resume.aiMatchingEnabled`는 AI 추천 후보군 포함 여부만 의미하고, 직접 지원 허용 여부와는 분리한다.
 - 매칭 성립 이후의 이력은 `matching.participation_status`로 관리한다.
 - `matching`의 요청/수락 상태와 참여 이력 상태는 분리한다.
+- 클라이언트의 매칭 요청은 참여 시작 승인으로 간주하지 않는다.
+- 참여 시작은 매칭 성립 이후 클라이언트와 프리랜서의 별도 승인 2건이 모두 있어야 한다.
 
 ## 4. 권장 집합 경계
 
@@ -281,7 +283,11 @@ ERD 초안의 `position_skill`은 유지할 수 있지만 역할을 제한해야
 | `requested_at` | timestamp | Y | 요청 시각 |
 | `responded_at` | timestamp | N | 수락/거절 시각 |
 | `accepted_at` | timestamp | N | 수락 시각 |
+| `client_started_approved_at` | timestamp | N | 클라이언트의 시작 승인 시각 |
+| `freelancer_started_approved_at` | timestamp | N | 프리랜서의 시작 승인 시각 |
 | `started_at` | timestamp | N | 시작 시각 |
+| `client_completed_approved_at` | timestamp | N | 클라이언트의 종료 승인 시각 |
+| `freelancer_completed_approved_at` | timestamp | N | 프리랜서의 종료 승인 시각 |
 | `completed_at` | timestamp | N | 종료 시각 |
 | `canceled_at` | timestamp | N | 취소 시각 |
 | `created_at` | timestamp | Y | 생성 시각 |
@@ -294,7 +300,9 @@ ERD 초안의 `position_skill`은 유지할 수 있지만 역할을 제한해야
 - 한 `proposal_position`과 한 `resume` 조합에는 동시에 하나의 활성 매칭만 허용한다.
 - `status = REQUESTED`일 때만 응답 가능하다.
 - `status = ACCEPTED`일 때만 `participation_status`를 가질 수 있다.
-- `participation_status = DISCUSSING`에서 `ACTIVE`, `COMPLETED`로 가는 전이는 양측 동의가 필요하다.
+- 클라이언트의 매칭 요청 또는 프리랜서의 지원은 `ACTIVE` 전이를 위한 승인으로 간주하지 않는다.
+- `participation_status = DISCUSSING`에서 `ACTIVE`로 가려면 매칭 성립 이후 클라이언트와 프리랜서의 시작 승인 시각이 모두 존재해야 한다.
+- `participation_status = ACTIVE`에서 `COMPLETED`로 가려면 클라이언트와 프리랜서의 종료 승인 시각이 모두 존재해야 한다.
 - 연락처 공개 시점은 `status = ACCEPTED` 이후다.
 - `accepted`된 매칭 수가 `headcount`에 도달하면 해당 `proposal_position`은 신규 매칭을 막아야 한다.
 
@@ -379,6 +387,15 @@ DISCUSSING -> ACTIVE -> COMPLETED
 
 이 전이는 `status = ACCEPTED`인 매칭에만 적용된다.
 
+세부 규칙은 아래와 같다.
+
+- `REQUESTED -> ACCEPTED`는 "함께 논의를 시작할 의사"를 의미한다.
+- `ACCEPTED` 직후의 기본 참여 상태는 `DISCUSSING`이다.
+- 클라이언트의 매칭 요청은 `ACTIVE` 승인이 아니다.
+- `DISCUSSING -> ACTIVE`는 매칭 성립 이후 양측이 별도로 시작 승인을 남겨야 한다.
+- `ACTIVE -> COMPLETED`도 양측이 별도로 종료 승인을 남겨야 한다.
+- 한쪽만 승인한 상태에서는 각각 `DISCUSSING`, `ACTIVE`를 유지한다.
+
 ## 7. 핵심 도메인 규칙
 
 이번 도메인에서 반드시 지켜야 하는 규칙은 아래와 같다.
@@ -393,6 +410,7 @@ DISCUSSING -> ACTIVE -> COMPLETED
 8. `proposal`의 상태와 `matching`의 상태를 섞지 않는다.
 9. MVP에서는 프로젝트 전체 상태를 저장하지 않고 매칭별 참여 이력만 관리한다.
 10. 서비스 역할은 별도 필드가 아니라 `Resume` 존재 여부와 공개 플래그로 파생한다.
+11. 매칭 요청과 참여 시작 승인은 서로 다른 이벤트로 분리한다.
 
 ## 8. 추천 엔진 입력 기준
 
@@ -491,6 +509,7 @@ MVP에서는 채택하지 않는다.
 - `proposal_position_skill`, `resume_skill`은 추천 성능과 정확도에 직결되므로 초기에 정규화해야 한다.
 - `Resume` 없는 회원은 프리랜서 전용 기능에 진입하지 못하게 화면과 서비스 계층에서 함께 막아야 한다.
 - 제안서 첨부파일과 이력서 첨부파일은 기존 `StoredFile` 패턴을 재사용하면 된다.
+- 시작/종료 승인 이벤트는 요청/수락과 별도로 감사 로그를 남겨야 나중에 상태 분쟁을 줄일 수 있다.
 
 ## 11. 명세 기준 우선순위
 

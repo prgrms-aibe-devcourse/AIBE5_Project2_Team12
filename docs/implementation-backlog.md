@@ -24,6 +24,7 @@
 - `proposal_position.unit_budget_*`는 1인 기준 예산이다.
 - `DONE` 제안서의 material edit는 다시 `WRITING`으로 되돌리고, non-material edit는 `DONE`을 유지한다.
 - MVP에서는 별도 `project` 테이블 없이 `matching`이 참여 이력을 관리한다.
+- 클라이언트의 매칭 요청은 시작 승인으로 간주하지 않고, `ACTIVE` 전이는 양측의 별도 시작 승인 이후에만 허용한다.
 
 ## 3. 단계별 계획
 
@@ -102,6 +103,7 @@
 
 - `Matching` 엔티티, 리포지토리, 테스트 추가
 - `initiator_type`, `status`, `participation_status` 구현
+- 시작 승인/종료 승인 필드 및 상태 전이 구현
 - 클라이언트 요청 플로우 구현
 - 프리랜서 직접 지원 플로우 구현
 - 수락/거절/취소 처리 구현
@@ -113,6 +115,7 @@
 - 후보 요청 생성
 - 프리랜서 지원 생성
 - 요청 수락/거절
+- 시작 승인 / 종료 승인
 - 참여 상태 전환
 - 매칭 목록 조회
 
@@ -121,7 +124,9 @@
 - 동일 `proposal_position + resume` 활성 매칭 중복 방지 테스트
 - 수락 시 정원 재검증 테스트
 - 수락 전 연락처 비노출 테스트
+- 클라이언트 매칭 요청만으로 `ACTIVE` 전환 불가 테스트
 - 양측 동의 전 `ACTIVE` 전환 불가 테스트
+- 한쪽만 종료 승인한 상태에서 `COMPLETED` 전환 불가 테스트
 
 ## Phase 5. AI 브리프 MVP
 
