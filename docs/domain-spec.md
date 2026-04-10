@@ -110,8 +110,9 @@
 
 - 제안서 초안과 모집 진행 상태를 관리하는 집합 루트
 - 클라이언트가 소유
-- AI 브리프 결과를 저장할 수는 있지만, 현재 ERD는 `raw_input_text`나 `overview` 같은 별도 원문/요약 필드를 두지 않는다.
 - 현재 저장 모델에서 제안서 본문은 `description` 하나로 표현한다.
+- MVP에서는 별도 `overview` 필드를 두지 않고, 목록이나 카드 미리보기는 `description` 발췌로 처리한다.
+- AI 브리프 원문 보존이 필요하면 `raw_input_text`만 별도 저장 후보로 본다.
 
 ### 4.4 ProposalPosition
 
@@ -322,6 +323,7 @@
 | `id`               | bigint                                  | Y  | PK                       |
 | `member_id`        | bigint                                  | Y  | 제안서 작성 클라이언트             |
 | `title`            | varchar(200)                            | Y  | 프로젝트 제목                  |
+| `raw_input_text`   | text                                    | Y  | 사용자 입력 원문                |
 | `description`      | text                                    | N  | 프로젝트 설명                  |
 | `total_budget_min` | bigint                                  | N  | 전체 프로젝트 최소 예산            |
 | `total_budget_max` | bigint                                  | N  | 전체 프로젝트 최대 예산            |
@@ -341,7 +343,6 @@
 - 둘 다 존재하면 `total_budget_min <= total_budget_max`여야 한다.
 - 현재 ERD 기준으로 추천과 모집 시작 상태는 `MATCHING`이다.
 - `COMPLETE`는 제안서 단위의 종료 상태다.
-- 현재 ERD에는 AI 브리프 원문 저장 필드가 없으므로, 자유 입력 원문을 영구 보관하려면 별도 스키마 추가가 필요하다.
 
 ### 5.10 proposal_positions
 
@@ -552,12 +553,12 @@ PROPOSED -> CANCELED
 아래 항목은 이전 대화에서 한 번 논의됐지만, 현재 ERD 초안에는 아직 반영되지 않았다.
 현재 문서에서는 "미래 확장 후보"로만 유지한다.
 
-### 10.1 제안서 원문과 요약 필드 분리
+### 10.1 제안서 원문 필드 추가
 
 - `proposal.raw_input_text`
-- `proposal.overview`
 
-AI 브리프 원문 보존과 사용자가 정리한 요약을 분리하려면 스키마 확장이 필요하다.
+MVP에서는 `overview`를 두지 않고 `description`을 정본으로 사용한다.
+AI 브리프 입력 원문까지 추적해야 하면 `raw_input_text`만 별도 필드로 추가한다.
 
 ### 10.2 proposal_position 상세 필드 확장
 

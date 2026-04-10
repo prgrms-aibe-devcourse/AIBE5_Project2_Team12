@@ -20,6 +20,13 @@
 - `position`은 공용 직무 마스터다.
 - `position_skill`은 현재 ERD 기준의 직무-스킬 템플릿이다.
 
+### AI 브리프 저장 모델
+
+- `proposal.description`은 사용자가 검토하고 수정하는 최종 제안서 본문이다.
+- MVP에서는 `proposal.overview`를 두지 않는다.
+- AI 브리프 원문 보존이 필요하면 `proposal.raw_input_text`만 저장 대상으로 본다.
+- 리스트와 카드의 미리보기 텍스트는 별도 `overview`가 아니라 `description` 발췌본으로 처리한다.
+
 ### 예산
 
 - `proposal.total_budget_*`는 전체 프로젝트 예산이다.
@@ -40,7 +47,7 @@
 
 ## 2. 현재 보류 결정
 
-- `proposal.raw_input_text`, `proposal.overview` 도입 여부
+- `proposal.raw_input_text` ERD 반영 방식
 - `proposal_position` 상세 필드 확장 여부
 - `proposal_position_skill` 도입 여부
 - `proposal_attachments` 도입 여부
