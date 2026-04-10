@@ -8,6 +8,25 @@
 - 유저 플로우(FigJam): https://www.figma.com/board/cWaXvSsJ430Zc04jn94YyM/IT-da-%EC%9C%A0%EC%A0%80-%ED%94%8C%EB%A1%9C%EC%9A%B0?node-id=0-1&t=HFlWFnYZp19BCIS1-1
 - 디자인 문서(Figma): https://www.figma.com/design/zpmqsi84xBvHAmdLABBwfZ/IT-da-%EB%94%94%EC%9E%90%EC%9D%B8?node-id=0-1&t=xHEfASK7hbFbtYnZ-1
 
+## 문서 읽는 순서
+
+구현 직전 기준으로는 아래 순서로 읽는 편이 가장 빠르다.
+
+1. 이 문서에서 서비스 목적과 전체 흐름을 파악한다.
+2. [decision-log.md](./decision-log.md)에서 현재 확정/보류 결정을 확인한다.
+3. [domain-spec.md](./domain-spec.md)에서 필드와 상태 모델을 확인한다.
+4. [implementation-backlog.md](./implementation-backlog.md)에서 실제 구현 순서를 확인한다.
+
+## 이번 주 확정 결정 요약
+
+- 서비스 역할은 별도 컬럼으로 저장하지 않는다.
+- `Resume`가 있으면 프리랜서 기능을 사용할 수 있다.
+- `Resume.aiMatchingEnabled`는 AI 추천 후보군 포함 여부만 의미한다.
+- `proposal`은 프로젝트 전체 문서이고 `proposal_position`은 실제 모집 단위다.
+- `proposal.total_budget_*`와 `proposal_position.unit_budget_*`는 의미가 다르므로 둘 다 유지한다.
+- MVP에서는 별도 `project` 테이블 없이 `matching.status` 단일 모델로 진행 흐름을 관리한다.
+- 양측 시작/종료 승인, `proposal_position_skill`, `proposal_attachments`는 현재 보류다.
+
 ## 1. 프로젝트 개요
 
 - 프로젝트명: `IT-da`
@@ -204,7 +223,18 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 
 `contract_date`는 수락 또는 계약 성립 시점, `complete_date`는 완료 시점으로 해석한다.
 
-## 8. 핵심 운영 규칙
+## 8. 구현 직전 체크포인트
+
+개발 시작 전에 팀이 마지막으로 확인해야 할 항목은 아래와 같다.
+
+- `proposal.status = MATCHING`에 진입하기 위한 최소 입력 조건
+- `proposal_position.status = FULL`을 서비스에서 언제 갱신할지
+- `matching.status`의 정확한 enum literal
+- `Resume.status`, `Resume.writing_status`를 추천 필터에 어떻게 반영할지
+- `position_skill`만으로 추천을 시작해도 MVP 범위에 충분한지
+- `MATCHING` 상태 제안서의 수정 UX를 어디까지 허용할지
+
+## 9. 핵심 운영 규칙
 
 - 연락처는 매칭 이전에 공개하지 않는다.
 - `ACCEPTED` 이후에만 상호 연락처를 확인할 수 있다.
@@ -217,7 +247,7 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 - 현재 ERD에는 `proposal_attachments`가 없으므로 제안서 첨부파일은 아직 정식 스키마에 포함되지 않는다.
 - 현재 ERD에는 시작/종료 양측 승인 모델이 없으므로, 진행과 완료는 `matching.status` 단일 상태로 관리한다.
 
-## 9. MVP 범위
+## 10. MVP 범위
 
 ### MVP 필수
 
@@ -245,7 +275,7 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 - `proposal_attachments`
 - 양측 시작 승인 / 종료 승인 모델
 
-## 10. 기술 방향
+## 11. 기술 방향
 
 기획 기준 기술 스택 방향은 아래와 같다.
 
@@ -259,7 +289,7 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 
 아키텍처는 일정상 모놀리식 애플리케이션을 기본으로 하고, 추후 확장 시 AI 추천 영역의 분리를 검토한다.
 
-## 11. 현재 구현 상태
+## 12. 현재 구현 상태
 
 현재 리포지토리 기준으로 이미 구현된 항목은 제한적이며, 아래 범위가 확인된다.
 

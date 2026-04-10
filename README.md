@@ -9,4 +9,5 @@ IT-da는 IT 업종 한정 프로젝트 의뢰인과 IT 프리랜서를 연결하
 - 디자인 문서(Figma): https://www.figma.com/design/zpmqsi84xBvHAmdLABBwfZ/IT-da-%EB%94%94%EC%9E%90%EC%9D%B8?node-id=0-1&t=xHEfASK7hbFbtYnZ-1
 
 프로젝트 개요와 현재 구현 상태는 [docs/project-overview.md](/Users/ilhyeon/Documents/study/devcourse/backend/projects/IT-da/docs/project-overview.md)에서 확인할 수 있다.
+현재 합의된 도메인 결정은 [docs/decision-log.md](/Users/ilhyeon/Documents/study/devcourse/backend/projects/IT-da/docs/decision-log.md)에서 빠르게 확인할 수 있다.
 Figma Make용 와이어프레임 프롬프트는 [docs/figma-make-wireframes.md](/Users/ilhyeon/Documents/study/devcourse/backend/projects/IT-da/docs/figma-make-wireframes.md)에서 확인할 수 있다.
