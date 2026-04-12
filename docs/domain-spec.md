@@ -72,13 +72,14 @@
 - `matching`은 `proposal_position`과 `resume`의 조합을 표현한다.
 - `matching`은 `status` 단일 필드와 `contract_date`, `complete_date`만으로 흐름을 관리한다.
 - 현재 ERD에는 `initiator_type`, `participation_status`, 시작/종료 승인 시각이 없다.
+- 매칭 단위 계약서/완료 증빙은 `matching_attachments`, 상호 리뷰는 `matching_reviews`로 관리한다.
 - 현재 ERD에는 `proposal_attachments`가 없다.
 - MVP에서는 별도 `project` 테이블을 두지 않는다.
 - 서비스 역할은 별도 컬럼으로 저장하지 않는다.
 - 모든 활성 회원은 기본적으로 클라이언트 기능을 사용할 수 있다.
-- `Resume`가 존재하면 프리랜서 기능을 사용할 수 있다.
-- `Resume.publiclyVisible`은 발견 가능 영역 노출 여부를 제어한다.
-- `Resume.aiMatchingEnabled`는 AI 추천 후보군 포함 여부만 제어한다.
+- `Resume`가 존재하고 `resume.status = ACTIVE`이면 프리랜서로서 직접 지원과 매칭 흐름에 참여할 수 있다.
+- `Resume.writing_status = DONE`이고 `Resume.publiclyVisible = true`여야 검색/목록 노출 대상이 된다.
+- `Resume.aiMatchingEnabled`는 그 전제 조건을 만족한 이력서 중 AI 추천 후보군 포함 여부만 추가로 제어한다.
 
 ## 4. 권장 집합 경계
 
@@ -129,6 +130,7 @@
 - 클라이언트 요청과 프리랜서 지원을 하나의 흐름으로 표현하는 집합 루트
 - 대상은 항상 `proposal_position`과 `resume`의 조합이다.
 - 현재 ERD는 요청 처리와 진행 이력을 `matching.status` 하나로 관리한다.
+- 계약서/완료 증빙은 `MatchingAttachment`, 상호 리뷰는 `MatchingReview`를 종속 집합으로 둔다.
 
 ### 4.6 Project
 
@@ -148,6 +150,8 @@
 - `Proposal`: 클라이언트가 작성하는 프로젝트 문서
 - `ProposalPosition`: 실제 모집 단위
 - `Matching`: 요청, 수락, 진행, 완료 흐름 기록
+- `MatchingAttachment`: 매칭 단위 계약서/완료 증빙 연결
+- `MatchingReview`: 매칭 단위 상호 리뷰
 
 ## 5. 엔티티 명세
 
@@ -426,8 +430,8 @@
 | `proposal_position_id` | bigint                                                                           | Y  | 대상 모집 단위                 |
 | `resume_id`            | bigint                                                                           | Y  | 대상 이력서                   |
 | `status`               | enum(`PROPOSED`, `ACCEPTED`, `REJECTED`, `IN_PROGRESS`, `COMPLETED`, `CANCELED`) | Y  | 단일 매칭 상태, 기본값 `PROPOSED` |
-| `contract_date`        | timestamp                                                                        | N  | 수락 또는 계약 성립 시각           |
-| `complete_date`        | timestamp                                                                        | N  | 완료 시각                    |
+| `contract_date`        | timestamp                                                                        | N  | 양측 계약 체결 시각               |
+| `complete_date`        | timestamp                                                                        | N  | 완료 요건 충족 시각               |
 | `created_at`           | timestamp                                                                        | Y  | 생성 시각                    |
 | `modified_at`          | timestamp                                                                        | Y  | 수정 시각                    |
 
@@ -439,11 +443,74 @@
 - 현재 ERD는 `initiator_type`을 저장하지 않으므로, 클라이언트 요청인지 프리랜서 지원인지는 API나 감사 로그에서 구분해야 한다.
 - 현재 ERD는 `participation_status`를 별도로 두지 않으므로 요청 처리와 진행 상태를 하나의 `status`가 모두 담당한다.
 - 연락처 공개 시점은 `ACCEPTED` 이후로 해석하는 것이 자연스럽다.
-- `contract_date`는 `ACCEPTED` 전이 시점 기록으로 사용한다.
-- `complete_date`는 `COMPLETED` 전이 시점 기록으로 사용한다.
+- `ACCEPTED`는 상호 수락 완료 상태지만 아직 계약 체결 완료 상태는 아니다.
+- `ACCEPTED -> IN_PROGRESS` 전이는 양측이 각각 계약서를 업로드했을 때만 허용한다.
+- `contract_date`는 양측 계약서가 모두 올라와 계약이 체결된 시각으로 사용한다.
+- `IN_PROGRESS -> COMPLETED` 전이는 양측이 각각 완료 증빙 서류를 업로드하고 상대방 리뷰를 작성했을 때만 허용한다.
+- `complete_date`는 완료 증빙과 리뷰 조건이 모두 충족되어 완료 처리된 시각으로 사용한다.
+- 계약서/완료 증빙은 `matching_attachments`, 리뷰는 `matching_reviews`로 저장한다.
 - 활성 매칭 중복 방지는 partial unique index 또는 동일 트랜잭션 내 재검증으로 강제한다.
 
-### 5.13 상태별 허용 액션 매트릭스
+### 5.13 matching_attachments
+
+매칭 단위 계약서/완료 증빙 첨부 집합이다.
+
+| 필드                | 타입                                             | 필수 | 설명               |
+|-------------------|------------------------------------------------|----|------------------|
+| `id`              | bigint                                         | Y  | PK               |
+| `matching_id`     | bigint                                         | Y  | 대상 매칭            |
+| `member_id`       | bigint                                         | Y  | 첨부 파일 당사자 회원     |
+| `file_id`         | bigint                                         | Y  | 파일 메타데이터         |
+| `attachment_type` | enum(`CONTRACT`, `COMPLETION_EVIDENCE`)        | Y  | 첨부 타입            |
+| `created_at`      | timestamp                                      | Y  | 생성 시각            |
+| `modified_at`     | timestamp                                      | Y  | 수정 시각            |
+
+규칙은 아래와 같다.
+
+- 계약서와 완료 증빙은 별도 테이블로 분리하지 않고 `matching_attachments` 공통 집합으로 관리한다.
+- `member_id`는 단순 업로더가 아니라 해당 계약서/증빙의 당사자 회원을 뜻한다.
+- `member_id`는 해당 `matching`의 클라이언트 회원 또는 프리랜서 회원 중 하나여야 한다.
+- 파일 FK 컬럼명은 다른 자산 테이블과 맞춰 `file_id`를 사용한다.
+- `attachment_type`은 `CONTRACT`, `COMPLETION_EVIDENCE`만 허용한다.
+- `UNIQUE (matching_id, member_id, attachment_type)`를 강제한다.
+- MVP에서는 회원당 타입별 첨부 파일을 1개만 허용한다.
+- `attachment_type = CONTRACT`인 첨부가 양측 모두 존재해야 `ACCEPTED -> IN_PROGRESS` 전이를 허용한다.
+- `attachment_type = COMPLETION_EVIDENCE`인 첨부가 양측 모두 존재하고 상호 리뷰까지 완료돼야 `IN_PROGRESS -> COMPLETED` 전이를 허용한다.
+- 추후 참여자별 완료 증빙 다중 파일이 필요해지면 제출 묶음 엔티티를 추가로 검토한다.
+
+### 5.14 matching_reviews
+
+매칭 단위 상호 리뷰 집합이다.
+
+| 필드                   | 타입                                                                | 필수 | 설명                    |
+|----------------------|-------------------------------------------------------------------|----|-----------------------|
+| `id`                 | bigint                                                            | Y  | PK                    |
+| `matching_id`        | bigint                                                            | Y  | 대상 매칭                 |
+| `reviewer_member_id` | bigint                                                            | Y  | 리뷰 작성자 회원             |
+| `reviewee_member_id` | bigint                                                            | Y  | 리뷰 대상자 회원             |
+| `direction`          | enum(`CLIENT_TO_FREELANCER`, `FREELANCER_TO_CLIENT`)              | Y  | 리뷰 방향                 |
+| `rating`             | numeric                                                           | Y  | 평점                    |
+| `comment`            | text                                                              | Y  | 리뷰 코멘트                |
+| `created_at`         | timestamp                                                         | Y  | 생성 시각, 제출 시각으로 함께 사용   |
+| `modified_at`        | timestamp                                                         | Y  | 수정 시각                 |
+
+규칙은 아래와 같다.
+
+- 리뷰는 독립 집합이 아니라 `matching` 종속 집합으로 둔다.
+- 리뷰의 기준 FK는 `matching_id`다. `proposal_id + resume_id` 조합으로 식별하지 않는다.
+- `reviewer_member_id`와 `reviewee_member_id`는 모두 유지한다.
+- 역할은 `reviewer_role`, `reviewee_role` 2개로 중복 저장하지 않고 `direction` 하나로 표현한다.
+- `UNIQUE (matching_id, direction)`를 강제한다.
+- `UNIQUE (matching_id, reviewer_member_id)`를 강제한다.
+- `reviewer_member_id <> reviewee_member_id`를 강제한다.
+- 리뷰 생성 시 작성자, 대상자, 방향은 `matching + 로그인 회원` 기준으로 서버가 계산한다.
+- 리뷰 작성 화면 접근 시에도 `matching + 로그인 회원` 기준으로 작성 가능 여부, 이미 작성했는지 여부, 상대방 정보를 계산한다.
+- 클라이언트가 hidden field로 작성자/대상자 값을 보내더라도 저장 시 신뢰하지 않는다.
+- 리뷰 수정은 로그인 회원과 `reviewer_member_id`가 같은 경우에만 허용한다.
+- 리뷰 작성은 `matching.status = IN_PROGRESS`일 때만 시작할 수 있다.
+- 별도 초안 상태가 없다면 `created_at`을 제출 시각으로 해석하고 `submitted_at`은 두지 않는다.
+
+### 5.15 상태별 허용 액션 매트릭스
 
 현재 ERD 기준으로 구현할 때 해석하기 쉬운 최소 액션 매트릭스는 아래와 같다.
 
@@ -456,9 +523,9 @@
 | `proposal_position` | `FULL`                 | 조회, 기존 매칭 관리            | 신규 요청/지원 차단   |
 | `proposal_position` | `CLOSED`               | 조회                      | 신규 요청/지원 차단   |
 | `matching`          | `PROPOSED`             | 수락, 거절, 취소              | 연락처 비공개       |
-| `matching`          | `ACCEPTED`             | 진행 시작                   | 연락처 공개 가능     |
-| `matching`          | `IN_PROGRESS`          | 완료 처리                   | 진행 중 상태       |
-| `matching`          | `COMPLETED`            | 조회                      | 완료 상태         |
+| `matching`          | `ACCEPTED`             | 계약서 업로드, 진행 시작 준비         | 연락처 공개 가능, 계약 미체결 가능 |
+| `matching`          | `IN_PROGRESS`          | 진행 관리, 완료 증빙 업로드, 리뷰 작성 | 계약 체결 후 진행 중 상태 |
+| `matching`          | `COMPLETED`            | 조회                      | 양측 증빙/리뷰 완료 상태 |
 | `matching`          | `REJECTED`, `CANCELED` | 조회                      | 종료 상태         |
 
 이 매트릭스는 현재 ERD에서 직접 드러나지 않는 운영 해석을 정리한 것이다.
@@ -511,7 +578,9 @@ PROPOSED -> CANCELED
 현재 문서의 핵심 포인트는 아래와 같다.
 
 - 요청/수락 상태와 참여 상태가 분리되어 있지 않다.
-- 별도 시작 승인, 종료 승인 개념은 현재 ERD에 없다.
+- 명시적 시작 승인, 종료 승인 버튼 개념은 현재 ERD에 없다.
+- 대신 운영 규칙상 `ACCEPTED -> IN_PROGRESS`는 양측 계약서 업로드 완료를, `IN_PROGRESS -> COMPLETED`는 양측 완료 증빙 업로드와 상호 리뷰 작성을 게이트로 둔다.
+- 구현 시에는 이를 `matching_attachments`, `matching_reviews` 확장으로 반영해야 한다.
 
 ## 7. 현재 ERD 기준 추천 엔진 입력
 
@@ -563,8 +632,18 @@ PROPOSED -> CANCELED
 8. 연락처는 `matching.status = ACCEPTED` 이전에는 공개하지 않는다.
 9. 전체 예산과 포지션 예산은 의미가 다르므로 별도로 유지한다.
 10. 현재 ERD에는 `proposal_attachments`가 없으므로, 제안서 파일은 저장 경로가 있더라도 아직 정식 도메인 연관 자산이 아니다.
-11. 현재 ERD에는 시작/종료 양측 승인 모델이 없으므로, 진행/완료는 `matching.status` 단일 상태로 처리한다.
-12. 한 `proposal_position + resume` 조합에는 동시에 하나의 활성 매칭만 존재해야 한다.
+11. 한 `proposal_position + resume` 조합에는 동시에 하나의 활성 매칭만 존재해야 한다.
+12. `matching.status = ACCEPTED`는 상호 수락 완료 상태지만 아직 계약 체결 완료 상태는 아니다.
+13. `ACCEPTED -> IN_PROGRESS` 전이는 양측 계약서 업로드가 모두 완료됐을 때만 허용한다.
+14. `contract_date`는 수락 시각이 아니라 양측 계약서가 모두 업로드되어 계약이 체결된 시각으로 기록한다.
+15. `IN_PROGRESS -> COMPLETED` 전이는 양측 완료 증빙 서류 업로드와 상호 리뷰 작성이 모두 끝났을 때만 허용한다.
+16. `complete_date`는 완료 승인 버튼 클릭 시각이 아니라 완료 증빙과 리뷰 조건이 모두 충족된 시각으로 기록한다.
+17. 리뷰는 `matching` 종속 집합으로 두고 FK는 `matching_id`를 사용한다.
+18. 리뷰 생성 시 작성자, 대상자, 방향은 `matching + 로그인 회원`으로 서버가 결정한다.
+19. 리뷰 수정은 로그인 회원과 `reviewer_member_id`가 같은 경우에만 허용한다.
+20. `created_at`은 리뷰 제출 시각으로 함께 사용하고 별도 `submitted_at`은 두지 않는다.
+21. 매칭 단위 계약서/완료 증빙은 `matching_attachments(matching_id, member_id, file_id, attachment_type)`로 저장한다.
+22. `matching_attachments`는 `UNIQUE (matching_id, member_id, attachment_type)`를 강제한다.
 
 ## 9. 구현 전 확인 체크리스트
 
@@ -577,11 +656,15 @@ PROPOSED -> CANCELED
 5. `matching.status`의 정확한 enum literal이 ERDCloud 원본과 일치하는지
 6. 활성 매칭 중복 방지를 DB partial unique index로 강제할지 서비스 계층 락으로 강제할지
 7. `StoredFile.contentType`을 enum으로 바꿀지 문자열로 유지할지
+8. `matching_attachments`에서 완료 증빙을 참여자당 1개로 고정할지, 다중 파일 제출 묶음으로 확장할지
+9. 현재 인증 principal에 `memberId`를 직접 포함할지, `email` 기반 회원 재조회로 해결할지
+10. 리뷰 평점 스케일과 완료 이후 수정 허용 범위를 어디까지 둘지
+11. `contract_date`, `complete_date`를 각각 계약 체결/완료 조건 충족 시각으로 일관되게 사용할지
 
 ## 10. 추후 재논의 항목
 
-아래 항목은 이전 대화에서 한 번 논의됐지만, 현재 ERD 초안에는 아직 반영되지 않았다.
-현재 문서에서는 "미래 확장 후보"로만 유지한다.
+아래 항목은 이전 대화에서 한 번 논의됐고, 일부는 현재 문서에 방향만 반영돼 있다.
+현재 문서에서는 "미래 확장 후보" 또는 "추가 정교화 포인트"로 유지한다.
 
 ### 10.1 proposal_position 상세 필드 확장
 
@@ -616,12 +699,14 @@ PROPOSED -> CANCELED
 현재 ERD에는 없다.
 요청/수락 흐름과 실제 참여 이력을 분리하려면 추후 스키마 재설계가 필요하다.
 
-### 10.5 양측 시작 승인 / 종료 승인
+### 10.5 matching_attachments 확장 가능성
 
-이전 논의에서는 아래 규칙을 검토했다.
+현재는 아래 구조로 정리했다.
 
-- 클라이언트 요청은 시작 승인으로 보지 않음
-- 매칭 성립 후 양측이 별도로 시작 승인해야 진행 상태 진입
-- 진행 중 양측이 별도로 종료 승인해야 완료 상태 진입
+- `matching_attachments(matching_id, member_id, file_id, attachment_type)`를 사용한다.
+- `member_id`는 업로더가 아니라 해당 계약서/증빙의 당사자 회원으로 해석한다.
+- `attachment_type`은 `CONTRACT`, `COMPLETION_EVIDENCE`를 사용한다.
+- `UNIQUE (matching_id, member_id, attachment_type)`를 전제로 한다.
+- 리뷰는 `matching_reviews(matching_id, reviewer_member_id, reviewee_member_id, direction)`로 유지한다.
 
-현재 ERD에는 이 모델이 반영되어 있지 않으므로, 추후 재논의 대상이다.
+추후 참여자별 완료 증빙을 여러 파일로 관리해야 하면, `matching_attachments`의 유니크 제약을 깨는 대신 제출 묶음 엔티티를 추가하는 방향으로 재논의한다.

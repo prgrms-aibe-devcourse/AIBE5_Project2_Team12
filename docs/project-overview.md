@@ -20,13 +20,16 @@
 ## 이번 주 확정 결정 요약
 
 - 서비스 역할은 별도 컬럼으로 저장하지 않는다.
-- `Resume`가 있으면 프리랜서 기능을 사용할 수 있다.
-- `Resume.aiMatchingEnabled`는 AI 추천 후보군 포함 여부만 의미한다.
+- 직접 지원/매칭 참여, 검색 노출, AI 추천 노출은 `Resume` 상태 조합으로 분리해서 본다.
+- `Resume.aiMatchingEnabled`는 AI 추천 후보군 포함 여부만 추가로 의미한다.
 - `proposal`은 프로젝트 전체 문서이고 `proposal_position`은 실제 모집 단위다.
 - `proposal.raw_input_text`는 AI 브리프의 원본 자유 입력을 보존한다.
 - `proposal.total_budget_*`와 `proposal_position.unit_budget_*`는 의미가 다르므로 둘 다 유지한다.
 - MVP에서는 별도 `project` 테이블 없이 `matching.status` 단일 모델로 진행 흐름을 관리한다.
-- 양측 시작/종료 승인, `proposal_attachments`는 현재 보류다.
+- 계약서와 완료 증빙은 `matching_attachments(matching_id, member_id, file_id, attachment_type)`로 관리한다.
+- `ACCEPTED -> IN_PROGRESS`는 양측 계약서 업로드, `IN_PROGRESS -> COMPLETED`는 양측 완료 증빙과 상호 리뷰를 조건으로 둔다.
+- 리뷰는 `matching_reviews` 종속 집합으로 두고, 생성/수정 검증은 `matching + 로그인 회원`과 `reviewer_member_id` 기준으로 처리한다.
+- 명시적 시작/종료 승인 버튼과 `proposal_attachments`는 현재 보류다.
 
 ## 1. 프로젝트 개요
 
@@ -42,8 +45,8 @@
 - 운영자: 데이터 품질과 추천 품질을 관리하는 내부 사용자
 
 같은 회원이 클라이언트와 프리랜서 역할을 동시에 수행할 수 있다.
-기본적으로 모든 활성 회원은 클라이언트 기능을 사용할 수 있고, 이력서를 등록한 회원은 프리랜서 기능도 사용할 수 있다.
-프리랜서 추천 노출은 `Resume.publiclyVisible`, AI 추천 후보 포함은 `Resume.aiMatchingEnabled`로 별도 제어한다.
+기본적으로 모든 활성 회원은 클라이언트 기능을 사용할 수 있고, `resume.status = ACTIVE`인 회원만 프리랜서로서 직접 지원과 매칭 흐름에 참여할 수 있다.
+프리랜서 검색/목록 노출은 `Resume.writing_status = DONE`과 `Resume.publiclyVisible`, AI 추천 후보 포함은 여기에 `Resume.aiMatchingEnabled`를 추가로 본다.
 현재 ERD에는 이력서 작성 상태(`writing_status`), 이력서 상태(`status`), 포트폴리오 URL, 프로필 이미지, 이력서 첨부파일도 포함돼 있다.
 
 ## 2. 문제 정의
@@ -66,7 +69,9 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 6. 제안서가 `MATCHING` 상태가 되면 추천과 지원 흐름이 열린다.
 7. 클라이언트가 추천 후보와 지원자 리스트를 비교해 요청을 보낸다.
 8. 프리랜서가 수락하면 매칭이 성립하고 연락처가 공개된다.
-9. 이후 진행과 완료는 현재 ERD 기준으로 `matching.status` 단일 필드에서 관리한다.
+9. 양측이 각각 계약서를 업로드하면 계약이 체결되고 `IN_PROGRESS`로 전이한다.
+10. 진행 중에는 양측이 각각 완료 증빙을 업로드하고, 리뷰 작성 화면은 현재 로그인 회원 기준으로 상대방과 기존 작성 여부를 판정해 연다.
+11. 완료 조건이 모두 충족되면 `COMPLETED`로 전이한다.
 
 ## 4. 사용자별 플로우
 
@@ -82,7 +87,9 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 8. AI 추천 결과 확인
 9. 추천 후보와 지원자 비교
 10. 매칭 요청 전송
-11. 수락 후 진행 관리
+11. 수락 후 계약서 업로드
+12. 계약 체결 후 진행 관리
+13. 완료 증빙/리뷰 작성 후 종료
 
 핵심 포인트는 아래와 같다.
 
@@ -101,13 +108,15 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 6. 프로젝트 탐색 또는 추천 결과 확인
 7. 프로젝트 지원
 8. 매칭 요청 수락 또는 거절
-9. 수락 후 진행 상태 확인
+9. 수락 후 계약서 업로드
+10. 진행 중 완료 증빙 업로드 및 리뷰 작성
+11. 완료 상태 확인
 
 핵심 포인트는 아래와 같다.
 
 - 추천 노출은 프리랜서가 직접 켜고 끌 수 있어야 한다.
 - `aiMatchingEnabled`는 AI 추천 후보군 포함 여부만 제어하고, 직접 지원 자체를 막지는 않는다.
-- 프리랜서 기능은 별도 역할 컬럼이 아니라 이력서 등록 여부로 활성화한다.
+- 프리랜서 기능은 별도 역할 컬럼이 아니라 이력서 상태 조합으로 파생한다.
 - 다중 프로젝트 참여가 가능하다.
 
 ### 4.3 운영자 플로우
@@ -181,6 +190,7 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 - 직무 마스터: 재사용 가능한 공용 직무 기준값
 - 제안서 포지션 스킬: 실제 모집 단위에 연결된 요구 스킬
 - 매칭: 요청, 수락, 진행, 완료 흐름을 표현하는 관계
+- 매칭 리뷰: `matching`에 종속된 상호 리뷰
 - 파일: 프로필 이미지, 이력서 첨부 등 업로드 자산
 
 현재 논의 흐름상 개념 구분은 아래가 적절하다.
@@ -193,7 +203,7 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 - `resume_attachments`: 이력서 첨부파일 연결
 - `stored_file`: 업로드 자산 공통 메타데이터
 - MVP에서는 별도 `project` 테이블을 두지 않는다.
-- 서비스 역할은 별도 컬럼으로 저장하지 않고, `Resume` 존재 여부와 공개 설정으로 파생한다.
+- 서비스 역할은 별도 컬럼으로 저장하지 않고, `Resume` 상태와 공개 설정 조합으로 파생한다.
 - `proposal.total_budget_*`는 전체 프로젝트 예산이고, `proposal_position.unit_budget_*`는 1인 기준 예산이다.
 
 ## 7. 상태 모델
@@ -220,13 +230,13 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 현재 ERD는 `matching.status` 단일 필드로 흐름을 관리한다.
 
 - `PROPOSED`: 요청 또는 지원 생성
-- `ACCEPTED`: 상대방 수락
+- `ACCEPTED`: 상대방 수락, 아직 계약 미체결 가능
 - `REJECTED`: 거절
-- `IN_PROGRESS`: 진행 중
-- `COMPLETED`: 완료
+- `IN_PROGRESS`: 양측 계약서 업로드 후 진행 중
+- `COMPLETED`: 양측 완료 증빙 + 상호 리뷰 완료
 - `CANCELED`: 취소
 
-`contract_date`는 수락 또는 계약 성립 시점, `complete_date`는 완료 시점으로 해석한다.
+`contract_date`는 양측 계약서가 모두 제출되어 계약이 체결된 시점, `complete_date`는 양측 완료 증빙과 상호 리뷰가 모두 제출된 시점으로 해석한다.
 
 ## 8. 구현 직전 체크포인트
 
@@ -238,6 +248,7 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 - `Resume.status`, `Resume.writing_status`를 추천 필터에 어떻게 반영할지
 - `proposal_position_skill`의 최소 입력 기준을 어디까지 강제할지
 - `MATCHING` 상태 제안서의 수정 UX를 어디까지 허용할지
+- 완료 증빙을 참여자당 1개 파일로 유지할지, 다중 파일 제출 묶음으로 확장할지
 
 ## 9. 핵심 운영 규칙
 
@@ -250,7 +261,13 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 - `resume.status = INACTIVE`면 비활성 프로필로 본다.
 - `resume.writing_status = WRITING`인 이력서는 추천 노출 대상에서 제외하는 방향이 자연스럽다.
 - 현재 ERD에는 `proposal_attachments`가 없으므로 제안서 첨부파일은 아직 정식 스키마에 포함되지 않는다.
-- 현재 ERD에는 시작/종료 양측 승인 모델이 없으므로, 진행과 완료는 `matching.status` 단일 상태로 관리한다.
+- 매칭 단위 계약서와 완료 증빙은 `matching_attachments(matching_id, member_id, file_id, attachment_type)`로 저장한다.
+- `matching_attachments.member_id`는 업로더가 아니라 해당 계약서/증빙의 당사자 회원이다.
+- `UNIQUE (matching_id, member_id, attachment_type)`를 전제로 한다.
+- `ACCEPTED`만으로는 진행 중으로 보지 않고, 양측 계약서 업로드가 모두 끝났을 때만 `IN_PROGRESS`로 본다.
+- `IN_PROGRESS`만으로는 자동 완료하지 않고, 양측 완료 증빙 업로드와 상호 리뷰 작성이 모두 끝났을 때만 `COMPLETED`로 본다.
+- 리뷰는 `matching_reviews`로 저장하고, 계약서/완료 증빙과 함께 매칭 상태 게이트를 구성한다.
+- 리뷰 생성 시 작성자/대상자 hidden field를 받더라도 저장 기준은 `matching + 로그인 회원`으로 다시 계산하는 편이 안전하다.
 
 ## 10. MVP 범위
 
@@ -261,7 +278,7 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 - 추천 엔진
 - 설명 가능한 추천 결과
 - 후보 비교 및 선택
-- 단일 `matching.status` 기반 요청 -> 수락 -> 진행 -> 완료 흐름
+- 단일 `matching.status` 기반 요청 -> 수락 -> 계약 체결 -> 진행 -> 완료 흐름
 
 ### 중간 우선순위
 
@@ -277,7 +294,7 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 - 비 IT 업종 확장
 - 외부 데이터 대량 연동
 - `proposal_attachments`
-- 양측 시작 승인 / 종료 승인 모델
+- 명시적 시작 승인 / 종료 승인 버튼 모델
 
 ## 11. 기술 방향
 
