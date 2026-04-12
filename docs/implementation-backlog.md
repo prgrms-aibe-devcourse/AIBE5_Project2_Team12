@@ -19,6 +19,7 @@
 - `Resume`가 존재하면 프리랜서 기능을 사용할 수 있다.
 - 현재 ERD에는 `members.memo`, `resumes.status`, `resumes.writing_status`, `resumes.portfolio_url`, `profile_image`, `resume_attachments`가 존재한다.
 - AI 추천 노출은 `Resume.aiMatchingEnabled`로 제어하고, 직접 지원 허용 여부와는 분리한다.
+- `proposal.raw_input_text`는 AI 브리프 원본 입력을 저장한다.
 - `proposal.total_budget_*`는 전체 프로젝트 예산이다.
 - `proposal_position.unit_budget_*`는 1인 기준 예산이다.
 - `proposal.status`는 `WRITING`, `MATCHING`, `COMPLETE`다.
@@ -114,15 +115,17 @@
 
 - AI 브리프 요청/응답 DTO 정의
 - 외부 LLM API 연동 어댑터 추가
+- 사용자 자유 입력을 `proposal.raw_input_text`에 저장
 - 응답을 `Proposal`, `ProposalPosition` 구조로 변환
 - `description`, `work_type`, `work_place`, `expected_period`, `position_id`, `head_count`, `unit_budget_*` 매핑 로직 구현
 - 실패 시 수동 입력 fallback 구현
 
 중요한 제약은 아래와 같다.
 
-- 현재 ERD에는 `raw_input_text`, `overview`가 없다.
+- 현재 ERD에는 `raw_input_text`가 있고, `overview`는 없다.
 - 현재 ERD에는 `proposal_position_skill`이 없다.
 - 따라서 AI 브리프 결과 중 상세 요구사항은 `description` 텍스트와 `position_id` 선택 중심으로 흡수해야 한다.
+- `raw_input_text`는 재생성, 비교, 신뢰 확보를 위한 원문 보존 필드로 사용한다.
 
 검증은 아래와 같다.
 

@@ -22,9 +22,9 @@
 
 ### AI 브리프 저장 모델
 
+- `proposal.raw_input_text`는 사용자의 원본 자유 입력을 저장한다.
 - `proposal.description`은 사용자가 검토하고 수정하는 최종 제안서 본문이다.
 - MVP에서는 `proposal.overview`를 두지 않는다.
-- AI 브리프 원문 보존이 필요하면 `proposal.raw_input_text`만 저장 대상으로 본다.
 - 리스트와 카드의 미리보기 텍스트는 별도 `overview`가 아니라 `description` 발췌본으로 처리한다.
 
 ### 예산
@@ -47,7 +47,6 @@
 
 ## 2. 현재 보류 결정
 
-- `proposal.raw_input_text` ERD 반영 방식
 - `proposal_position` 상세 필드 확장 여부
 - `proposal_position_skill` 도입 여부
 - `proposal_attachments` 도입 여부

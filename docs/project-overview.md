@@ -23,6 +23,7 @@
 - `Resume`가 있으면 프리랜서 기능을 사용할 수 있다.
 - `Resume.aiMatchingEnabled`는 AI 추천 후보군 포함 여부만 의미한다.
 - `proposal`은 프로젝트 전체 문서이고 `proposal_position`은 실제 모집 단위다.
+- `proposal.raw_input_text`는 AI 브리프의 원본 자유 입력을 보존한다.
 - `proposal.total_budget_*`와 `proposal_position.unit_budget_*`는 의미가 다르므로 둘 다 유지한다.
 - MVP에서는 별도 `project` 테이블 없이 `matching.status` 단일 모델로 진행 흐름을 관리한다.
 - 양측 시작/종료 승인, `proposal_position_skill`, `proposal_attachments`는 현재 보류다.
@@ -124,6 +125,7 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 
 현재 ERD 기준으로 저장 가능한 대표 출력은 아래와 같다.
 
+- 원본 자유 입력 텍스트
 - 제안서 제목
 - 프로젝트 설명
 - 전체 예산 범위
@@ -135,10 +137,11 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 
 중요한 점은 아래와 같다.
 
-- 현재 ERD에는 `raw_input_text` 필드가 없다.
+- 현재 ERD에는 `raw_input_text` 필드가 있다.
+- `raw_input_text`는 AI 브리프 생성 전 사용자가 입력한 원문을 보존한다.
 - MVP에서는 `overview`를 별도 컬럼으로 두지 않는다.
 - 따라서 목록과 카드에서 필요한 미리보기는 `description` 발췌본으로 처리한다.
-- 자유 입력 원문까지 장기 저장하려면 이후 `raw_input_text` 필드를 추가해야 한다.
+- `description`은 사용자가 검토하고 수정한 최종 제출 본문이다.
 
 ### 5.2 추천 엔진
 

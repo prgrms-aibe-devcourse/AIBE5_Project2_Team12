@@ -62,7 +62,7 @@
 - `skills.description`은 optional이다.
 - `position_skill`은 현재 ERD에 존재하는 유일한 정규화된 직무-스킬 연결 테이블이다.
 - `proposal`은 프로젝트 전체 수준의 문서다.
-- `proposal`은 `title`, `description`, `total_budget_*`, `work_type`, `work_place`, `expected_period`, `status`를 가진다.
+- `proposal`은 `raw_input_text`, `title`, `description`, `total_budget_*`, `work_type`, `work_place`, `expected_period`, `status`를 가진다.
 - `proposal.status`는 `WRITING`, `MATCHING`, `COMPLETE` 3단계다.
 - `proposal_position`은 실제 모집 단위지만 현재 ERD에서는 최소 필드만 가진다.
 - `proposal_position`은 `position_id`, `head_count`, `unit_budget_*`, `status`를 가진다.
@@ -93,9 +93,7 @@
 
 - `canActAsClient(member) = member.status == ACTIVE`
 - `canActAsFreelancer(member) = resume exists`
--
-
-`canBeRecommended(member) = resume exists && resume.status == ACTIVE && resume.writing_status == DONE && resume.publiclyVisible && resume.aiMatchingEnabled`
+- `canBeRecommended(member) = resume exists && resume.status == ACTIVE && resume.writing_status == DONE && resume.publiclyVisible && resume.aiMatchingEnabled`
 
 따라서 `UserRole`은 권한 관리 축으로만 두고, 서비스 역할은 `Resume` 존재 여부와 공개 설정으로 해석한다.
 
@@ -110,9 +108,10 @@
 
 - 제안서 초안과 모집 진행 상태를 관리하는 집합 루트
 - 클라이언트가 소유
-- 현재 저장 모델에서 제안서 본문은 `description` 하나로 표현한다.
+- 현재 저장 모델은 `raw_input_text`와 `description` 2단 구조다.
+- `raw_input_text`는 사용자의 원본 자유 입력을 보존한다.
+- `description`은 AI 브리프가 만든 뒤 사용자가 검토하고 수정하는 최종 제안서 본문이다.
 - MVP에서는 별도 `overview` 필드를 두지 않고, 목록이나 카드 미리보기는 `description` 발췌로 처리한다.
-- AI 브리프 원문 보존이 필요하면 `raw_input_text`만 별도 저장 후보로 본다.
 
 ### 4.4 ProposalPosition
 
@@ -182,7 +181,7 @@
 | `member_id`           | bigint                           | Y  | 회원 1:1 연결       |
 | `introduction`        | text                             | Y  | 자기소개            |
 | `career_years`        | tinyint                          | Y  | 경력 연차           |
-| `career`              | json                             | N  | 경력 상세 JSON      |
+| `career`              | json                             | Y  | 경력 상세 JSON      |
 | `preferred_work_type` | enum(`SITE`, `REMOTE`, `HYBRID`) | Y  | 선호 근무 형태        |
 | `publicly_visible`    | boolean                          | Y  | 검색/목록 노출 여부     |
 | `ai_matching_enabled` | boolean                          | Y  | AI 추천 후보군 포함 여부 |
@@ -354,7 +353,7 @@
 | `proposal_id`     | bigint                         | Y  | 상위 제안서      |
 | `position_id`     | bigint                         | Y  | 직무 마스터      |
 | `head_count`      | bigint                         | N  | 모집 인원       |
-| `status`          | enum(`OPEN`, `FULL`, `CLOSED`) | N  | 모집 상태       |
+| `status`          | enum(`OPEN`, `FULL`, `CLOSED`) | Y  | 모집 상태       |
 | `unit_budget_min` | bigint                         | N  | 1인 기준 최소 예산 |
 | `unit_budget_max` | bigint                         | N  | 1인 기준 최대 예산 |
 | `created_at`      | timestamp                      | Y  | 생성 시각       |
@@ -400,7 +399,7 @@
 | `id`                   | bigint                                                                            | Y  | PK                       |
 | `proposal_position_id` | bigint                                                                            | Y  | 대상 모집 단위                 |
 | `resume_id`            | bigint                                                                            | Y  | 대상 이력서                   |
-| `status`               | enum(`PROPOSED`, `ACCECPTED`, `REJECTED`, `IN_PROGRESS`, `COMPLETED`, `CANCELED`) | N  | 단일 매칭 상태, 기본값 `PROPOSED` |
+| `status`               | enum(`PROPOSED`, `ACCEPTED`, `REJECTED`, `IN_PROGRESS`, `COMPLETED`, `CANCELED`) | Y  | 단일 매칭 상태, 기본값 `PROPOSED` |
 | `contract_date`        | timestamp                                                                         | N  | 수락 또는 계약 성립 시각           |
 | `complete_date`        | timestamp                                                                         | N  | 완료 시각                    |
 | `created_at`           | timestamp                                                                         | Y  | 생성 시각                    |
@@ -553,14 +552,7 @@ PROPOSED -> CANCELED
 아래 항목은 이전 대화에서 한 번 논의됐지만, 현재 ERD 초안에는 아직 반영되지 않았다.
 현재 문서에서는 "미래 확장 후보"로만 유지한다.
 
-### 10.1 제안서 원문 필드 추가
-
-- `proposal.raw_input_text`
-
-MVP에서는 `overview`를 두지 않고 `description`을 정본으로 사용한다.
-AI 브리프 입력 원문까지 추적해야 하면 `raw_input_text`만 별도 필드로 추가한다.
-
-### 10.2 proposal_position 상세 필드 확장
+### 10.1 proposal_position 상세 필드 확장
 
 - `title`
 - `requirement_summary`
@@ -571,16 +563,16 @@ AI 브리프 입력 원문까지 추적해야 하면 `raw_input_text`만 별도 
 
 현재 ERD는 최소 모집 단위만 갖고 있어서, 포지션별 세부 조건을 표현하기 어렵다.
 
-### 10.3 proposal_position_skills
+### 10.2 proposal_position_skills
 
 `proposal_position`별 요구 스킬을 별도로 저장하는 모델이다.
 현재 ERD에는 없지만, 추천 정확도를 높이려면 가장 먼저 재도입을 검토할 대상이다.
 
-### 10.4 proposal_attachments
+### 10.3 proposal_attachments
 
 현재 리포의 파일 저장 구조로는 바로 붙일 수 있지만, 현재 ERD에는 테이블이 없다.
 
-### 10.5 matching 상태 분리
+### 10.4 matching 상태 분리
 
 이전 논의에서는 아래 항목이 있었다.
 
@@ -593,7 +585,7 @@ AI 브리프 입력 원문까지 추적해야 하면 `raw_input_text`만 별도 
 현재 ERD에는 없다.
 요청/수락 흐름과 실제 참여 이력을 분리하려면 추후 스키마 재설계가 필요하다.
 
-### 10.6 양측 시작 승인 / 종료 승인
+### 10.5 양측 시작 승인 / 종료 승인
 
 이전 논의에서는 아래 규칙을 검토했다.
 

@@ -125,6 +125,100 @@ Output expectations:
 - Optimize for engineering handoff and implementation clarity.
 ```
 
+## 2.1 raw_input_text 반영 프롬프트
+
+아래 프롬프트는 현재 ERD에 반영된
+`raw_input_text` / `description` 2단 구조를
+화면에 명확히 드러내기 위한 개발용 프롬프트다.
+
+핵심 의도는 이렇다.
+
+- `raw_input_text`: 사용자가 처음 입력한 자유 텍스트 원문
+- `description`: 실제 제출되는 본문이자 사용자가 편집하는 최종 제안서 내용
+
+즉, `description`은 상세 전용이 아니라 작성 화면에서도 바로 보이고 수정 가능해야 한다.
+
+```text
+Create low-fidelity to mid-fidelity desktop wireframes for IT-da, an AI-based freelancer matching platform for IT projects.
+
+This is not a polished visual design task. I need development-ready wireframes that help the team validate one specific product direction before implementation: keeping only the original AI brief input and the final editable proposal body.
+- raw_input_text = the original free-text project input written by the client
+- description = the full editable proposal body that will actually be submitted
+
+Important product intent:
+- The client should not feel that AI output is hidden until a detail page.
+- The client must be able to compare their original input and the full generated proposal body in the editing flow.
+- description is the canonical proposal content and must be editable before submission.
+- raw_input_text should remain visible enough to support regeneration, comparison, and trust.
+
+Create 4 frames in one consistent grayscale B2B SaaS wireframe style:
+
+1. Client dashboard / proposal list
+- Show proposal cards or rows.
+- Each item should include:
+  - proposal title
+  - status badge
+  - short description excerpt only, not full description
+  - total budget range
+  - number of positions
+  - last modified date
+  - actions such as edit, recommendation results, duplicate
+- Make it obvious that list screens use a short description excerpt as preview text.
+
+2. AI brief editor / proposal editing
+- Desktop two-column layout.
+- Left panel:
+  - raw_input_text textarea
+  - helper text explaining this is the original user input
+  - AI brief generate / regenerate action
+  - save state and proposal status
+- Right main editing area:
+  - editable description field as the main proposal body
+  - title
+  - total budget range
+  - work type
+  - work place
+  - expected period
+  - repeatable proposal positions
+- Each proposal position should include:
+  - position selector
+  - headcount
+  - unit budget range
+  - position status
+- Bottom actions:
+  - 임시 저장
+  - AI 재생성
+  - 매칭 시작
+- The screen must clearly show that description is editable now, not hidden for later.
+
+3. Proposal detail / review screen
+- Header with proposal title and status
+- Main content block with full description
+- Secondary metadata blocks for budget, work type, work place, expected period, positions
+- Show the original input as a secondary collapsible block or side panel, not as a competing main summary.
+
+4. Recommendation results screen
+- Header with proposal title and a compact description excerpt
+- Do not show full description inline here
+- Show selected proposal position filter
+- Left area: AI top 3 candidates
+- Right area: direct applicants
+- Sticky comparison tray
+- This screen should reinforce that the proposal body remains the canonical source, while list-like contexts use a short description excerpt
+
+Design constraints:
+- Desktop-first
+- Low-fidelity or mid-fidelity only
+- Grayscale with restrained accent color
+- Korean copy
+- Realistic Thymeleaf + Bootstrap implementation style
+- Prefer tables, cards, forms, chips, helper text, state badges, and summary blocks
+- No marketing visuals, gradients, illustrations, or decorative concepts
+
+Output goal:
+- Help the team create development-ready wireframes for the current proposal editing model, where raw_input_text is preserved and description is the single canonical proposal body.
+```
+
 ## 3. 마스터 프롬프트
 
 ```text
