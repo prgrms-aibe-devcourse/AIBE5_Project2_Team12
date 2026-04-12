@@ -26,17 +26,18 @@
 - `proposal.status`는 `WRITING`, `MATCHING`, `COMPLETE`다.
 - `proposal_position.status`는 `OPEN`, `FULL`, `CLOSED`다.
 - `proposal_position.status = FULL`은 `matching.status in (ACCEPTED, IN_PROGRESS)` 수가 `head_count`에 도달했다는 뜻이고, `PROPOSED`는 정원을 점유하지 않는다.
-- `matching`은 `status` 단일 필드와 `contract_date`, `complete_date`를 유지하되, `ACCEPTED -> IN_PROGRESS`는 양측 계약서 업로드 완료를 조건으로 둔다.
+- `matching`은 `proposal_position_id`, `resume_id`, `client_member_id`, `freelancer_member_id`, `status`, `contract_date`, `complete_date`를 유지하되, `ACCEPTED -> IN_PROGRESS`는 양측 계약서 업로드 완료를 조건으로 둔다.
 - `contract_date`는 수락 시각이 아니라 양측 계약서가 모두 제출되어 계약이 체결된 시각이다.
 - `IN_PROGRESS -> COMPLETED`는 양측 완료 증빙 업로드와 상호 리뷰 작성을 조건으로 둔다.
 - `complete_date`는 완료 요청 시각이 아니라 완료 증빙과 리뷰 조건이 모두 충족된 시각이다.
 - 활성 매칭은 `PROPOSED`, `ACCEPTED`, `IN_PROGRESS`로 본다.
+- `client_member_id`, `freelancer_member_id`는 각각 제안서 소유 회원, 이력서 소유 회원과 일치해야 한다.
 - 계약서와 완료 증빙은 `matching_attachments` 공통 집합으로 두고 `matching_id`, `member_id`, `file_id`, `attachment_type`를 유지한다.
-- `matching_attachments.member_id`는 업로더가 아니라 해당 계약서/증빙의 당사자 회원이다.
+- `matching_attachments.member_id`는 업로더가 아니라 해당 계약서/증빙의 당사자 회원이며 `matching.client_member_id`, `matching.freelancer_member_id` 중 하나다.
 - `matching_attachments.attachment_type`은 `CONTRACT`, `COMPLETION_EVIDENCE`다.
 - `UNIQUE (matching_id, member_id, attachment_type)`를 강제한다.
 - 리뷰는 `matching_reviews`를 `matching` 종속 집합으로 두고 `matching_id`, `reviewer_member_id`, `reviewee_member_id`, `direction`을 유지한다.
-- 리뷰 생성 시 작성자, 대상자, 방향은 `matching + 로그인 회원` 기준으로 서버가 계산한다.
+- 리뷰 생성 시 작성자, 대상자, 방향은 `matching.client_member_id`, `matching.freelancer_member_id`, 로그인 회원 기준으로 서버가 계산한다.
 - 리뷰 수정은 로그인 회원과 `reviewer_member_id`가 같은 경우에만 허용한다.
 - 리뷰는 별도 초안 상태 없이 `created_at`을 제출 시각으로 함께 사용하고 `submitted_at`은 두지 않는다.
 - 현재 ERD에는 `proposal_position_skill`이 존재하고, 요구 스킬의 정규화 source로 사용한다.
@@ -221,6 +222,7 @@
 - `initiator_type`이 없으므로 요청 주체는 API 엔드포인트나 감사 로그에서 구분해야 한다.
 - `participation_status`가 없으므로 요청 처리와 진행 상태가 `matching.status` 하나에 모두 들어간다.
 - 활성 매칭은 `PROPOSED`, `ACCEPTED`, `IN_PROGRESS`이며 같은 `proposal_position + resume` 조합에 동시에 하나만 존재해야 한다.
+- 참여자 판정은 `proposal_position -> proposal`, `resume -> member` 역추적 대신 `matching.client_member_id`, `matching.freelancer_member_id`를 기준으로 처리한다.
 - 정원은 `ACCEPTED`, `IN_PROGRESS`만 점유하고 `PROPOSED`는 점유하지 않는다.
 - 정원 여유가 다시 생기면 `proposal_position.status`는 `OPEN`으로 되돌릴 수 있어야 한다.
 - 명시적 시작 승인 / 종료 승인 버튼 없이 계약서, 완료 증빙, 리뷰 제출을 상태 게이트로 사용한다.
@@ -245,6 +247,7 @@
 검증은 아래와 같다.
 
 - 동일 `proposal_position + resume` 활성 매칭 중복 방지 테스트
+- `client_member_id`, `freelancer_member_id`가 각각 제안서/이력서 소유자와 일치하는지 테스트
 - 수락 시 정원 재검증 테스트
 - `PROPOSED`가 정원을 점유하지 않는지 테스트
 - 수락 전 연락처 비노출 테스트
@@ -253,7 +256,7 @@
 - 양측 계약서 업로드 완료 시 `contract_date`가 기록되는지 테스트
 - `FULL`, `CLOSED` 상태에서 신규 매칭 생성 불가 테스트
 - 양측 완료 증빙과 상호 리뷰가 모두 없으면 `COMPLETED`로 갈 수 없는지 테스트
-- 리뷰 생성 시 `matching + 로그인 회원` 기준으로 작성자/대상자/direction이 계산되는지 테스트
+- 리뷰 생성 시 `matching.client_member_id`, `matching.freelancer_member_id`, 로그인 회원 기준으로 작성자/대상자/direction이 계산되는지 테스트
 - 같은 `matching`에서 같은 방향 또는 같은 작성자 중복 리뷰가 막히는지 테스트
 - 본인 리뷰만 수정 가능한지 테스트
 - `IN_PROGRESS`가 아니면 리뷰 작성이 불가능한지 테스트

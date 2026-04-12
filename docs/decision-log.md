@@ -51,6 +51,8 @@
 
 - MVP에서는 별도 `project` 테이블을 두지 않는다.
 - 참여 이력과 진행 흐름은 `matching.status` 단일 필드로 관리한다.
+- `matching`은 `proposal_position_id`, `resume_id`와 함께 `client_member_id`, `freelancer_member_id`를 유지한다.
+- `client_member_id`, `freelancer_member_id`는 목록 조회, 권한 검증, 첨부/리뷰 당사자 판정을 단순화하는 참여자 anchor다.
 - 연락처는 `matching.status = ACCEPTED` 이후에만 공개한다.
 - `matching.contract_date`는 양측 계약서가 모두 제출되어 계약이 체결된 시각으로 해석한다.
 - `matching.complete_date`는 양측 완료 증빙과 상호 리뷰가 모두 제출된 시각으로 해석한다.
@@ -63,9 +65,9 @@
 - `reviewer_member_id`와 `reviewee_member_id`는 모두 유지한다.
 - 역할은 `reviewer_role`, `reviewee_role` 2개 대신 `direction` 하나로 표현한다.
 - `created_at`은 리뷰 제출 시각으로 함께 사용하고 별도 `submitted_at`은 두지 않는다.
-- 리뷰 생성 시 작성자, 대상자, 방향은 `matching + 로그인 회원`으로 서버가 계산한다.
+- 리뷰 생성 시 작성자, 대상자, 방향은 `matching.client_member_id`, `matching.freelancer_member_id`, 로그인 회원으로 서버가 계산한다.
 - 리뷰 수정은 로그인 회원과 `reviewer_member_id`가 같은 경우에만 허용한다.
-- 리뷰 작성 화면도 `matching + 로그인 회원` 기준으로 작성 가능 여부와 상대방 정보를 계산한다.
+- 리뷰 작성 화면도 `matching.client_member_id`, `matching.freelancer_member_id`, 로그인 회원 기준으로 작성 가능 여부와 상대방 정보를 계산한다.
 
 ### 파일 자산
 
@@ -73,7 +75,7 @@
 - 다만 ERD에 `proposal_attachments`가 없으므로 제안서 파일은 아직 정식 도메인 연관 자산으로 취급하지 않는다.
 - 매칭 단위 계약서와 완료 증빙 파일은 `matching_attachments` 공통 집합으로 둔다.
 - `matching_attachments`는 `matching_id`, `member_id`, `file_id`, `attachment_type`를 유지한다.
-- `member_id`는 업로더가 아니라 해당 계약서/증빙의 당사자 회원이다.
+- `member_id`는 업로더가 아니라 해당 계약서/증빙의 당사자 회원이며 `matching.client_member_id`, `matching.freelancer_member_id` 중 하나다.
 - `attachment_type`은 `CONTRACT`, `COMPLETION_EVIDENCE`를 사용한다.
 - `UNIQUE (matching_id, member_id, attachment_type)`를 강제한다.
 - 상호 리뷰는 `matching_reviews` 종속 집합으로 둔다.
@@ -127,7 +129,7 @@
 
 ### Q. 리뷰 작성 가능 여부는 무엇으로 판단하나?
 
-`matching + 로그인 회원` 기준으로 판정한다. 생성은 현재 로그인 회원이 해당 매칭의 당사자인지와 이미 리뷰를 썼는지를 보고 작성자, 대상자, 방향을 서버가 계산한다. 수정은 로그인 회원과 `reviewer_member_id` 비교로 권한을 검증한다.
+`matching.client_member_id`, `matching.freelancer_member_id`, 로그인 회원 기준으로 판정한다. 생성은 현재 로그인 회원이 해당 매칭의 당사자인지와 이미 리뷰를 썼는지를 보고 작성자, 대상자, 방향을 서버가 계산한다. 수정은 로그인 회원과 `reviewer_member_id` 비교로 권한을 검증한다.
 
 ### Q. 포지션별 요구 스킬을 따로 저장하나?
 

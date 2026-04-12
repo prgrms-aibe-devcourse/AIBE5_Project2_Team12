@@ -26,9 +26,10 @@
 - `proposal.raw_input_text`는 AI 브리프의 원본 자유 입력을 보존한다.
 - `proposal.total_budget_*`와 `proposal_position.unit_budget_*`는 의미가 다르므로 둘 다 유지한다.
 - MVP에서는 별도 `project` 테이블 없이 `matching.status` 단일 모델로 진행 흐름을 관리한다.
+- `matching`은 `proposal_position_id`, `resume_id`와 함께 `client_member_id`, `freelancer_member_id`를 유지한다.
 - 계약서와 완료 증빙은 `matching_attachments(matching_id, member_id, file_id, attachment_type)`로 관리한다.
 - `ACCEPTED -> IN_PROGRESS`는 양측 계약서 업로드, `IN_PROGRESS -> COMPLETED`는 양측 완료 증빙과 상호 리뷰를 조건으로 둔다.
-- 리뷰는 `matching_reviews` 종속 집합으로 두고, 생성/수정 검증은 `matching + 로그인 회원`과 `reviewer_member_id` 기준으로 처리한다.
+- 리뷰는 `matching_reviews` 종속 집합으로 두고, 생성/수정 검증은 `matching.client_member_id`, `matching.freelancer_member_id`, 로그인 회원과 `reviewer_member_id` 기준으로 처리한다.
 - 명시적 시작/종료 승인 버튼과 `proposal_attachments`는 현재 보류다.
 
 ## 1. 프로젝트 개요
@@ -198,7 +199,7 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 - `position`: 직무 마스터 테이블
 - `proposal_position`: 실제 모집 단위
 - `proposal_position_skill`: 실제 모집 단위 요구 스킬
-- `matching`: `proposal_position` 기준으로 성립하는 요청과 진행 흐름
+- `matching`: `proposal_position` 기준으로 성립하는 요청과 진행 흐름이며, 참여자 anchor로 `client_member_id`, `freelancer_member_id`를 함께 가진다.
 - `profile_image`: 회원 대표 이미지 연결
 - `resume_attachments`: 이력서 첨부파일 연결
 - `stored_file`: 업로드 자산 공통 메타데이터
@@ -262,12 +263,12 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 - `resume.writing_status = WRITING`인 이력서는 추천 노출 대상에서 제외하는 방향이 자연스럽다.
 - 현재 ERD에는 `proposal_attachments`가 없으므로 제안서 첨부파일은 아직 정식 스키마에 포함되지 않는다.
 - 매칭 단위 계약서와 완료 증빙은 `matching_attachments(matching_id, member_id, file_id, attachment_type)`로 저장한다.
-- `matching_attachments.member_id`는 업로더가 아니라 해당 계약서/증빙의 당사자 회원이다.
+- `matching_attachments.member_id`는 업로더가 아니라 해당 계약서/증빙의 당사자 회원이며 `matching.client_member_id`, `matching.freelancer_member_id` 중 하나다.
 - `UNIQUE (matching_id, member_id, attachment_type)`를 전제로 한다.
 - `ACCEPTED`만으로는 진행 중으로 보지 않고, 양측 계약서 업로드가 모두 끝났을 때만 `IN_PROGRESS`로 본다.
 - `IN_PROGRESS`만으로는 자동 완료하지 않고, 양측 완료 증빙 업로드와 상호 리뷰 작성이 모두 끝났을 때만 `COMPLETED`로 본다.
 - 리뷰는 `matching_reviews`로 저장하고, 계약서/완료 증빙과 함께 매칭 상태 게이트를 구성한다.
-- 리뷰 생성 시 작성자/대상자 hidden field를 받더라도 저장 기준은 `matching + 로그인 회원`으로 다시 계산하는 편이 안전하다.
+- 리뷰 생성 시 작성자/대상자 hidden field를 받더라도 저장 기준은 `matching.client_member_id`, `matching.freelancer_member_id`, 로그인 회원으로 다시 계산하는 편이 안전하다.
 
 ## 10. MVP 범위
 

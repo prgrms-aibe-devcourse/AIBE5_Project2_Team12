@@ -69,7 +69,7 @@
 - `proposal_position`은 `position_id`, `head_count`, `unit_budget_*`, `status`를 가진다.
 - `proposal_position.status`는 `OPEN`, `FULL`, `CLOSED`를 저장한다.
 - `proposal_position_skill`은 `proposal_position`별 요구 스킬을 저장한다.
-- `matching`은 `proposal_position`과 `resume`의 조합을 표현한다.
+- `matching`은 `proposal_position`과 `resume`의 조합을 표현하되, 당사자 판정 anchor로 `client_member_id`, `freelancer_member_id`를 함께 가진다.
 - `matching`은 `status` 단일 필드와 `contract_date`, `complete_date`만으로 흐름을 관리한다.
 - 현재 ERD에는 `initiator_type`, `participation_status`, 시작/종료 승인 시각이 없다.
 - 매칭 단위 계약서/완료 증빙은 `matching_attachments`, 상호 리뷰는 `matching_reviews`로 관리한다.
@@ -129,6 +129,7 @@
 
 - 클라이언트 요청과 프리랜서 지원을 하나의 흐름으로 표현하는 집합 루트
 - 대상은 항상 `proposal_position`과 `resume`의 조합이다.
+- 참여자 판정과 권한 검증을 단순화하기 위해 `client_member_id`, `freelancer_member_id`를 직접 가진다.
 - 현재 ERD는 요청 처리와 진행 이력을 `matching.status` 하나로 관리한다.
 - 계약서/완료 증빙은 `MatchingAttachment`, 상호 리뷰는 `MatchingReview`를 종속 집합으로 둔다.
 
@@ -429,6 +430,8 @@
 | `id`                   | bigint                                                                           | Y  | PK                       |
 | `proposal_position_id` | bigint                                                                           | Y  | 대상 모집 단위                 |
 | `resume_id`            | bigint                                                                           | Y  | 대상 이력서                   |
+| `client_member_id`     | bigint                                                                           | Y  | 제안서를 소유한 클라이언트 회원         |
+| `freelancer_member_id` | bigint                                                                           | Y  | 이력서를 소유한 프리랜서 회원         |
 | `status`               | enum(`PROPOSED`, `ACCEPTED`, `REJECTED`, `IN_PROGRESS`, `COMPLETED`, `CANCELED`) | Y  | 단일 매칭 상태, 기본값 `PROPOSED` |
 | `contract_date`        | timestamp                                                                        | N  | 양측 계약 체결 시각               |
 | `complete_date`        | timestamp                                                                        | N  | 완료 요건 충족 시각               |
@@ -440,6 +443,10 @@
 - 활성 매칭은 `PROPOSED`, `ACCEPTED`, `IN_PROGRESS`로 정의한다.
 - 종료 매칭은 `REJECTED`, `CANCELED`, `COMPLETED`로 정의한다.
 - 한 `proposal_position`과 한 `resume` 조합에는 동시에 하나의 활성 매칭만 허용한다.
+- `client_member_id`는 해당 `proposal_position`이 속한 `proposal`의 소유 회원과 같아야 한다.
+- `freelancer_member_id`는 해당 `resume`의 소유 회원과 같아야 한다.
+- `client_member_id <> freelancer_member_id`를 강제하는 편이 자연스럽다.
+- 목록 조회, 권한 검증, 연락처 공개 여부 판단은 `proposal_position -> proposal`, `resume -> member` 역추적 대신 `matching.client_member_id`, `matching.freelancer_member_id`를 우선 기준으로 삼는다.
 - 현재 ERD는 `initiator_type`을 저장하지 않으므로, 클라이언트 요청인지 프리랜서 지원인지는 API나 감사 로그에서 구분해야 한다.
 - 현재 ERD는 `participation_status`를 별도로 두지 않으므로 요청 처리와 진행 상태를 하나의 `status`가 모두 담당한다.
 - 연락처 공개 시점은 `ACCEPTED` 이후로 해석하는 것이 자연스럽다.
@@ -469,7 +476,7 @@
 
 - 계약서와 완료 증빙은 별도 테이블로 분리하지 않고 `matching_attachments` 공통 집합으로 관리한다.
 - `member_id`는 단순 업로더가 아니라 해당 계약서/증빙의 당사자 회원을 뜻한다.
-- `member_id`는 해당 `matching`의 클라이언트 회원 또는 프리랜서 회원 중 하나여야 한다.
+- `member_id`는 해당 `matching.client_member_id` 또는 `matching.freelancer_member_id` 중 하나여야 한다.
 - 파일 FK 컬럼명은 다른 자산 테이블과 맞춰 `file_id`를 사용한다.
 - `attachment_type`은 `CONTRACT`, `COMPLETION_EVIDENCE`만 허용한다.
 - `UNIQUE (matching_id, member_id, attachment_type)`를 강제한다.
@@ -503,8 +510,8 @@
 - `UNIQUE (matching_id, direction)`를 강제한다.
 - `UNIQUE (matching_id, reviewer_member_id)`를 강제한다.
 - `reviewer_member_id <> reviewee_member_id`를 강제한다.
-- 리뷰 생성 시 작성자, 대상자, 방향은 `matching + 로그인 회원` 기준으로 서버가 계산한다.
-- 리뷰 작성 화면 접근 시에도 `matching + 로그인 회원` 기준으로 작성 가능 여부, 이미 작성했는지 여부, 상대방 정보를 계산한다.
+- 리뷰 생성 시 작성자, 대상자, 방향은 `matching.client_member_id`, `matching.freelancer_member_id`, 로그인 회원 기준으로 서버가 계산한다.
+- 리뷰 작성 화면 접근 시에도 `matching.client_member_id`, `matching.freelancer_member_id`, 로그인 회원 기준으로 작성 가능 여부, 이미 작성했는지 여부, 상대방 정보를 계산한다.
 - 클라이언트가 hidden field로 작성자/대상자 값을 보내더라도 저장 시 신뢰하지 않는다.
 - 리뷰 수정은 로그인 회원과 `reviewer_member_id`가 같은 경우에만 허용한다.
 - 리뷰 작성은 `matching.status = IN_PROGRESS`일 때만 시작할 수 있다.
@@ -639,7 +646,7 @@ PROPOSED -> CANCELED
 15. `IN_PROGRESS -> COMPLETED` 전이는 양측 완료 증빙 서류 업로드와 상호 리뷰 작성이 모두 끝났을 때만 허용한다.
 16. `complete_date`는 완료 승인 버튼 클릭 시각이 아니라 완료 증빙과 리뷰 조건이 모두 충족된 시각으로 기록한다.
 17. 리뷰는 `matching` 종속 집합으로 두고 FK는 `matching_id`를 사용한다.
-18. 리뷰 생성 시 작성자, 대상자, 방향은 `matching + 로그인 회원`으로 서버가 결정한다.
+18. 리뷰 생성 시 작성자, 대상자, 방향은 `matching.client_member_id`, `matching.freelancer_member_id`, 로그인 회원으로 서버가 결정한다.
 19. 리뷰 수정은 로그인 회원과 `reviewer_member_id`가 같은 경우에만 허용한다.
 20. `created_at`은 리뷰 제출 시각으로 함께 사용하고 별도 `submitted_at`은 두지 않는다.
 21. 매칭 단위 계약서/완료 증빙은 `matching_attachments(matching_id, member_id, file_id, attachment_type)`로 저장한다.
