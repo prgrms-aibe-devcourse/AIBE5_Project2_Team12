@@ -16,17 +16,22 @@
 이번 백로그는 아래 가정으로 작성한다.
 
 - 모든 활성 회원은 클라이언트 기능을 사용할 수 있다.
-- `Resume`가 존재하면 프리랜서 기능을 사용할 수 있다.
+- `resume`가 존재하고 `resume.status = ACTIVE`이면 프리랜서로서 직접 지원과 매칭 흐름에 참여할 수 있다.
+- `resume.writing_status = DONE`이고 `publiclyVisible = true`여야 검색/목록 노출 대상이 된다.
 - 현재 ERD에는 `members.memo`, `resumes.status`, `resumes.writing_status`, `resumes.portfolio_url`, `profile_image`, `resume_attachments`가 존재한다.
-- AI 추천 노출은 `Resume.aiMatchingEnabled`로 제어하고, 직접 지원 허용 여부와는 분리한다.
+- AI 추천 노출은 검색/목록 노출 조건에 더해 `Resume.aiMatchingEnabled`로 제어하고, 직접 지원 허용 여부와는 분리한다.
 - `proposal.raw_input_text`는 AI 브리프 원본 입력을 저장한다.
 - `proposal.total_budget_*`는 전체 프로젝트 예산이다.
 - `proposal_position.unit_budget_*`는 1인 기준 예산이다.
 - `proposal.status`는 `WRITING`, `MATCHING`, `COMPLETE`다.
 - `proposal_position.status`는 `OPEN`, `FULL`, `CLOSED`다.
+- `proposal_position.status = FULL`은 `matching.status in (ACCEPTED, IN_PROGRESS)` 수가 `head_count`에 도달했다는 뜻이고, `PROPOSED`는 정원을 점유하지 않는다.
 - `matching`은 `status` 단일 필드와 `contract_date`, `complete_date`만 가진다.
+- 활성 매칭은 `PROPOSED`, `ACCEPTED`, `IN_PROGRESS`로 본다.
 - 현재 ERD에는 `proposal_position_skill`이 존재하고, 요구 스킬의 정규화 source로 사용한다.
-- 현재 ERD에는 `proposal_attachments`, `initiator_type`, `participation_status`가 없다.
+- 현재 애플리케이션에는 `/files/proposal/**` 저장 경로가 있지만, ERD에는 `proposal_attachments`가 없어서 제안서 파일은 아직 정식 도메인 연관 자산이 아니다.
+- 현재 ERD에는 `initiator_type`, `participation_status`가 없다.
+- `profile_image.member_id`, `resume_attachments(resume_id, display_order)`, `resume_skills(resume_id, skill_id)`, `proposal_position_skills(proposal_position_id, skill_id)`는 중복 없이 관리한다.
 - 양측 시작 승인 / 종료 승인 모델은 현재 MVP 백로그에 포함하지 않는다.
 - `StoredFile.contentType`은 ERD 표현과 현재 코드 표현이 다르므로 구현 전에 한 번 더 맞춰야 한다.
 
@@ -49,7 +54,7 @@
 
 작업 항목은 아래와 같다.
 
-- `Resume` 존재 여부 기반 프리랜서 진입 규칙 정리
+- 프리랜서 진입 규칙을 `canApplyDirectly`, `canBeListed`, `canBeRecommended` 기준으로 분리
 - `Member.memo` 반영 여부와 노출 범위 정리
 - `Resume.status`, `Resume.writingStatus`, `Resume.portfolioUrl` 반영
 - `ProfileImage`, `ResumeAttachment` 엔티티/리포지토리 추가
@@ -57,13 +62,16 @@
 - `resume_skill` 엔티티, 리포지토리, 테스트 추가
 - 기존 `Resume`와 연결되는 스킬 등록 API 또는 서비스 추가
 - `StoredFile.contentType` 표현 정리
+- 현재 코드 기준 `nickname`, `phone`, `careerYears`, `fileUrl` 제약 반영 여부 점검
 
 검증은 아래와 같다.
 
 - 회원 생성 테스트
 - 프리랜서 이력서 + 스킬 등록 테스트
 - 프로필 이미지 / 이력서 첨부 연결 테스트
+- `profile_image`, `resume_attachments` 유니크 제약 테스트
 - 중복 스킬 등록 방지 테스트
+- 전화번호 정규화, 기본 닉네임, `fileUrl` prefix 제약 테스트
 - `publiclyVisible`, `aiMatchingEnabled` 해석 테스트
 - `status`, `writingStatus`가 추천 노출 조건에 미치는 영향 테스트
 
@@ -85,6 +93,7 @@
 - `ProposalPosition` 엔티티, 리포지토리, 테스트 추가
 - 제안서 저장/수정/모집 시작 서비스 추가
 - `WRITING`, `MATCHING`, `COMPLETE` 상태 전이 규칙 구현
+- `proposal_position_skill` 중복 입력 방지 규칙 구현
 
 권장 API 범위는 아래와 같다.
 
@@ -100,6 +109,7 @@
 - 제안서 저장 및 상태 전이 테스트
 - 예산, 인원, 상태 검증 테스트
 - `MATCHING` 상태 진입 전 최소 입력 검증 테스트
+- `proposal_position_skill` 중복 방지 테스트
 - 같은 직무 마스터를 여러 줄 등록할 수 있는지 여부를 ERD 원본과 맞춰 테스트
 
 종료 산출물은 아래와 같다.
@@ -178,11 +188,15 @@
 - 진행 시작 / 완료 처리 구현
 - 연락처 공개 시점 제어 구현
 - 정원 도달 시 추가 요청 차단 구현
+- 수락/취소/완료 시 `proposal_position.status` 재계산 구현
 
 현재 모델의 제약은 아래와 같다.
 
 - `initiator_type`이 없으므로 요청 주체는 API 엔드포인트나 감사 로그에서 구분해야 한다.
 - `participation_status`가 없으므로 요청 처리와 진행 상태가 `matching.status` 하나에 모두 들어간다.
+- 활성 매칭은 `PROPOSED`, `ACCEPTED`, `IN_PROGRESS`이며 같은 `proposal_position + resume` 조합에 동시에 하나만 존재해야 한다.
+- 정원은 `ACCEPTED`, `IN_PROGRESS`만 점유하고 `PROPOSED`는 점유하지 않는다.
+- 정원 여유가 다시 생기면 `proposal_position.status`는 `OPEN`으로 되돌릴 수 있어야 한다.
 
 권장 API 범위는 아래와 같다.
 
@@ -198,8 +212,10 @@
 
 - 동일 `proposal_position + resume` 활성 매칭 중복 방지 테스트
 - 수락 시 정원 재검증 테스트
+- `PROPOSED`가 정원을 점유하지 않는지 테스트
 - 수락 전 연락처 비노출 테스트
 - `FULL`, `CLOSED` 상태에서 신규 매칭 생성 불가 테스트
+- 수락 취소/완료 후 `FULL -> OPEN` 재계산 테스트
 - `status` 단일 필드 전이 테스트
 
 종료 산출물은 아래와 같다.
@@ -267,7 +283,7 @@
 
 현재 ERD에 없어서 이번 백로그에서 제외한 항목은 아래와 같다.
 
-- `proposal_attachments`
+- `proposal_attachments` 또는 정식 제안서 파일 연관 모델
 - `proposal_position`의 상세 요구사항 필드
 - `matching.initiator_type`
 - `matching.participation_status`
@@ -294,16 +310,18 @@
 PR 리뷰나 중간 점검 때는 아래 질문을 공통으로 본다.
 
 1. ERD에 없는 필드를 코드에 먼저 추가하지 않았는가
-2. `Resume` 기반 프리랜서 진입 규칙을 깨지 않았는가
+2. 프리랜서 진입, 검색 노출, AI 추천 노출 규칙을 서로 다른 조건으로 구현했는가
 3. `proposal`과 `proposal_position`의 예산 의미를 섞지 않았는가
 4. `matching.status` 하나에 현재 허용한 상태만 사용하고 있는가
 5. 추천 노출 조건이 `status`, `writing_status`, `publiclyVisible`, `aiMatchingEnabled`를 모두 반영하는가
+6. `FULL` 판정과 활성 매칭 판정을 같은 기준으로 재사용하는가
+7. 프로필/이력서/스킬 연결 테이블의 유니크 제약을 코드와 DB 양쪽에서 놓치지 않았는가
 
 ## 7. 첫 구현 순서
 
 가장 먼저 손대야 할 실제 구현 순서는 아래와 같다.
 
-1. `Resume` 기반 프리랜서 진입 규칙 반영
+1. 프리랜서 역할 파생 규칙과 현재 코드 기반 값 제약 정리
 2. `resume_skill` 추가
 3. `Position`, `Proposal`, `ProposalPosition`, `ProposalPositionSkill` 엔티티 추가
 4. 제안서 저장/모집 시작 서비스 구현
@@ -330,11 +348,11 @@ PR 리뷰나 중간 점검 때는 아래 질문을 공통으로 본다.
 
 현재 기준 주요 리스크는 아래와 같다.
 
-- `Resume` 존재 여부, 공개 노출 여부, AI 추천 노출 여부를 같은 의미로 잘못 해석하면 화면과 권한 설계가 흔들린다.
+- 직접 지원 가능 여부, 검색/목록 노출 여부, AI 추천 노출 여부를 같은 의미로 잘못 해석하면 화면과 권한 설계가 흔들린다.
 - `proposal_position_skill` 입력 품질이 낮으면 추천 근거와 스킬 일치도 설명이 흔들린다.
 - `Resume.status`, `Resume.writingStatus`, `profile_image`, `resume_attachments`를 늦게 반영하면 이력서 화면 구조와 추천 필터 조건이 다시 흔들릴 수 있다.
 - `matching.status` 하나에 요청 처리와 진행 이력을 모두 넣으면 상태 전이 버그가 빠르게 늘어난다.
-- `proposal_position` 정원 수락 경쟁은 동시성 문제를 만든다.
+- `proposal_position` 정원 수락 경쟁과 `FULL -> OPEN` 재계산은 동시성 문제를 만든다.
 - `MATCHING` 상태 제안서의 수정 정책이 현재 ERD에 없어서 UX 규칙을 따로 정해야 한다.
 
 ## 10. 완료 기준

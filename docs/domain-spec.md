@@ -62,7 +62,8 @@
 - `skills.description`은 optional이다.
 - `proposal_position_skill`은 현재 ERD에 존재하는 정규화된 모집 단위-스킬 연결 테이블이다.
 - `proposal`은 프로젝트 전체 수준의 문서다.
-- `proposal`은 `raw_input_text`, `title`, `description`, `total_budget_*`, `work_type`, `work_place`, `expected_period`, `status`를 가진다.
+- `proposal`은 `raw_input_text`, `title`, `description`, `total_budget_*`, `work_type`, `work_place`, `expected_period`,
+  `status`를 가진다.
 - `proposal.status`는 `WRITING`, `MATCHING`, `COMPLETE` 3단계다.
 - `proposal_position`은 실제 모집 단위지만 현재 ERD에서는 최소 필드만 가진다.
 - `proposal_position`은 `position_id`, `head_count`, `unit_budget_*`, `status`를 가진다.
@@ -87,22 +88,26 @@
 - `Resume`는 프리랜서 프로필 루트다.
 - `ProfileImage`, `ResumeAttachment`, `StoredFile`은 프로필 자산 루트다.
 - 모든 활성 회원은 클라이언트로서 제안서를 작성할 수 있다.
-- `Resume`가 생성된 회원은 프리랜서로서 추천, 지원, 매칭 흐름에 참여할 수 있다.
+- `Resume`가 생성되고 활성 상태인 회원은 프리랜서로서 지원과 매칭 흐름에 참여할 수 있다.
 
 현재 도메인에서는 서비스 역할을 별도 필드로 저장하지 않고, 아래 규칙으로 파생시킨다.
 
 - `canActAsClient(member) = member.status == ACTIVE`
-- `canActAsFreelancer(member) = resume exists`
+- `canActAsFreelancer(member) = resume exists && resume.status == ACTIVE`
+- `canApplyDirectly(member) = resume exists && resume.status == ACTIVE`
+- `canBeListed(member) = resume exists && resume.status == ACTIVE && resume.writing_status == DONE && resume.publiclyVisible`
 - `canBeRecommended(member) = resume exists && resume.status == ACTIVE && resume.writing_status == DONE && resume.publiclyVisible && resume.aiMatchingEnabled`
 
-따라서 `UserRole`은 권한 관리 축으로만 두고, 서비스 역할은 `Resume` 존재 여부와 공개 설정으로 해석한다.
+따라서 `UserRole`은 권한 관리 축으로만 두고, 서비스 역할은 `Resume` 존재 여부, 이력서 상태, 공개 설정으로 해석한다.
 
 ### 4.2 File Asset
 
 - `StoredFile`은 실제 업로드 파일의 메타데이터 루트다.
 - `ProfileImage`는 회원 프로필 대표 이미지를 연결한다.
 - `ResumeAttachment`는 이력서에 연결되는 첨부 파일 목록이다.
+- 애플리케이션 레벨에서는 `/files/profile/**`, `/files/proposal/**`, `/files/resume/**` 공개 경로를 이미 사용한다.
 - 현재 ERD에는 제안서 첨부파일 연결 테이블은 없다.
+- 따라서 제안서 파일 업로드 경로가 존재하더라도 현재 시점에서는 도메인 연관이 확정된 자산이 아니라 임시 업로드 또는 화면 보조 자산으로 해석한다.
 
 ### 4.3 Proposal
 
@@ -168,7 +173,13 @@
 규칙은 아래와 같다.
 
 - `role`은 서비스 역할이 아니라 권한 축이다.
-- 서비스 역할은 `Resume` 존재 여부로 파생한다.
+- 서비스 역할은 `Resume` 존재 여부, 이력서 상태, 공개 설정으로 파생한다.
+- 일반 회원가입 기본값은 `role = USER`, `type = INDIVIDUAL`, `status = ACTIVE`다.
+- `name`과 `nickname`은 trim 후 저장한다.
+- `nickname`이 비어 있으면 `name`으로 대체한다.
+- `email`은 값 객체에서 형식을 검증하고 유니크하게 취급한다.
+- `phone`은 지원 가능한 국내 전화번호 형식만 허용하고, 하이픈을 제거한 값으로 정규화해 저장한다.
+- `delete()`와 `restore()`는 물리 삭제가 아니라 `status` 변경 기반 soft delete / restore다.
 - `memo`는 현재 ERD에는 있지만 현재 코드 엔티티에는 아직 없다.
 
 ### 5.2 resumes
@@ -195,10 +206,11 @@
 
 규칙은 아래와 같다.
 
-- `member_id`는 1:1 연결이므로 유니크 제약이 필요하다.
+- `member_id`는 1:1 연결이므로 `UNIQUE (member_id)`를 강제한다.
 - `preferred_work_type` 기본값은 `SITE`다.
 - `publicly_visible`, `ai_matching_enabled` 기본값은 `true`다.
-- 현재 ERD는 `career`를 nullable로 보지만 현재 코드는 필수로 검증한다.
+- 현재 코드 기준으로 `introduction`, `career_years`, `career`는 모두 필수다.
+- 현재 코드 기준으로 `career_years >= 0`이어야 한다.
 - 현재 ERD에는 `writing_status`, `status`, `portfolio_url`이 있지만 현재 코드 엔티티에는 아직 없다.
 
 ### 5.3 profile_images
@@ -215,7 +227,7 @@
 
 규칙은 아래와 같다.
 
-- 용도상 회원당 대표 프로필 이미지는 1개이므로 `member_id` 유니크 제약을 두는 편이 안전하다.
+- 용도상 회원당 대표 프로필 이미지는 1개이므로 `UNIQUE (member_id)`를 강제한다.
 - 현재 ERD에는 존재하지만 현재 코드 엔티티는 아직 없다.
 
 ### 5.4 stored_files
@@ -238,6 +250,10 @@
 규칙은 아래와 같다.
 
 - `file_url`은 실제 저장 경로가 아니라 애플리케이션이 노출하는 논리 경로다.
+- 현재 코드 기준으로 `file_url`은 반드시 `/`로 시작해야 한다.
+- 현재 코드 기준으로 `file_url`의 base path는 `/files/profile/`, `/files/proposal/`, `/files/resume/` 중 하나다.
+- 현재 코드 기준으로 `original_name`, `stored_name`, `content_type`은 모두 필수다.
+- 현재 코드 기준으로 `size`는 `0` 이상이어야 한다.
 - 현재 ERD는 `content_type`을 enum처럼 표현하지만 현재 코드는 `String`으로 구현돼 있다.
 
 ### 5.5 resume_attachments
@@ -257,7 +273,7 @@
 
 - 첨부파일은 이력서당 여러 개를 가질 수 있다.
 - `display_order`는 현재 ERD 주석 기준 0-indexed다.
-- `UNIQUE (resume_id, display_order)`를 두는 편이 안전하다.
+- `UNIQUE (resume_id, display_order)`를 강제한다.
 - 현재 ERD에는 존재하지만 현재 코드 엔티티는 아직 없다.
 
 ### 5.6 skills
@@ -298,14 +314,14 @@
 
 현재 ERD에서 모집 단위와 스킬을 연결하는 정규화 테이블이다.
 
-| 필드            | 타입                              | 필수 | 설명     |
-|---------------|---------------------------------|----|--------|
-| `id`          | bigint                          | Y  | PK     |
-| `proposal_position_id` | bigint                          | Y  | 모집 단위    |
-| `skill_id`             | bigint                          | Y  | 스킬      |
-| `importance`           | enum(`PREFERENCE`, `ESSENTIAL`) | N  | 우대/필수   |
-| `created_at`           | timestamp                       | Y  | 생성 시각   |
-| `modified_at`          | timestamp                       | Y  | 수정 시각   |
+| 필드                     | 타입                              | 필수 | 설명    |
+|------------------------|---------------------------------|----|-------|
+| `id`                   | bigint                          | Y  | PK    |
+| `proposal_position_id` | bigint                          | Y  | 모집 단위 |
+| `skill_id`             | bigint                          | Y  | 스킬    |
+| `importance`           | enum(`PREFERENCE`, `ESSENTIAL`) | N  | 우대/필수 |
+| `created_at`           | timestamp                       | Y  | 생성 시각 |
+| `modified_at`          | timestamp                       | Y  | 수정 시각 |
 
 현재 역할은 아래와 같다.
 
@@ -317,6 +333,7 @@
 
 - 이 테이블의 FK 기준은 `proposal_position.id`다.
 - 따라서 이름이 비슷하더라도 직무 마스터 `position`의 기본 스킬 템플릿으로 해석하지 않는다.
+- 한 모집 단위 안에서 같은 스킬을 중복 저장하지 않도록 `UNIQUE (proposal_position_id, skill_id)`를 강제한다.
 
 ### 5.9 proposals
 
@@ -371,6 +388,10 @@
 - `head_count`는 현재 ERD에서는 nullable이지만, 서비스 계층에서는 모집 시작 전 양수 검증을 두는 편이 안전하다.
 - 예산이 둘 다 존재하면 `unit_budget_min <= unit_budget_max`여야 한다.
 - `FULL`은 현재 ERD에서는 파생 상태가 아니라 저장 상태다.
+- 현재 문서에서는 `ACCEPTED`, `IN_PROGRESS` 상태 매칭만 정원을 점유하는 것으로 해석한다.
+- 현재 문서에서는 `PROPOSED` 상태 매칭은 정원을 점유하지 않는다.
+- `head_count`가 존재하고 정원 점유 매칭 수가 `head_count`에 도달하면 `FULL`로 전이한다.
+- 수락된 매칭 취소, 반려, 정원 변경으로 여석이 다시 생기면 명시적 재계산 후 `OPEN`으로 되돌릴 수 있다.
 - `CLOSED`이면 신규 요청과 지원을 받을 수 없다.
 - 현재 ERD에는 포지션별 제목, 요구사항 요약, 근무 형태, 경력 범위, 정렬 순서가 없다.
 - 현재 ERD에는 같은 `proposal_id + position_id` 중복을 막는 제약이 보이지 않는다.
@@ -390,7 +411,7 @@
 
 규칙은 아래와 같다.
 
-- `UNIQUE (resume_id, skill_id)`를 두는 편이 안전하다.
+- `UNIQUE (resume_id, skill_id)`를 강제한다.
 - 추천 대상은 `publiclyVisible = true`인 이력서만 포함한다.
 - AI 추천 대상은 `aiMatchingEnabled = true`인 이력서만 포함한다.
 - 직접 지원은 `aiMatchingEnabled = false`여도 허용할 수 있다.
@@ -399,24 +420,28 @@
 
 요청, 수락, 진행, 완료를 하나의 상태 필드로 다루는 핵심 집합이다.
 
-| 필드                     | 타입                                                                                | 필수 | 설명                       |
-|------------------------|-----------------------------------------------------------------------------------|----|--------------------------|
-| `id`                   | bigint                                                                            | Y  | PK                       |
-| `proposal_position_id` | bigint                                                                            | Y  | 대상 모집 단위                 |
-| `resume_id`            | bigint                                                                            | Y  | 대상 이력서                   |
+| 필드                     | 타입                                                                               | 필수 | 설명                       |
+|------------------------|----------------------------------------------------------------------------------|----|--------------------------|
+| `id`                   | bigint                                                                           | Y  | PK                       |
+| `proposal_position_id` | bigint                                                                           | Y  | 대상 모집 단위                 |
+| `resume_id`            | bigint                                                                           | Y  | 대상 이력서                   |
 | `status`               | enum(`PROPOSED`, `ACCEPTED`, `REJECTED`, `IN_PROGRESS`, `COMPLETED`, `CANCELED`) | Y  | 단일 매칭 상태, 기본값 `PROPOSED` |
-| `contract_date`        | timestamp                                                                         | N  | 수락 또는 계약 성립 시각           |
-| `complete_date`        | timestamp                                                                         | N  | 완료 시각                    |
-| `created_at`           | timestamp                                                                         | Y  | 생성 시각                    |
-| `modified_at`          | timestamp                                                                         | Y  | 수정 시각                    |
+| `contract_date`        | timestamp                                                                        | N  | 수락 또는 계약 성립 시각           |
+| `complete_date`        | timestamp                                                                        | N  | 완료 시각                    |
+| `created_at`           | timestamp                                                                        | Y  | 생성 시각                    |
+| `modified_at`          | timestamp                                                                        | Y  | 수정 시각                    |
 
 현재 ERD 기준 핵심 규칙은 아래와 같다.
 
-- 한 `proposal_position`과 한 `resume` 조합에는 동시에 하나의 활성 매칭만 허용하는 편이 안전하다.
+- 활성 매칭은 `PROPOSED`, `ACCEPTED`, `IN_PROGRESS`로 정의한다.
+- 종료 매칭은 `REJECTED`, `CANCELED`, `COMPLETED`로 정의한다.
+- 한 `proposal_position`과 한 `resume` 조합에는 동시에 하나의 활성 매칭만 허용한다.
 - 현재 ERD는 `initiator_type`을 저장하지 않으므로, 클라이언트 요청인지 프리랜서 지원인지는 API나 감사 로그에서 구분해야 한다.
 - 현재 ERD는 `participation_status`를 별도로 두지 않으므로 요청 처리와 진행 상태를 하나의 `status`가 모두 담당한다.
 - 연락처 공개 시점은 `ACCEPTED` 이후로 해석하는 것이 자연스럽다.
-- `contract_date`와 `complete_date`는 각각 수락/완료 시점 기록으로 사용한다.
+- `contract_date`는 `ACCEPTED` 전이 시점 기록으로 사용한다.
+- `complete_date`는 `COMPLETED` 전이 시점 기록으로 사용한다.
+- 활성 매칭 중복 방지는 partial unique index 또는 동일 트랜잭션 내 재검증으로 강제한다.
 
 ### 5.13 상태별 허용 액션 매트릭스
 
@@ -528,16 +553,18 @@ PROPOSED -> CANCELED
 
 현재 모델에서 최소한으로 지켜야 할 규칙은 아래와 같다.
 
-1. `Resume`가 있어야 프리랜서 기능을 사용할 수 있다.
-2. `resume.status = INACTIVE`면 프리랜서 프로필로 취급하지 않는다.
-3. `resume.writing_status = WRITING`이면 추천 노출 대상에서 제외하는 편이 자연스럽다.
+1. `member.status = ACTIVE`인 회원만 클라이언트로서 제안서를 작성할 수 있다.
+2. `resume`가 존재하고 `resume.status = ACTIVE`인 회원만 프리랜서로서 직접 지원과 매칭 흐름에 참여할 수 있다.
+3. `resume.writing_status = WRITING`이면 검색/목록/추천 노출 대상에서 제외한다.
 4. `resume.publiclyVisible = false`면 검색과 추천 결과에서 제외한다.
-5. `resume.aiMatchingEnabled = false`면 AI 추천 결과에서 제외하지만 직접 지원은 허용 가능하다.
+5. `resume.aiMatchingEnabled = false`면 AI 추천 결과에서 제외하지만 직접 지원은 허용한다.
 6. `proposal_position.status = FULL` 또는 `CLOSED`이면 신규 매칭 생성을 막아야 한다.
-7. 연락처는 `matching.status = ACCEPTED` 이전에는 공개하지 않는다.
-8. 전체 예산과 포지션 예산은 의미가 다르므로 별도로 유지한다.
-9. 현재 ERD에는 `proposal_attachments`가 없으므로 제안서 첨부파일은 아직 정식 스키마에 포함되지 않는다.
-10. 현재 ERD에는 시작/종료 양측 승인 모델이 없으므로, 진행/완료는 `matching.status` 단일 상태로 처리한다.
+7. `proposal_position` 정원은 `matching.status in (ACCEPTED, IN_PROGRESS)`만 점유하고, `PROPOSED`는 정원을 점유하지 않는다.
+8. 연락처는 `matching.status = ACCEPTED` 이전에는 공개하지 않는다.
+9. 전체 예산과 포지션 예산은 의미가 다르므로 별도로 유지한다.
+10. 현재 ERD에는 `proposal_attachments`가 없으므로, 제안서 파일은 저장 경로가 있더라도 아직 정식 도메인 연관 자산이 아니다.
+11. 현재 ERD에는 시작/종료 양측 승인 모델이 없으므로, 진행/완료는 `matching.status` 단일 상태로 처리한다.
+12. 한 `proposal_position + resume` 조합에는 동시에 하나의 활성 매칭만 존재해야 한다.
 
 ## 9. 구현 전 확인 체크리스트
 
@@ -545,12 +572,11 @@ PROPOSED -> CANCELED
 
 1. `members.memo`를 내부 전용 필드로만 둘지
 2. `resumes.career`를 nullable로 둘지 현재 코드처럼 필수로 둘지
-3. `profile_image.member_id`를 1:1 unique로 강제할지
-4. `resume_attachments.display_order`의 unique 제약 범위
-5. `proposal.status = MATCHING` 진입 최소 조건
-6. `proposal_position.status = FULL` 갱신 트리거
-7. `matching.status`의 정확한 enum literal과 전이 표
-8. `StoredFile.contentType`을 enum으로 바꿀지 문자열로 유지할지
+3. `proposal.status = MATCHING` 진입 최소 조건
+4. `proposal_position.status` 재계산을 서비스에서 수동으로 할지 배치/트리거성 로직으로 둘지
+5. `matching.status`의 정확한 enum literal이 ERDCloud 원본과 일치하는지
+6. 활성 매칭 중복 방지를 DB partial unique index로 강제할지 서비스 계층 락으로 강제할지
+7. `StoredFile.contentType`을 enum으로 바꿀지 문자열로 유지할지
 
 ## 10. 추후 재논의 항목
 

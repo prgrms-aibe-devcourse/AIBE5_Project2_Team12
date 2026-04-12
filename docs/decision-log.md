@@ -9,9 +9,10 @@
 
 - `UserRole`은 권한 축으로만 사용한다.
 - 모든 활성 회원은 기본적으로 클라이언트 기능을 사용할 수 있다.
-- `Resume`가 존재하면 프리랜서 기능을 사용할 수 있다.
-- `Resume.publiclyVisible`은 검색/목록 노출 여부를 제어한다.
-- `Resume.aiMatchingEnabled`는 AI 추천 후보군 포함 여부만 제어한다.
+- `resume`가 존재하고 `resume.status = ACTIVE`이면 프리랜서로서 직접 지원과 매칭 흐름에 참여할 수 있다.
+- `Resume.publiclyVisible`은 검색/목록 노출 여부를 제어하고, 추천 노출의 선행 조건에도 포함된다.
+- `Resume.writing_status = DONE`이어야 검색/목록/추천 노출 대상이 된다.
+- `Resume.aiMatchingEnabled`는 그 전제 조건을 만족한 이력서 중 AI 추천 후보군 포함 여부만 추가로 제어한다.
 
 ### 제안서와 모집 단위
 
@@ -39,17 +40,27 @@
 - `proposal.status`: `WRITING`, `MATCHING`, `COMPLETE`
 - `proposal_position.status`: `OPEN`, `FULL`, `CLOSED`
 - `matching.status`: `PROPOSED`, `ACCEPTED`, `REJECTED`, `IN_PROGRESS`, `COMPLETED`, `CANCELED`
+- 활성 매칭은 `PROPOSED`, `ACCEPTED`, `IN_PROGRESS`로 본다.
+- `proposal_position.status = FULL`은 `matching.status in (ACCEPTED, IN_PROGRESS)` 수가 `head_count`에 도달했음을 의미한다.
+- 수락 취소나 완료로 정원 여유가 다시 생기면 `proposal_position.status`는 `OPEN`으로 재계산할 수 있다.
 
 ### 매칭/프로젝트 모델
 
 - MVP에서는 별도 `project` 테이블을 두지 않는다.
 - 참여 이력과 진행 흐름은 `matching.status` 단일 필드로 관리한다.
 - 연락처는 `matching.status = ACCEPTED` 이후에만 공개한다.
+- `matching.contract_date`는 `ACCEPTED` 전이 시각, `matching.complete_date`는 `COMPLETED` 전이 시각으로 해석한다.
+- 동일 `proposal_position + resume` 조합에는 동시에 하나의 활성 매칭만 둔다.
+
+### 파일 자산
+
+- 현재 애플리케이션에는 `/files/profile/**`, `/files/resume/**`, `/files/proposal/**` 저장 경로가 있다.
+- 다만 ERD에 `proposal_attachments`가 없으므로 제안서 파일은 아직 정식 도메인 연관 자산으로 취급하지 않는다.
 
 ## 2. 현재 보류 결정
 
 - `proposal_position` 상세 필드 확장 여부
-- `proposal_attachments` 도입 여부
+- 제안서 파일을 정식 도메인 자산으로 승격할지 여부
 - `matching.initiator_type`, `requested_by_member_id` 추가 여부
 - 시작/종료 양측 승인 모델 도입 여부
 - `MATCHING` 상태 제안서 수정 정책
@@ -65,11 +76,19 @@
 
 ### Q. 클라이언트와 프리랜서를 동시에 할 수 있나?
 
-가능하다. 서비스 역할을 별도 컬럼으로 저장하지 않고, `Resume` 존재 여부로 프리랜서 기능을 파생한다.
+가능하다. 다만 프리랜서 기능은 `resume` 존재만으로 충분하지 않고, 직접 지원/매칭 참여는 `resume.status = ACTIVE`, 검색/목록 노출은 `writing_status`와 `publiclyVisible`, AI 추천 노출은 여기에 `aiMatchingEnabled`를 추가로 본다.
 
 ### Q. AI 추천을 끄면 직접 지원도 막히나?
 
 아니다. `aiMatchingEnabled`는 AI 추천 후보군 제외만 의미한다.
+
+### Q. `FULL`은 언제 되나?
+
+`PROPOSED`는 정원을 차지하지 않고, `ACCEPTED` 또는 `IN_PROGRESS` 매칭 수가 `head_count`에 도달했을 때만 `FULL`이다.
+
+### Q. 제안서 파일은 지금 도메인에서 어디까지 지원하나?
+
+저장 경로는 이미 있지만, 현재 MVP 기준으로는 정식 `proposal_attachments` 모델 없이 임시 업로드 또는 UI 보조 자산으로만 해석한다.
 
 ### Q. 매칭이 성립하면 프로젝트가 생성되나?
 
