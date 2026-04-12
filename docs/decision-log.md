@@ -18,7 +18,8 @@
 - `proposal`은 프로젝트 전체 수준의 문서다.
 - `proposal_position`은 실제 모집 단위다.
 - `position`은 공용 직무 마스터다.
-- `position_skill`은 현재 ERD 기준의 직무-스킬 템플릿이다.
+- `proposal_position_skill`은 실제 모집 단위별 요구 스킬 집합이다.
+- 요구 스킬 테이블의 FK 기준은 `proposal_position.id`다.
 
 ### AI 브리프 저장 모델
 
@@ -48,7 +49,6 @@
 ## 2. 현재 보류 결정
 
 - `proposal_position` 상세 필드 확장 여부
-- `proposal_position_skill` 도입 여부
 - `proposal_attachments` 도입 여부
 - `matching.initiator_type`, `requested_by_member_id` 추가 여부
 - 시작/종료 양측 승인 모델 도입 여부
@@ -59,7 +59,7 @@
 - ERD에 없는 확장 설계는 현재 코드 대상으로 보지 않는다.
 - 문서와 ERD가 충돌하면 우선 현재 ERD 기준으로 맞춘다.
 - 단, 코드에 이미 구현된 제약과 다르면 `domain-spec.md`의 "현재 코드 기준 제약"에 차이를 명시한다.
-- 추천 엔진은 당분간 `position_skill`을 정규화된 요구 스킬 source로 사용한다.
+- 추천 엔진은 `proposal_position_skill`을 정규화된 요구 스킬 source로 사용한다.
 
 ## 4. 지금 팀이 자주 확인해야 할 질문
 
@@ -77,4 +77,4 @@
 
 ### Q. 포지션별 요구 스킬을 따로 저장하나?
 
-현재 ERD 기준으로는 아니다. 직무 마스터의 `position_skill`을 우선 사용한다.
+그렇다. 현재 모델의 요구 스킬 source는 `proposal_position_skill`이다.

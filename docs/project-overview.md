@@ -26,7 +26,7 @@
 - `proposal.raw_input_text`는 AI 브리프의 원본 자유 입력을 보존한다.
 - `proposal.total_budget_*`와 `proposal_position.unit_budget_*`는 의미가 다르므로 둘 다 유지한다.
 - MVP에서는 별도 `project` 테이블 없이 `matching.status` 단일 모델로 진행 흐름을 관리한다.
-- 양측 시작/종료 승인, `proposal_position_skill`, `proposal_attachments`는 현재 보류다.
+- 양측 시작/종료 승인, `proposal_attachments`는 현재 보류다.
 
 ## 1. 프로젝트 개요
 
@@ -158,7 +158,7 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 - 구조화가 부족하면 룰 베이스 fallback으로 품질 저하를 완충한다.
 - LLM 설명은 응답으로 노출되는 Top 3 후보에 대해서만 생성한다.
 - 매 요청마다 전부 재생성하지 않고 세션 또는 캐시를 활용해 비용을 제어한다.
-- 현재 ERD에는 `proposal_position_skill`이 없으므로, 정규화된 요구 스킬 기준은 `position_skill`을 우선 사용한다.
+- 현재 정규화된 요구 스킬 기준은 `proposal_position_skill`이다.
 
 ### 5.3 설명 가능한 추천
 
@@ -179,15 +179,15 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 - 제안서: 클라이언트가 작성하는 프로젝트 문서
 - 제안서 포지션: 하나의 제안서 안에서 실제 모집 단위가 되는 포지션
 - 직무 마스터: 재사용 가능한 공용 직무 기준값
-- 직무 스킬: 직무 마스터에 연결된 기본 스킬 템플릿
+- 제안서 포지션 스킬: 실제 모집 단위에 연결된 요구 스킬
 - 매칭: 요청, 수락, 진행, 완료 흐름을 표현하는 관계
 - 파일: 프로필 이미지, 이력서 첨부 등 업로드 자산
 
 현재 논의 흐름상 개념 구분은 아래가 적절하다.
 
 - `position`: 직무 마스터 테이블
-- `position_skill`: 직무 기준의 스킬 템플릿
 - `proposal_position`: 실제 모집 단위
+- `proposal_position_skill`: 실제 모집 단위 요구 스킬
 - `matching`: `proposal_position` 기준으로 성립하는 요청과 진행 흐름
 - `profile_image`: 회원 대표 이미지 연결
 - `resume_attachments`: 이력서 첨부파일 연결
@@ -236,7 +236,7 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 - `proposal_position.status = FULL`을 서비스에서 언제 갱신할지
 - `matching.status`의 정확한 enum literal
 - `Resume.status`, `Resume.writing_status`를 추천 필터에 어떻게 반영할지
-- `position_skill`만으로 추천을 시작해도 MVP 범위에 충분한지
+- `proposal_position_skill`의 최소 입력 기준을 어디까지 강제할지
 - `MATCHING` 상태 제안서의 수정 UX를 어디까지 허용할지
 
 ## 9. 핵심 운영 규칙
@@ -276,7 +276,6 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 - 신규 프리랜서 등록 시 자동 재랭킹 알림
 - 비 IT 업종 확장
 - 외부 데이터 대량 연동
-- `proposal_position_skill`
 - `proposal_attachments`
 - 양측 시작 승인 / 종료 승인 모델
 
@@ -316,7 +315,7 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 - `resume_attachments`
 - 프로젝트 제안서 작성 UI
 - AI 브리프 생성
-- 직무 마스터 및 직무 스킬 관리
+- 직무 마스터 및 제안서 포지션 스킬 관리
 - 제안서 포지션 관리
 - 추천 엔진
 - 지원자 비교 및 선택

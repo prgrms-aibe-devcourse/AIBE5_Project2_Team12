@@ -25,7 +25,8 @@
 - `proposal.status`는 `WRITING`, `MATCHING`, `COMPLETE`다.
 - `proposal_position.status`는 `OPEN`, `FULL`, `CLOSED`다.
 - `matching`은 `status` 단일 필드와 `contract_date`, `complete_date`만 가진다.
-- 현재 ERD에는 `proposal_position_skill`, `proposal_attachments`, `initiator_type`, `participation_status`가 없다.
+- 현재 ERD에는 `proposal_position_skill`이 존재하고, 요구 스킬의 정규화 source로 사용한다.
+- 현재 ERD에는 `proposal_attachments`, `initiator_type`, `participation_status`가 없다.
 - 양측 시작 승인 / 종료 승인 모델은 현재 MVP 백로그에 포함하지 않는다.
 - `StoredFile.contentType`은 ERD 표현과 현재 코드 표현이 다르므로 구현 전에 한 번 더 맞춰야 한다.
 
@@ -34,7 +35,7 @@
 이번 문서 기준으로 팀이 실제로 만들어야 하는 최소 산출물은 아래와 같다.
 
 - `Member`, `Resume`, `ProfileImage`, `ResumeAttachment`, `StoredFile`, `ResumeSkill` 정렬
-- `Position`, `PositionSkill`, `Proposal`, `ProposalPosition`, `Matching` 엔티티/리포지토리
+- `Position`, `Proposal`, `ProposalPosition`, `ProposalPositionSkill`, `Matching` 엔티티/리포지토리
 - 제안서 저장/모집 시작 흐름
 - 매칭 요청/수락/진행/완료 흐름
 - 추천 엔진의 하드 필터 + Top 3 응답 뼈대
@@ -79,7 +80,7 @@
 작업 항목은 아래와 같다.
 
 - `Position` 엔티티 및 초기 시드 설계
-- `PositionSkill` 엔티티, 리포지토리, 테스트 추가
+- `ProposalPositionSkill` 엔티티, 리포지토리, 테스트 추가
 - `Proposal` 엔티티, 리포지토리, 테스트 추가
 - `ProposalPosition` 엔티티, 리포지토리, 테스트 추가
 - 제안서 저장/수정/모집 시작 서비스 추가
@@ -103,7 +104,7 @@
 
 종료 산출물은 아래와 같다.
 
-- 직무/직무 스킬 시드 구조
+- 직무/모집 단위 스킬 구조
 - 제안서와 모집 단위 저장 구조
 - `WRITING -> MATCHING -> COMPLETE` 상태 전이 서비스
 
@@ -123,8 +124,8 @@
 중요한 제약은 아래와 같다.
 
 - 현재 ERD에는 `raw_input_text`가 있고, `overview`는 없다.
-- 현재 ERD에는 `proposal_position_skill`이 없다.
-- 따라서 AI 브리프 결과 중 상세 요구사항은 `description` 텍스트와 `position_id` 선택 중심으로 흡수해야 한다.
+- 현재 ERD에는 `proposal_position_skill`이 있다.
+- 따라서 AI 브리프 결과 중 구조화된 요구 스킬은 `proposal_position_skill`까지 저장하도록 설계해야 한다.
 - `raw_input_text`는 재생성, 비교, 신뢰 확보를 위한 원문 보존 필드로 사용한다.
 
 검증은 아래와 같다.
@@ -228,12 +229,12 @@
 - `aiMatchingEnabled = true`
 - `preferred_work_type`와 `proposal.work_type`
 - `career_years`
-- `position_skill.importance = ESSENTIAL`
+- `proposal_position_skill.importance = ESSENTIAL`
 
 현재 모델의 제약은 아래와 같다.
 
-- `proposal_position_skill`이 없어서 실제 모집 단위별 커스텀 스킬 요구사항을 정규화해 비교할 수 없다.
-- 추천 근거의 normalized source는 당분간 `position_skill`이 된다.
+- `proposal_position_skill`은 현재 스킬 ID와 중요도만 표현하므로 세부 요구 수준은 담기 어렵다.
+- 직무 마스터 `position`에는 기본 스킬 템플릿이 없어서 생성 보조 재사용성이 낮다.
 
 검증은 아래와 같다.
 
@@ -267,7 +268,6 @@
 현재 ERD에 없어서 이번 백로그에서 제외한 항목은 아래와 같다.
 
 - `proposal_attachments`
-- `proposal_position_skill`
 - `proposal_position`의 상세 요구사항 필드
 - `matching.initiator_type`
 - `matching.participation_status`
@@ -286,7 +286,7 @@
 
 아래 작업은 병렬화하면 안 된다.
 
-- `PositionSkill` 없이 추천 점수 계산 구현
+- `ProposalPositionSkill` 없이 추천 점수 계산 구현
 - `ProposalPosition` 상태 모델 구현 전 매칭 수락 규칙 구현
 
 ## 6. 팀 리뷰 체크포인트
@@ -305,7 +305,7 @@ PR 리뷰나 중간 점검 때는 아래 질문을 공통으로 본다.
 
 1. `Resume` 기반 프리랜서 진입 규칙 반영
 2. `resume_skill` 추가
-3. `Position`, `PositionSkill`, `Proposal`, `ProposalPosition` 엔티티 추가
+3. `Position`, `Proposal`, `ProposalPosition`, `ProposalPositionSkill` 엔티티 추가
 4. 제안서 저장/모집 시작 서비스 구현
 5. `Matching` 구현
 
@@ -331,7 +331,7 @@ PR 리뷰나 중간 점검 때는 아래 질문을 공통으로 본다.
 현재 기준 주요 리스크는 아래와 같다.
 
 - `Resume` 존재 여부, 공개 노출 여부, AI 추천 노출 여부를 같은 의미로 잘못 해석하면 화면과 권한 설계가 흔들린다.
-- `proposal_position_skill`이 없는 상태에서 `position_skill`만으로 추천을 수행하면 포지션별 요구사항 표현력이 부족해진다.
+- `proposal_position_skill` 입력 품질이 낮으면 추천 근거와 스킬 일치도 설명이 흔들린다.
 - `Resume.status`, `Resume.writingStatus`, `profile_image`, `resume_attachments`를 늦게 반영하면 이력서 화면 구조와 추천 필터 조건이 다시 흔들릴 수 있다.
 - `matching.status` 하나에 요청 처리와 진행 이력을 모두 넣으면 상태 전이 버그가 빠르게 늘어난다.
 - `proposal_position` 정원 수락 경쟁은 동시성 문제를 만든다.

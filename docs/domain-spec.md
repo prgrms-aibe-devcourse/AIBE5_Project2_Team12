@@ -18,7 +18,7 @@
 - 스킬과 직무 마스터
 - 클라이언트가 작성하는 제안서
 - 제안서 내부의 모집 단위
-- 직무 마스터와 직무 스킬 템플릿
+- 직무 마스터와 모집 단위 요구 스킬
 - 요청, 수락, 진행, 완료를 하나의 상태로 관리하는 매칭
 - 현재 ERD 기준에서 추천 엔진이 읽을 수 있는 입력 구조
 
@@ -60,14 +60,14 @@
 - `profile_image`와 `resume_attachments`는 현재 ERD에 존재한다.
 - `stored_file`은 업로드 자산의 공통 메타데이터 테이블이다.
 - `skills.description`은 optional이다.
-- `position_skill`은 현재 ERD에 존재하는 유일한 정규화된 직무-스킬 연결 테이블이다.
+- `proposal_position_skill`은 현재 ERD에 존재하는 정규화된 모집 단위-스킬 연결 테이블이다.
 - `proposal`은 프로젝트 전체 수준의 문서다.
 - `proposal`은 `raw_input_text`, `title`, `description`, `total_budget_*`, `work_type`, `work_place`, `expected_period`, `status`를 가진다.
 - `proposal.status`는 `WRITING`, `MATCHING`, `COMPLETE` 3단계다.
 - `proposal_position`은 실제 모집 단위지만 현재 ERD에서는 최소 필드만 가진다.
 - `proposal_position`은 `position_id`, `head_count`, `unit_budget_*`, `status`를 가진다.
 - `proposal_position.status`는 `OPEN`, `FULL`, `CLOSED`를 저장한다.
-- `proposal_position`별 커스텀 스킬 테이블은 현재 ERD에 없다.
+- `proposal_position_skill`은 `proposal_position`별 요구 스킬을 저장한다.
 - `matching`은 `proposal_position`과 `resume`의 조합을 표현한다.
 - `matching`은 `status` 단일 필드와 `contract_date`, `complete_date`만으로 흐름을 관리한다.
 - 현재 ERD에는 `initiator_type`, `participation_status`, 시작/종료 승인 시각이 없다.
@@ -139,7 +139,7 @@
 - `ResumeAttachment`: 이력서 첨부 파일 연결
 - `StoredFile`: 업로드 자산 메타데이터
 - `Position`: 공용 직무 마스터
-- `PositionSkill`: 직무 기준 스킬 템플릿
+- `ProposalPositionSkill`: 실제 모집 단위 요구 스킬
 - `Proposal`: 클라이언트가 작성하는 프로젝트 문서
 - `ProposalPosition`: 실제 모집 단위
 - `Matching`: 요청, 수락, 진행, 완료 흐름 기록
@@ -294,24 +294,29 @@
 - `name`은 유니크해야 한다.
 - `description`, `status`, `member_id`는 현재 ERD에 없다.
 
-### 5.8 position_skills
+### 5.8 proposal_position_skills
 
-현재 ERD에서 직무와 스킬을 연결하는 유일한 정규화 테이블이다.
+현재 ERD에서 모집 단위와 스킬을 연결하는 정규화 테이블이다.
 
 | 필드            | 타입                              | 필수 | 설명     |
 |---------------|---------------------------------|----|--------|
 | `id`          | bigint                          | Y  | PK     |
-| `position_id` | bigint                          | Y  | 직무 마스터 |
-| `skill_id`    | bigint                          | Y  | 스킬     |
-| `importance`  | enum(`PREFERENCE`, `ESSENTIAL`) | N  | 우대/필수  |
-| `created_at`  | timestamp                       | Y  | 생성 시각  |
-| `modified_at` | timestamp                       | Y  | 수정 시각  |
+| `proposal_position_id` | bigint                          | Y  | 모집 단위    |
+| `skill_id`             | bigint                          | Y  | 스킬      |
+| `importance`           | enum(`PREFERENCE`, `ESSENTIAL`) | N  | 우대/필수   |
+| `created_at`           | timestamp                       | Y  | 생성 시각   |
+| `modified_at`          | timestamp                       | Y  | 수정 시각   |
 
 현재 역할은 아래와 같다.
 
-- 직무 마스터 기준의 기본 요구 스킬 세트
+- `proposal_position`별 실제 요구 스킬 저장
 - 추천 엔진이 읽는 현재 normalized requirement source
-- AI 브리프나 수동 입력 시 기본 템플릿 제공
+- 매칭 단위별 필수/우대 스킬 표현
+
+해석 기준은 아래와 같다.
+
+- 이 테이블의 FK 기준은 `proposal_position.id`다.
+- 따라서 이름이 비슷하더라도 직무 마스터 `position`의 기본 스킬 템플릿으로 해석하지 않는다.
 
 ### 5.9 proposals
 
@@ -510,13 +515,13 @@ PROPOSED -> CANCELED
 - `proposal_position.head_count`
 - `proposal_position.unit_budget_min`
 - `proposal_position.unit_budget_max`
-- `position_skill.skill_id`
-- `position_skill.importance`
+- `proposal_position_skill.skill_id`
+- `proposal_position_skill.importance`
 
 현재 모델의 한계는 아래와 같다.
 
-- `proposal_position`별 커스텀 요구 스킬을 정규화해서 저장할 수 없다.
-- 직무 마스터 `position_skill`이 실제 모집 스킬의 source of truth 역할까지 겸하게 된다.
+- `proposal_position_skill`은 현재 스킬 ID와 중요도만 가지므로 요구 이유나 숙련도 조건을 담기 어렵다.
+- 직무 마스터 `position` 자체에는 기본 스킬 템플릿이 없어서 생성 보조 시 재사용성이 약하다.
 - 포지션별 경력 범위나 요구사항 요약이 없어서 하드 필터와 설명 근거가 거칠어진다.
 
 ## 8. 핵심 운영 규칙
@@ -563,10 +568,10 @@ PROPOSED -> CANCELED
 
 현재 ERD는 최소 모집 단위만 갖고 있어서, 포지션별 세부 조건을 표현하기 어렵다.
 
-### 10.2 proposal_position_skills
+### 10.2 position 기본 스킬 템플릿
 
-`proposal_position`별 요구 스킬을 별도로 저장하는 모델이다.
-현재 ERD에는 없지만, 추천 정확도를 높이려면 가장 먼저 재도입을 검토할 대상이다.
+현재 요구 스킬 source는 `proposal_position_skill`이다.
+향후 AI 브리프 생성 보조나 직무별 기본값 재사용이 필요해지면, 별도의 `position_skill` 또는 `position_default_skill` 템플릿 모델을 검토할 수 있다.
 
 ### 10.3 proposal_attachments
 
