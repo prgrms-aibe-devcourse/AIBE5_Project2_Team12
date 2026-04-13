@@ -1,7 +1,7 @@
 # IT-da 도메인 상세 명세
 
-이 문서는 2026-04-10 기준 `ERDCloud` 초안을 기준으로 `member`, `resume`, `file`, `skill`, `proposal`, `proposal_position`,
-`position`, `matching` 도메인을 다시 정렬한 명세다.
+이 문서는 2026-04-10 기준 `ERDCloud` 초안과 이번에 함께 반영하는 추천 도메인 테이블(`5.16 ~ 5.18`)을 기준으로
+`member`, `resume`, `file`, `skill`, `proposal`, `proposal_position`, `position`, `matching` 도메인을 다시 정렬한 명세다.
 이전 대화에서 나온 확장 설계 중 ERD에 아직 반영되지 않은 항목은 현재 모델로 취급하지 않고, 문서 마지막의 `추후 재논의`로 내린다.
 
 ## 1. 기준과 범위
@@ -9,7 +9,7 @@
 현재 문서의 source of truth는 아래 두 가지다.
 
 - 현재 리포지토리의 구현 상태
-- ERDCloud 초안에 반영된 현재 스키마
+- ERDCloud 초안과 이번 ERD 변경안에 반영하는 현재 스키마
 
 이번 문서의 범위는 아래와 같다.
 
@@ -21,6 +21,7 @@
 - 직무 마스터와 모집 단위 요구 스킬
 - 요청, 수락, 진행, 완료를 하나의 상태로 관리하는 매칭
 - 현재 ERD 기준에서 추천 엔진이 읽을 수 있는 입력 구조
+- MVP 추천 결과 저장 구조
 
 이번 문서의 비범위는 아래와 같다.
 
@@ -60,7 +61,7 @@
 - `profile_image`와 `resume_attachments`는 현재 ERD에 존재한다.
 - `stored_file`은 업로드 자산의 공통 메타데이터 테이블이다.
 - `skills.description`은 optional이다.
-- `proposal_position_skill`은 현재 ERD에 존재하는 정규화된 모집 단위-스킬 연결 테이블이다.
+- `proposal_position_skills`는 현재 ERD에 존재하는 정규화된 모집 단위-스킬 연결 테이블이다.
 - `proposal`은 프로젝트 전체 수준의 문서다.
 - `proposal`은 `raw_input_text`, `title`, `description`, `total_budget_*`, `work_type`, `work_place`, `expected_period`,
   `status`를 가진다.
@@ -68,7 +69,7 @@
 - `proposal_position`은 실제 모집 단위지만 현재 ERD에서는 최소 필드만 가진다.
 - `proposal_position`은 `position_id`, `head_count`, `unit_budget_*`, `status`를 가진다.
 - `proposal_position.status`는 `OPEN`, `FULL`, `CLOSED`를 저장한다.
-- `proposal_position_skill`은 `proposal_position`별 요구 스킬을 저장한다.
+- `proposal_position_skills`는 `proposal_position`별 요구 스킬을 저장한다.
 - `matching`은 `proposal_position`과 `resume`의 조합을 표현하되, 당사자 판정 anchor로 `client_member_id`, `freelancer_member_id`를 함께 가진다.
 - `matching`은 `status` 단일 필드와 `contract_date`, `complete_date`만으로 흐름을 관리한다.
 - 현재 ERD에는 `initiator_type`, `participation_status`, 시작/종료 승인 시각이 없다.
@@ -78,8 +79,10 @@
 - 서비스 역할은 별도 컬럼으로 저장하지 않는다.
 - 모든 활성 회원은 기본적으로 클라이언트 기능을 사용할 수 있다.
 - `Resume`가 존재하고 `resume.status = ACTIVE`이면 프리랜서로서 직접 지원과 매칭 흐름에 참여할 수 있다.
-- `Resume.writing_status = DONE`이고 `Resume.publiclyVisible = true`여야 검색/목록 노출 대상이 된다.
-- `Resume.aiMatchingEnabled`는 그 전제 조건을 만족한 이력서 중 AI 추천 후보군 포함 여부만 추가로 제어한다.
+- `resume.writing_status = DONE`이고 `resume.publicly_visible = true`여야 검색/목록 노출 대상이 된다.
+- `resume.ai_matching_enabled`는 그 전제 조건을 만족한 이력서 중 AI 추천 후보군 포함 여부만 추가로 제어한다.
+- MVP 추천 엔진을 위해 `recommendation_runs`, `recommendation_results`, `resume_embeddings`를 ERD에 추가한다.
+- `proposal_position_embeddings`는 MVP에서 추가하지 않는다.
 
 ## 4. 권장 집합 경계
 
@@ -96,8 +99,8 @@
 - `canActAsClient(member) = member.status == ACTIVE`
 - `canActAsFreelancer(member) = resume exists && resume.status == ACTIVE`
 - `canApplyDirectly(member) = resume exists && resume.status == ACTIVE`
-- `canBeListed(member) = resume exists && resume.status == ACTIVE && resume.writing_status == DONE && resume.publiclyVisible`
-- `canBeRecommended(member) = resume exists && resume.status == ACTIVE && resume.writing_status == DONE && resume.publiclyVisible && resume.aiMatchingEnabled`
+- `canBeListed(member) = resume exists && resume.status == ACTIVE && resume.writing_status == DONE && resume.publicly_visible`
+- `canBeRecommended(member) = resume exists && resume.status == ACTIVE && resume.writing_status == DONE && resume.publicly_visible && resume.ai_matching_enabled`
 
 따라서 `UserRole`은 권한 관리 축으로만 두고, 서비스 역할은 `Resume` 존재 여부, 이력서 상태, 공개 설정으로 해석한다.
 
@@ -417,9 +420,9 @@
 규칙은 아래와 같다.
 
 - `UNIQUE (resume_id, skill_id)`를 강제한다.
-- 추천 대상은 `publiclyVisible = true`인 이력서만 포함한다.
-- AI 추천 대상은 `aiMatchingEnabled = true`인 이력서만 포함한다.
-- 직접 지원은 `aiMatchingEnabled = false`여도 허용할 수 있다.
+- 추천 대상은 `publicly_visible = true`인 이력서만 포함한다.
+- AI 추천 대상은 `ai_matching_enabled = true`인 이력서만 포함한다.
+- 직접 지원은 `ai_matching_enabled = false`여도 허용할 수 있다.
 
 ### 5.12 matchings
 
@@ -538,6 +541,8 @@
 이 매트릭스는 현재 ERD에서 직접 드러나지 않는 운영 해석을 정리한 것이다.
 코드 구현 전 서비스 정책과 다르면 여기부터 먼저 맞추는 편이 안전하다.
 
+아래 `5.16 ~ 5.18`은 현재 ERD에 함께 반영하는 추천 도메인 집합이다.
+
 ### 5.16 recommendation_runs
 
 추천 실행 1회를 저장하는 루트다.
@@ -551,7 +556,7 @@ MVP에서는 캐시 키와 실행 이력을 함께 담당한다.
 | `algorithm_version`    | varchar(50)                                          | Y  | 추천 알고리즘 버전            |
 | `candidate_count`      | integer                                              | Y  | 하드 필터 통과 후 점수 계산 대상 수 |
 | `top_k`                | integer                                              | Y  | 저장 결과 개수, MVP 기본값 3    |
-| `hard_filter_stats`    | json                                                 | N  | 필터별 통과/탈락 집계          |
+| `hard_filter_stats`    | jsonb                                                | N  | 필터별 통과/탈락 집계          |
 | `status`               | enum(`PENDING`, `RUNNING`, `COMPUTED`, `FAILED`)     | Y  | 실행 상태                 |
 | `error_message`        | text                                                 | N  | 실패 사유                 |
 | `created_at`           | timestamp                                            | Y  | 생성 시각                 |
@@ -563,7 +568,7 @@ MVP에서는 캐시 키와 실행 이력을 함께 담당한다.
 
 - `UNIQUE (proposal_position_id, request_fingerprint, algorithm_version)`를 강제한다.
 - 같은 `proposal_position`, 같은 fingerprint, 같은 알고리즘 버전이면 기존 실행 결과를 재사용한다.
-- `request_fingerprint`는 최소한 `proposal`, `proposal_position`, `proposal_position_skill`, 추천 파라미터를 반영해야 한다.
+- `request_fingerprint`는 최소한 `proposal`, `proposal_position`, `proposal_position_skills`, 추천 파라미터를 반영해야 한다.
 - MVP에서는 `created_at`을 추천 실행 시작 시각, `modified_at`을 최종 상태 반영 시각으로 사용하고 별도 `started_at`, `finished_at` 컬럼은 두지 않는다.
 - MVP에서는 `input_snapshot_json`, `stale` 플래그, 프롬프트 버전 컬럼을 두지 않고 캐시 키와 재계산 규칙으로 단순화한다.
 - `resumes`, `resume_skills`, `publicly_visible`, `ai_matching_enabled` 변경 시 해당 이력서가 포함된 기존 추천 실행은 재사용하지 않고 새로 계산한다.
@@ -581,7 +586,7 @@ MVP에서는 전체 후보 랭킹이 아니라 응답에 노출할 결과만 저
 | `rank`                  | integer                                      | Y  | 추천 순위              |
 | `final_score`           | numeric(5,4)                                 | Y  | 최종 점수              |
 | `embedding_score`       | numeric(5,4)                                 | Y  | 임베딩 유사도 점수         |
-| `reason_facts`          | json                                         | Y  | 추천 근거 구조화 데이터      |
+| `reason_facts`          | jsonb                                        | Y  | 추천 근거 구조화 데이터      |
 | `llm_reason`            | text                                         | N  | 사용자 노출용 추천 설명       |
 | `llm_status`            | enum(`PENDING`, `READY`, `FAILED`)           | Y  | 설명 생성 상태           |
 | `created_at`            | timestamp                                    | Y  | 생성 시각, 최초 결과 저장 시각  |
@@ -611,7 +616,7 @@ MVP에서는 반복 비용이 큰 이력서 쪽만 영속화하고, `proposal_po
 | `resume_id`       | bigint      | Y  | 대상 이력서     |
 | `source_hash`     | varchar(128)| Y  | 임베딩 원문 해시  |
 | `embedding_model` | varchar(100)| Y  | 임베딩 모델     |
-| `embedding_vector`| json        | Y  | 임베딩 벡터 값   |
+| `embedding_vector`| jsonb       | Y  | 임베딩 벡터 값   |
 | `created_at`      | timestamp   | Y  | 생성 시각      |
 | `modified_at`     | timestamp   | Y  | 수정 시각      |
 | `created_by`      | varchar     | N  | 감사 정보      |
@@ -689,8 +694,8 @@ PROPOSED -> CANCELED
 - `resume.publicly_visible`
 - `resume.ai_matching_enabled`
 - `resume.portfolio_url`
-- `resume_skill.skill_id`
-- `resume_skill.proficiency_level`
+- `resume_skills.skill_id`
+- `resume_skills.proficiency_level`
 - `career` JSON의 상세 경력
 
 ### 제안서 쪽
@@ -703,12 +708,12 @@ PROPOSED -> CANCELED
 - `proposal_position.head_count`
 - `proposal_position.unit_budget_min`
 - `proposal_position.unit_budget_max`
-- `proposal_position_skill.skill_id`
-- `proposal_position_skill.importance`
+- `proposal_position_skills.skill_id`
+- `proposal_position_skills.importance`
 
 현재 모델의 한계는 아래와 같다.
 
-- `proposal_position_skill`은 현재 스킬 ID와 중요도만 가지므로 요구 이유나 숙련도 조건을 담기 어렵다.
+- `proposal_position_skills`는 현재 스킬 ID와 중요도만 가지므로 요구 이유나 숙련도 조건을 담기 어렵다.
 - 직무 마스터 `position` 자체에는 기본 스킬 템플릿이 없어서 생성 보조 시 재사용성이 약하다.
 - 포지션별 경력 범위나 요구사항 요약이 없어서 하드 필터와 설명 근거가 거칠어진다.
 
@@ -719,8 +724,8 @@ PROPOSED -> CANCELED
 1. `member.status = ACTIVE`인 회원만 클라이언트로서 제안서를 작성할 수 있다.
 2. `resume`가 존재하고 `resume.status = ACTIVE`인 회원만 프리랜서로서 직접 지원과 매칭 흐름에 참여할 수 있다.
 3. `resume.writing_status = WRITING`이면 검색/목록/추천 노출 대상에서 제외한다.
-4. `resume.publiclyVisible = false`면 검색과 추천 결과에서 제외한다.
-5. `resume.aiMatchingEnabled = false`면 AI 추천 결과에서 제외하지만 직접 지원은 허용한다.
+4. `resume.publicly_visible = false`면 검색과 추천 결과에서 제외한다.
+5. `resume.ai_matching_enabled = false`면 AI 추천 결과에서 제외하지만 직접 지원은 허용한다.
 6. `proposal_position.status = FULL` 또는 `CLOSED`이면 신규 매칭 생성을 막아야 한다.
 7. `proposal_position` 정원은 `matching.status in (ACCEPTED, IN_PROGRESS)`만 점유하고, `PROPOSED`는 정원을 점유하지 않는다.
 8. 연락처는 `matching.status = ACCEPTED` 이전에는 공개하지 않는다.
@@ -773,7 +778,7 @@ PROPOSED -> CANCELED
 
 ### 10.2 position 기본 스킬 템플릿
 
-현재 요구 스킬 source는 `proposal_position_skill`이다.
+현재 요구 스킬 source는 `proposal_position_skills`다.
 향후 AI 브리프 생성 보조나 직무별 기본값 재사용이 필요해지면, 별도의 `position_skill` 또는 `position_default_skill` 템플릿 모델을 검토할 수 있다.
 
 ### 10.3 proposal_attachments

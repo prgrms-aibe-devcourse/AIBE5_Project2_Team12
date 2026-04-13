@@ -1,7 +1,7 @@
 # IT-da 구현 백로그
 
 이 문서는 [project-overview.md](./project-overview.md)와 [domain-spec.md](./domain-spec.md)를 기준으로 MVP 구현 순서를 정리한 실행 백로그다.
-2026-04-10 기준으로는 현재 ERD 초안과 불일치하지 않게 범위를 다시 정리했다.
+2026-04-10 기준으로는 현재 ERD 초안과 이번에 함께 반영하는 추천 도메인 테이블 기준으로 범위를 다시 정리했다.
 
 ## 1. 구현 원칙
 
@@ -9,7 +9,7 @@
 - 한 번에 AI 기능까지 다 붙이지 않고, 도메인과 상태 모델을 먼저 고정한다.
 - 추천 엔진은 처음부터 벡터 DB를 전제로 하지 않는다.
 - 제안서, 매칭, 추천은 각각 독립적으로 검증 가능한 단계로 쪼갠다.
-- ERD에 없는 확장 설계는 현재 백로그에 넣지 않는다.
+- 현재 ERD 범위와 이번에 함께 반영하는 추천 도메인 테이블 범위 안에서만 백로그를 작성한다.
 
 ## 2. 현재 전제
 
@@ -17,9 +17,9 @@
 
 - 모든 활성 회원은 클라이언트 기능을 사용할 수 있다.
 - `resume`가 존재하고 `resume.status = ACTIVE`이면 프리랜서로서 직접 지원과 매칭 흐름에 참여할 수 있다.
-- `resume.writing_status = DONE`이고 `publiclyVisible = true`여야 검색/목록 노출 대상이 된다.
+- `resume.writing_status = DONE`이고 `resume.publicly_visible = true`여야 검색/목록 노출 대상이 된다.
 - 현재 ERD에는 `members.memo`, `resumes.status`, `resumes.writing_status`, `resumes.portfolio_url`, `profile_image`, `resume_attachments`가 존재한다.
-- AI 추천 노출은 검색/목록 노출 조건에 더해 `Resume.aiMatchingEnabled`로 제어하고, 직접 지원 허용 여부와는 분리한다.
+- AI 추천 노출은 검색/목록 노출 조건에 더해 `resume.ai_matching_enabled`로 제어하고, 직접 지원 허용 여부와는 분리한다.
 - `proposal.raw_input_text`는 AI 브리프 원본 입력을 저장한다.
 - `proposal.total_budget_*`는 전체 프로젝트 예산이다.
 - `proposal_position.unit_budget_*`는 1인 기준 예산이다.
@@ -40,7 +40,7 @@
 - 리뷰 생성 시 작성자, 대상자, 방향은 `matching.client_member_id`, `matching.freelancer_member_id`, 로그인 회원 기준으로 서버가 계산한다.
 - 리뷰 수정은 로그인 회원과 `reviewer_member_id`가 같은 경우에만 허용한다.
 - 리뷰는 별도 초안 상태 없이 `created_at`을 제출 시각으로 함께 사용하고 `submitted_at`은 두지 않는다.
-- 현재 ERD에는 `proposal_position_skill`이 존재하고, 요구 스킬의 정규화 source로 사용한다.
+- 현재 ERD에는 `proposal_position_skills`가 존재하고, 요구 스킬의 정규화 source로 사용한다.
 - 현재 애플리케이션에는 `/files/proposal/**` 저장 경로가 있지만, ERD에는 `proposal_attachments`가 없어서 제안서 파일은 아직 정식 도메인 연관 자산이 아니다.
 - 구현 스키마 확장은 `matching_attachments`, `matching_reviews` 기준으로 진행한다.
 - 현재 ERD에는 `initiator_type`, `participation_status`가 없다.
@@ -108,7 +108,7 @@
 - `ProposalPosition` 엔티티, 리포지토리, 테스트 추가
 - 제안서 저장/수정/모집 시작 서비스 추가
 - `WRITING`, `MATCHING`, `COMPLETE` 상태 전이 규칙 구현
-- `proposal_position_skill` 중복 입력 방지 규칙 구현
+- `proposal_position_skills` 중복 입력 방지 규칙 구현
 
 권장 API 범위는 아래와 같다.
 
@@ -124,7 +124,7 @@
 - 제안서 저장 및 상태 전이 테스트
 - 예산, 인원, 상태 검증 테스트
 - `MATCHING` 상태 진입 전 최소 입력 검증 테스트
-- `proposal_position_skill` 중복 방지 테스트
+- `proposal_position_skills` 중복 방지 테스트
 - 같은 직무 마스터를 여러 줄 등록할 수 있는지 여부를 ERD 원본과 맞춰 테스트
 
 종료 산출물은 아래와 같다.
@@ -149,8 +149,8 @@
 중요한 제약은 아래와 같다.
 
 - 현재 ERD에는 `raw_input_text`가 있고, `overview`는 없다.
-- 현재 ERD에는 `proposal_position_skill`이 있다.
-- 따라서 AI 브리프 결과 중 구조화된 요구 스킬은 `proposal_position_skill`까지 저장하도록 설계해야 한다.
+- 현재 ERD에는 `proposal_position_skills`가 있다.
+- 따라서 AI 브리프 결과 중 구조화된 요구 스킬은 `proposal_position_skills`까지 저장하도록 설계해야 한다.
 - `raw_input_text`는 재생성, 비교, 신뢰 확보를 위한 원문 보존 필드로 사용한다.
 
 검증은 아래와 같다.
@@ -291,9 +291,9 @@
 
 - `resume.status = ACTIVE`
 - `resume.writing_status = DONE`
-- `publiclyVisible = true`
-- `aiMatchingEnabled = true`
-- `proposal_position_skill.importance = ESSENTIAL`
+- `resume.publicly_visible = true`
+- `resume.ai_matching_enabled = true`
+- `proposal_position_skills.importance = ESSENTIAL`
 
 현재 점수화 기준은 아래를 우선한다.
 
@@ -304,7 +304,7 @@
 
 현재 모델의 제약은 아래와 같다.
 
-- `proposal_position_skill`은 현재 스킬 ID와 중요도만 표현하므로 세부 요구 수준은 담기 어렵다.
+- `proposal_position_skills`는 현재 스킬 ID와 중요도만 표현하므로 세부 요구 수준은 담기 어렵다.
 - 직무 마스터 `position`에는 기본 스킬 템플릿이 없어서 생성 보조 재사용성이 낮다.
 - `proposal_position`에 경력 최소/최대 범위가 없어서 `career_years`는 강한 하드 필터보다 점수 항목으로 해석하는 편이 안전하다.
 
@@ -371,7 +371,7 @@ PR 리뷰나 중간 점검 때는 아래 질문을 공통으로 본다.
 2. 프리랜서 진입, 검색 노출, AI 추천 노출 규칙을 서로 다른 조건으로 구현했는가
 3. `proposal`과 `proposal_position`의 예산 의미를 섞지 않았는가
 4. `matching.status` 하나에 현재 허용한 상태만 사용하고 있는가
-5. 추천 노출 조건이 `status`, `writing_status`, `publiclyVisible`, `aiMatchingEnabled`를 모두 반영하는가
+5. 추천 노출 조건이 `status`, `writing_status`, `publicly_visible`, `ai_matching_enabled`를 모두 반영하는가
 6. `FULL` 판정과 활성 매칭 판정을 같은 기준으로 재사용하는가
 7. 프로필/이력서/스킬 연결 테이블의 유니크 제약을 코드와 DB 양쪽에서 놓치지 않았는가
 8. `contract_date`, `complete_date`를 각각 계약 체결 시각, 완료 조건 충족 시각으로 일관되게 쓰고 있는가
@@ -409,7 +409,7 @@ PR 리뷰나 중간 점검 때는 아래 질문을 공통으로 본다.
 현재 기준 주요 리스크는 아래와 같다.
 
 - 직접 지원 가능 여부, 검색/목록 노출 여부, AI 추천 노출 여부를 같은 의미로 잘못 해석하면 화면과 권한 설계가 흔들린다.
-- `proposal_position_skill` 입력 품질이 낮으면 추천 근거와 스킬 일치도 설명이 흔들린다.
+- `proposal_position_skills` 입력 품질이 낮으면 추천 근거와 스킬 일치도 설명이 흔들린다.
 - `Resume.status`, `Resume.writingStatus`, `profile_image`, `resume_attachments`를 늦게 반영하면 이력서 화면 구조와 추천 필터 조건이 다시 흔들릴 수 있다.
 - `matching.status` 하나에 요청 처리와 진행 이력을 모두 넣으면 상태 전이 버그가 빠르게 늘어난다.
 - `proposal_position` 정원 수락 경쟁과 `FULL -> OPEN` 재계산은 동시성 문제를 만든다.
