@@ -47,7 +47,7 @@
 - ERD에는 `resumes.status`, `resumes.writing_status`, `resumes.portfolio_url`이 있지만 현재 코드에는 없다.
 - ERD는 `resumes.career`를 nullable로 보지만 현재 코드는 필수로 검증한다.
 - ERD에는 `profile_image`, `resume_attachments`가 있지만 현재 코드 엔티티는 아직 없다.
-- ERD는 `stored_file.content_type`을 enum처럼 표현하지만 현재 코드는 `String`이다.
+- `stored_file.content_type`은 ERDCloud 표기와 별개로 현재 구현 기준 MIME 문자열(`String` / `varchar`)로 본다.
 
 따라서 신규 도메인은 현재 패턴을 깨지 않는 선에서 추가하는 것이 우선이다.
 
@@ -60,6 +60,7 @@
 - `resumes`는 `status`, `writing_status`, `portfolio_url`을 가진다.
 - `profile_image`와 `resume_attachments`는 현재 ERD에 존재한다.
 - `stored_file`은 업로드 자산의 공통 메타데이터 테이블이다.
+- `stored_file.content_type`은 enum이 아니라 MIME 타입 문자열(`varchar`)로 저장한다.
 - `skills.description`은 optional이다.
 - `proposal_position_skills`는 현재 ERD에 존재하는 정규화된 모집 단위-스킬 연결 테이블이다.
 - `proposal`은 프로젝트 전체 수준의 문서다.
@@ -250,7 +251,7 @@
 | `original_name` | varchar   | Y  | 원본 파일명    |
 | `stored_name`   | varchar   | Y  | 저장 파일명    |
 | `file_url`      | varchar   | Y  | 논리적 요청 경로 |
-| `content_type`  | enum      | Y  | 콘텐츠 타입    |
+| `content_type`  | varchar   | Y  | MIME 타입 문자열 |
 | `size`          | bigint    | Y  | 바이트 단위 크기 |
 | `created_at`    | timestamp | Y  | 생성 시각     |
 | `modified_at`   | timestamp | Y  | 수정 시각     |
@@ -263,8 +264,9 @@
 - 현재 코드 기준으로 `file_url`은 반드시 `/`로 시작해야 한다.
 - 현재 코드 기준으로 `file_url`의 base path는 `/files/profile/`, `/files/proposal/`, `/files/resume/` 중 하나다.
 - 현재 코드 기준으로 `original_name`, `stored_name`, `content_type`은 모두 필수다.
+- 현재 코드 기준으로 `content_type`은 `MultipartFile.getContentType()`에서 얻은 MIME 문자열을 저장한다.
 - 현재 코드 기준으로 `size`는 `0` 이상이어야 한다.
-- 현재 ERD는 `content_type`을 enum처럼 표현하지만 현재 코드는 `String`으로 구현돼 있다.
+- MVP 단계에서는 `content_type`을 enum으로 정규화하지 않고 문자열 allowlist 검증으로 다룬다.
 
 ### 5.5 resume_attachments
 
@@ -758,11 +760,10 @@ PROPOSED -> CANCELED
 4. `proposal_position.status` 재계산을 서비스에서 수동으로 할지 배치/트리거성 로직으로 둘지
 5. `matching.status`의 정확한 enum literal이 ERDCloud 원본과 일치하는지
 6. 활성 매칭 중복 방지를 DB partial unique index로 강제할지 서비스 계층 락으로 강제할지
-7. `StoredFile.contentType`을 enum으로 바꿀지 문자열로 유지할지
-8. `matching_attachments`에서 완료 증빙을 참여자당 1개로 고정할지, 다중 파일 제출 묶음으로 확장할지
-9. 현재 인증 principal에 `memberId`를 직접 포함할지, `email` 기반 회원 재조회로 해결할지
-10. 리뷰 평점 스케일과 완료 이후 수정 허용 범위를 어디까지 둘지
-11. `contract_date`, `complete_date`를 각각 계약 체결/완료 조건 충족 시각으로 일관되게 사용할지
+7. `matching_attachments`에서 완료 증빙을 참여자당 1개로 고정할지, 다중 파일 제출 묶음으로 확장할지
+8. 현재 인증 principal에 `memberId`를 직접 포함할지, `email` 기반 회원 재조회로 해결할지
+9. 리뷰 평점 스케일과 완료 이후 수정 허용 범위를 어디까지 둘지
+10. `contract_date`, `complete_date`를 각각 계약 체결/완료 조건 충족 시각으로 일관되게 사용할지
 
 ## 10. 추후 재논의 항목
 
