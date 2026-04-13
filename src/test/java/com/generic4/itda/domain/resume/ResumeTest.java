@@ -4,6 +4,7 @@ import static com.generic4.itda.fixture.MemberFixture.createMember;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.generic4.itda.domain.file.StoredFile;
 import com.generic4.itda.domain.member.Member;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -559,6 +560,121 @@ class ResumeTest {
         assertThat(resume.getPreferredWorkType()).isEqualTo(WorkType.HYBRID);
         assertThat(resume.getWritingStatus()).isEqualTo(ResumeWritingStatus.WRITING);
         assertThat(resume.getPortfolioUrl()).isEqualTo("https://github.com/user");
+    }
+
+    @DisplayName("파일을 추가하면 첫 번째 첨부파일의 표시 순서는 0이다")
+    @Test
+    void addFirstFileHasDisplayOrderZero() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        StoredFile file = createStoredFile("resume.pdf");
+
+        resume.addFile(file);
+
+        assertThat(resume.getAttachments()).hasSize(1);
+        assertThat(resume.getAttachments().get(0).getFile()).isEqualTo(file);
+        assertThat(resume.getAttachments().get(0).getDisplayOrder()).isEqualTo(0);
+    }
+
+    @DisplayName("파일을 순서대로 추가하면 표시 순서가 순차적으로 할당된다")
+    @Test
+    void addMultipleFilesAssignsSequentialDisplayOrder() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        StoredFile file1 = createStoredFile("resume1.pdf");
+        StoredFile file2 = createStoredFile("resume2.pdf");
+        StoredFile file3 = createStoredFile("resume3.pdf");
+
+        resume.addFile(file1);
+        resume.addFile(file2);
+        resume.addFile(file3);
+
+        assertThat(resume.getAttachments()).hasSize(3);
+        assertThat(resume.getAttachments().get(0).getDisplayOrder()).isEqualTo(0);
+        assertThat(resume.getAttachments().get(1).getDisplayOrder()).isEqualTo(1);
+        assertThat(resume.getAttachments().get(2).getDisplayOrder()).isEqualTo(2);
+    }
+
+    @DisplayName("파일을 삭제하면 첨부파일 목록에서 제거된다")
+    @Test
+    void removeFileDeletesAttachment() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        StoredFile file = createStoredFile("resume.pdf");
+        resume.addFile(file);
+
+        resume.removeFile(file);
+
+        assertThat(resume.getAttachments()).isEmpty();
+    }
+
+    @DisplayName("중간 파일을 삭제하면 나머지 첨부파일의 표시 순서가 재정렬된다")
+    @Test
+    void removeMiddleFileReordersRemainingAttachments() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        StoredFile file1 = createStoredFile("resume1.pdf");
+        StoredFile file2 = createStoredFile("resume2.pdf");
+        StoredFile file3 = createStoredFile("resume3.pdf");
+        resume.addFile(file1);
+        resume.addFile(file2);
+        resume.addFile(file3);
+
+        resume.removeFile(file2);
+
+        assertThat(resume.getAttachments()).hasSize(2);
+        assertThat(resume.getAttachments().get(0).getFile()).isEqualTo(file1);
+        assertThat(resume.getAttachments().get(0).getDisplayOrder()).isEqualTo(0);
+        assertThat(resume.getAttachments().get(1).getFile()).isEqualTo(file3);
+        assertThat(resume.getAttachments().get(1).getDisplayOrder()).isEqualTo(1);
+    }
+
+    @DisplayName("존재하지 않는 파일을 삭제해도 첨부파일 목록이 변하지 않는다")
+    @Test
+    void removeNonExistentFileDoesNotChangeAttachments() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        StoredFile file = createStoredFile("resume.pdf");
+        StoredFile otherFile = createStoredFile("other.pdf");
+        resume.addFile(file);
+
+        resume.removeFile(otherFile);
+
+        assertThat(resume.getAttachments()).hasSize(1);
+        assertThat(resume.getAttachments().get(0).getFile()).isEqualTo(file);
+    }
+
+    @DisplayName("null 파일을 추가하면 실패한다")
+    @Test
+    void failWhenAddFileIsNull() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+
+        assertThatThrownBy(() -> resume.addFile(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("첨부 파일은 필수값입니다.");
+    }
+
+    @DisplayName("첨부파일이 10개이상이면 추가에 실패한다")
+    @Test
+    void failWhenAttachmentsExceedMaxLimit() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        for (int i = 0; i <= 10; i++) {
+            resume.addFile(createStoredFile("file" + i + ".pdf"));
+        }
+
+        assertThatThrownBy(() -> resume.addFile(createStoredFile("extra.pdf")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("첨부파일은 최대 10개까지 등록할 수 있습니다.");
+    }
+
+    @DisplayName("null 파일을 삭제하면 실패한다")
+    @Test
+    void failWhenRemoveFileIsNull() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+
+        assertThatThrownBy(() -> resume.removeFile(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("삭제할 첨부 파일은 필수값입니다.");
+    }
+
+    private static StoredFile createStoredFile(String originalName) {
+        return StoredFile.create(originalName, "stored-" + originalName, "/files/" + originalName, "application/pdf",
+                1024L);
     }
 
     private static Resume createResume(Member member, String introduction, Byte careerYears, CareerPayload career) {
