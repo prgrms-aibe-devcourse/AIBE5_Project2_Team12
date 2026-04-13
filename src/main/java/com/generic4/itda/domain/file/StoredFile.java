@@ -59,4 +59,24 @@ public class StoredFile extends BaseEntity {
             Long size) {
         return new StoredFile(originalName, storedName, fileUrl, contentType, size);
     }
+
+    public String getExtension() {
+        int lastDotIndex = originalName.lastIndexOf(".");
+        if (lastDotIndex == -1 || lastDotIndex == originalName.length() - 1) {
+            return "";
+        }
+        return originalName.substring(lastDotIndex + 1);
+    }
+
+    public boolean isImage() {
+        return contentType != null && contentType.startsWith("image/");
+    }
+
+    public String getDisplayName() {
+        return originalName;
+    }
+
+    public boolean hasSameStoredName(String storedName) {
+        return this.storedName.equals(storedName);
+    }
 }

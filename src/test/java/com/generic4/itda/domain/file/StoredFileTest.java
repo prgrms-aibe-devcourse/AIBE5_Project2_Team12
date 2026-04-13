@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Named;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -98,6 +99,77 @@ class StoredFileTest {
                 .hasMessage("파일 크기는 음수일 수 없습니다.");
     }
 
+    @Nested
+    @DisplayName("getExtension")
+    class GetExtension {
+
+        @ParameterizedTest(name = "[{index}] {0}")
+        @MethodSource("com.generic4.itda.domain.file.StoredFileTest#extensionSource")
+        @DisplayName("원본 파일 이름에서 확장자를 반환한다")
+        void returnsExtension(String originalName, String expectedExtension) {
+            StoredFile storedFile = createStoredFile(originalName, "stored.bin", "/files/stored.bin", "application/octet-stream", 0L);
+
+            assertThat(storedFile.getExtension()).isEqualTo(expectedExtension);
+        }
+    }
+
+    @Nested
+    @DisplayName("isImage")
+    class IsImage {
+
+        @ParameterizedTest(name = "[{index}] {0}")
+        @MethodSource("com.generic4.itda.domain.file.StoredFileTest#imageContentTypeSource")
+        @DisplayName("컨텐츠 타입이 image/로 시작하면 true를 반환한다")
+        void returnsTrueForImageContentType(String contentType) {
+            StoredFile storedFile = createStoredFile("photo.png", "stored.png", "/files/stored.png", contentType, 0L);
+
+            assertThat(storedFile.isImage()).isTrue();
+        }
+
+        @ParameterizedTest(name = "[{index}] {0}")
+        @MethodSource("com.generic4.itda.domain.file.StoredFileTest#nonImageContentTypeSource")
+        @DisplayName("컨텐츠 타입이 image/로 시작하지 않으면 false를 반환한다")
+        void returnsFalseForNonImageContentType(String contentType) {
+            StoredFile storedFile = createStoredFile("file.pdf", "stored.pdf", "/files/stored.pdf", contentType, 0L);
+
+            assertThat(storedFile.isImage()).isFalse();
+        }
+    }
+
+    @Nested
+    @DisplayName("getDisplayName")
+    class GetDisplayName {
+
+        @Test
+        @DisplayName("원본 파일 이름을 반환한다")
+        void returnsOriginalName() {
+            StoredFile storedFile = createStoredFile("avatar.png", "stored.png", "/files/stored.png", "image/png", 0L);
+
+            assertThat(storedFile.getDisplayName()).isEqualTo("avatar.png");
+        }
+    }
+
+    @Nested
+    @DisplayName("hasSameStoredName")
+    class HasSameStoredName {
+
+        @Test
+        @DisplayName("저장 파일 이름이 같으면 true를 반환한다")
+        void returnsTrueWhenSameStoredName() {
+            StoredFile storedFile = createStoredFile("avatar.png", "stored-uuid.png", "/files/stored-uuid.png", "image/png", 0L);
+
+            assertThat(storedFile.hasSameStoredName("stored-uuid.png")).isTrue();
+        }
+
+        @Test
+        @DisplayName("저장 파일 이름이 다르면 false를 반환한다")
+        void returnsFalseWhenDifferentStoredName() {
+            StoredFile storedFile = createStoredFile("avatar.png", "stored-uuid.png", "/files/stored-uuid.png", "image/png", 0L);
+
+            assertThat(storedFile.hasSameStoredName("other-uuid.png")).isFalse();
+        }
+    }
+
     private static StoredFile createStoredFile(
             String originalName,
             String storedName,
@@ -106,6 +178,23 @@ class StoredFileTest {
             Long size
     ) {
         return StoredFile.create(originalName, storedName, fileUrl, contentType, size);
+    }
+
+    static Stream<Arguments> extensionSource() {
+        return Stream.of(
+                Arguments.of(Named.of("단일 확장자", "avatar.png"), "png"),
+                Arguments.of(Named.of("복합 확장자 (마지막만 반환)", "archive.tar.gz"), "gz"),
+                Arguments.of(Named.of("점이 없는 파일명", "README"), ""),
+                Arguments.of(Named.of("점으로 끝나는 파일명", "file."), "")
+        );
+    }
+
+    static Stream<String> imageContentTypeSource() {
+        return Stream.of("image/png", "image/jpeg", "image/gif", "image/webp");
+    }
+
+    static Stream<String> nonImageContentTypeSource() {
+        return Stream.of("application/pdf", "text/plain", "application/octet-stream", "video/mp4");
     }
 
     private static Stream<Arguments> validStoredFileSource() {
