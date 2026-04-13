@@ -37,7 +37,7 @@ class ResumeTest {
         assertThat(resume.isAiMatchingEnabled()).isTrue();
     }
 
-    @DisplayName("선호 근무 형태와 노출 설정이 누락되면 기본값으로 이력서를 생성한다")
+    @DisplayName("선택 입력이 없으면 기본값으로 이력서를 생성한다.")
     @Test
     void createWithDefaultOptionsWhenOptionalInputsAreNull() {
         Resume resume = createResume(
@@ -46,31 +46,15 @@ class ResumeTest {
                 (byte) 3,
                 createCareerPayload(),
                 null,
-                null,
+                ResumeWritingStatus.WRITING,
                 null
         );
 
         assertThat(resume.getPreferredWorkType()).isEqualTo(WorkType.SITE);
         assertThat(resume.isPubliclyVisible()).isTrue();
         assertThat(resume.isAiMatchingEnabled()).isTrue();
-    }
-
-    @DisplayName("공개 여부와 AI 매칭 허용 여부는 명시한 값을 유지한다")
-    @Test
-    void createWithExplicitVisibilityAndMatchingOptions() {
-        Resume resume = createResume(
-                createMember(),
-                "백엔드 개발자입니다.",
-                (byte) 3,
-                createCareerPayload(),
-                WorkType.HYBRID,
-                false,
-                false
-        );
-
-        assertThat(resume.getPreferredWorkType()).isEqualTo(WorkType.HYBRID);
-        assertThat(resume.isPubliclyVisible()).isFalse();
-        assertThat(resume.isAiMatchingEnabled()).isFalse();
+        assertThat(resume.getWritingStatus()).isEqualTo(ResumeWritingStatus.WRITING);
+        assertThat(resume.getStatus()).isEqualTo(ResumeStatus.ACTIVE);
     }
 
     @DisplayName("회원이 누락되면 이력서 생성에 실패한다")
@@ -157,13 +141,16 @@ class ResumeTest {
                 "플랫폼 백엔드 개발자입니다.",
                 (byte) 5,
                 updatedCareer,
-                WorkType.REMOTE
+                WorkType.REMOTE,
+                ResumeWritingStatus.DONE,
+                "https://github.com/kim"
         );
 
         assertThat(resume.getIntroduction()).isEqualTo("플랫폼 백엔드 개발자입니다.");
         assertThat(resume.getCareerYears()).isEqualTo((byte) 5);
         assertThat(resume.getCareer()).isEqualTo(updatedCareer);
         assertThat(resume.getPreferredWorkType()).isEqualTo(WorkType.REMOTE);
+        assertThat(resume.getWritingStatus()).isEqualTo(ResumeWritingStatus.DONE);
     }
 
     @DisplayName("수정 시 선호 근무 형태가 누락되면 SITE를 기본값으로 사용한다")
@@ -173,17 +160,16 @@ class ResumeTest {
                 createMember(),
                 "백엔드 개발자입니다.",
                 (byte) 3,
-                createCareerPayload(),
-                WorkType.HYBRID,
-                true,
-                true
+                createCareerPayload()
         );
 
         resume.update(
                 "플랫폼 백엔드 개발자입니다.",
                 (byte) 4,
                 createCareerPayload("Generic4", "배치 시스템을 개선했습니다."),
-                null
+                null,
+                ResumeWritingStatus.DONE,
+                "https://github.com/kim"
         );
 
         assertThat(resume.getPreferredWorkType()).isEqualTo(WorkType.SITE);
@@ -205,7 +191,9 @@ class ResumeTest {
                 introduction,
                 (byte) 4,
                 createCareerPayload(),
-                WorkType.HYBRID
+                WorkType.HYBRID,
+                ResumeWritingStatus.DONE,
+                "https://github.com/kim"
         ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("자기소개는 필수값입니다.");
@@ -225,7 +213,9 @@ class ResumeTest {
                 "플랫폼 백엔드 개발자입니다.",
                 (byte) 4,
                 null,
-                WorkType.HYBRID
+                WorkType.HYBRID,
+                ResumeWritingStatus.DONE,
+                "https://github.com/kim"
         ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("경력은 필수값입니다.");
@@ -245,7 +235,9 @@ class ResumeTest {
                 "플랫폼 백엔드 개발자입니다.",
                 null,
                 createCareerPayload(),
-                WorkType.HYBRID
+                WorkType.HYBRID,
+                ResumeWritingStatus.DONE,
+                "https://github.com/kim"
         ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("경력 연차는 필수값입니다.");
@@ -266,7 +258,9 @@ class ResumeTest {
                 "플랫폼 백엔드 개발자입니다.",
                 careerYears,
                 createCareerPayload(),
-                WorkType.HYBRID
+                WorkType.HYBRID,
+                ResumeWritingStatus.DONE,
+                "https://github.com/kim"
         ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("경력 연차는 음수일 수 없습니다.");
@@ -279,15 +273,14 @@ class ResumeTest {
                 createMember(),
                 "백엔드 개발자입니다.",
                 (byte) 3,
-                createCareerPayload(),
-                WorkType.HYBRID,
-                true,
-                true
+                createCareerPayload()
         );
 
         resume.togglePubliclyVisible();
-
         assertThat(resume.isPubliclyVisible()).isFalse();
+
+        resume.togglePubliclyVisible();
+        assertThat(resume.isPubliclyVisible()).isTrue();
     }
 
     @DisplayName("AI 매칭 허용 여부 토글 시 상태가 반전된다")
@@ -297,31 +290,277 @@ class ResumeTest {
                 createMember(),
                 "백엔드 개발자입니다.",
                 (byte) 3,
-                createCareerPayload(),
-                WorkType.HYBRID,
-                true,
-                true
+                createCareerPayload()
         );
 
         resume.toggleAiMatchingEnabled();
-
         assertThat(resume.isAiMatchingEnabled()).isFalse();
+
+        resume.toggleAiMatchingEnabled();
+        assertThat(resume.isAiMatchingEnabled()).isTrue();
+    }
+
+    @DisplayName("유효한 포트폴리오 URL이 주어지면 이력서를 생성한다")
+    @Test
+    void createWithValidPortfolioUrl() {
+        Resume resume = Resume.create(
+                createMember(),
+                "백엔드 개발자입니다.",
+                (byte) 3,
+                createCareerPayload(),
+                WorkType.HYBRID,
+                ResumeWritingStatus.DONE,
+                "https://github.com/user"
+        );
+
+        assertThat(resume.getPortfolioUrl()).isEqualTo("https://github.com/user");
+    }
+
+    @DisplayName("포트폴리오 URL에 앞뒤 공백이 있으면 제거하여 저장한다")
+    @Test
+    void createWithPortfolioUrlTrimsWhitespace() {
+        Resume resume = Resume.create(
+                createMember(),
+                "백엔드 개발자입니다.",
+                (byte) 3,
+                createCareerPayload(),
+                WorkType.HYBRID,
+                ResumeWritingStatus.DONE,
+                "  https://github.com/user  "
+        );
+
+        assertThat(resume.getPortfolioUrl()).isEqualTo("https://github.com/user");
+    }
+
+    @DisplayName("포트폴리오 URL이 null이면 저장하지 않는다")
+    @Test
+    void createWithNullPortfolioUrl() {
+        Resume resume = Resume.create(
+                createMember(),
+                "백엔드 개발자입니다.",
+                (byte) 3,
+                createCareerPayload(),
+                WorkType.HYBRID,
+                ResumeWritingStatus.DONE,
+                null
+        );
+
+        assertThat(resume.getPortfolioUrl()).isNull();
+    }
+
+    @DisplayName("포트폴리오 URL이 공백이면 저장하지 않는다")
+    @Test
+    void createWithBlankPortfolioUrl() {
+        Resume resume = Resume.create(
+                createMember(),
+                "백엔드 개발자입니다.",
+                (byte) 3,
+                createCareerPayload(),
+                WorkType.HYBRID,
+                ResumeWritingStatus.DONE,
+                "   "
+        );
+
+        assertThat(resume.getPortfolioUrl()).isNull();
+    }
+
+    @DisplayName("유효하지 않은 포트폴리오 URL이면 이력서 생성에 실패한다")
+    @Test
+    void failWhenPortfolioUrlIsInvalid() {
+        assertThatThrownBy(() -> Resume.create(
+                createMember(),
+                "백엔드 개발자입니다.",
+                (byte) 3,
+                createCareerPayload(),
+                WorkType.HYBRID,
+                ResumeWritingStatus.DONE,
+                "not a valid url"
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("포트폴리오 URL은 유효한 URL형식이어야 합니다.");
+    }
+
+    @DisplayName("생성 시 작성 상태가 누락되면 실패한다")
+    @Test
+    void failWhenWritingStatusIsNullOnCreate() {
+        assertThatThrownBy(() -> Resume.create(
+                createMember(),
+                "백엔드 개발자입니다.",
+                (byte) 3,
+                createCareerPayload(),
+                WorkType.HYBRID,
+                null,
+                null
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("작성 상태는 필수 입력값입니다.");
+    }
+
+    @DisplayName("임시 저장 상태로 이력서를 생성한다")
+    @Test
+    void createWithDraftWritingStatus() {
+        Resume resume = Resume.create(
+                createMember(),
+                "백엔드 개발자입니다.",
+                (byte) 3,
+                createCareerPayload(),
+                WorkType.HYBRID,
+                ResumeWritingStatus.WRITING,
+                null
+        );
+
+        assertThat(resume.getWritingStatus()).isEqualTo(ResumeWritingStatus.WRITING);
+        assertThat(resume.getStatus()).isEqualTo(ResumeStatus.ACTIVE);
+    }
+
+    @DisplayName("수정 시 작성 상태가 누락되면 실패한다")
+    @Test
+    void failWhenWritingStatusIsNullOnUpdate() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+
+        assertThatThrownBy(() -> resume.update(
+                "플랫폼 백엔드 개발자입니다.",
+                (byte) 4,
+                createCareerPayload(),
+                WorkType.HYBRID,
+                null,
+                null
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("작성 상태는 필수값입니다.");
+    }
+
+    @DisplayName("임시 저장 상태로 이력서를 수정한다")
+    @Test
+    void updateWithDraftWritingStatus() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+
+        resume.update(
+                "플랫폼 백엔드 개발자입니다.",
+                (byte) 4,
+                createCareerPayload("Generic4", "배치 시스템을 개선했습니다."),
+                WorkType.HYBRID,
+                ResumeWritingStatus.WRITING,
+                null
+        );
+
+        assertThat(resume.getWritingStatus()).isEqualTo(ResumeWritingStatus.WRITING);
+    }
+
+    @DisplayName("수정 시 유효한 포트폴리오 URL이면 저장된다")
+    @Test
+    void updateWithValidPortfolioUrl() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+
+        resume.update(
+                "플랫폼 백엔드 개발자입니다.",
+                (byte) 4,
+                createCareerPayload(),
+                WorkType.HYBRID,
+                ResumeWritingStatus.DONE,
+                "https://github.com/user"
+        );
+
+        assertThat(resume.getPortfolioUrl()).isEqualTo("https://github.com/user");
+    }
+
+    @DisplayName("수정 시 포트폴리오 URL에 앞뒤 공백이 있으면 제거하여 저장한다")
+    @Test
+    void updateWithPortfolioUrlTrimsWhitespace() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+
+        resume.update(
+                "플랫폼 백엔드 개발자입니다.",
+                (byte) 4,
+                createCareerPayload(),
+                WorkType.HYBRID,
+                ResumeWritingStatus.DONE,
+                "  https://github.com/user  "
+        );
+
+        assertThat(resume.getPortfolioUrl()).isEqualTo("https://github.com/user");
+    }
+
+    @DisplayName("수정 시 포트폴리오 URL이 공백이면 기존 값을 제거한다")
+    @Test
+    void updateWithBlankPortfolioUrlClearsExistingValue() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+
+        resume.update(
+                "플랫폼 백엔드 개발자입니다.",
+                (byte) 4,
+                createCareerPayload(),
+                WorkType.HYBRID,
+                ResumeWritingStatus.DONE,
+                "   "
+        );
+
+        assertThat(resume.getPortfolioUrl()).isNull();
+    }
+
+    @DisplayName("수정 시 유효하지 않은 포트폴리오 URL이면 실패한다")
+    @Test
+    void failWhenUpdatePortfolioUrlIsInvalid() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+
+        assertThatThrownBy(() -> resume.update(
+                "플랫폼 백엔드 개발자입니다.",
+                (byte) 4,
+                createCareerPayload(),
+                WorkType.HYBRID,
+                ResumeWritingStatus.DONE,
+                "not a valid url"
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("포트폴리오 URL은 유효한 URL형식이어야 합니다.");
+    }
+
+    @DisplayName("수정 시 포트폴리오 URL 검증에 실패하면 기존 상태를 유지한다")
+    @Test
+    void failWhenUpdatePortfolioUrlIsInvalidPreservesState() {
+        CareerPayload originalCareer = createCareerPayload();
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, originalCareer);
+
+        assertThatThrownBy(() -> resume.update(
+                "플랫폼 백엔드 개발자입니다.",
+                (byte) 4,
+                createCareerPayload("OpenAI", "대규모 트래픽 환경에서 API를 운영했습니다."),
+                WorkType.REMOTE,
+                ResumeWritingStatus.DONE,
+                "not a valid url"
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("포트폴리오 URL은 유효한 URL형식이어야 합니다.");
+
+        assertThat(resume.getIntroduction()).isEqualTo("백엔드 개발자입니다.");
+        assertThat(resume.getCareerYears()).isEqualTo((byte) 3);
+        assertThat(resume.getCareer()).isSameAs(originalCareer);
+        assertThat(resume.getPreferredWorkType()).isEqualTo(WorkType.HYBRID);
+        assertThat(resume.getWritingStatus()).isEqualTo(ResumeWritingStatus.WRITING);
+        assertThat(resume.getPortfolioUrl()).isEqualTo("https://github.com/user");
     }
 
     private static Resume createResume(Member member, String introduction, Byte careerYears, CareerPayload career) {
-        return createResume(member, introduction, careerYears, career, WorkType.HYBRID, true, true);
+        return Resume.create(member,
+                introduction,
+                careerYears,
+                career,
+                WorkType.HYBRID,
+                ResumeWritingStatus.WRITING,
+                "https://github.com/user"
+        );
     }
 
     private static Resume createResume(Member member, String introduction, Byte careerYears, CareerPayload career,
-            WorkType preferredWorkType, Boolean publiclyVisible, Boolean aiMatchingEnabled) {
+            WorkType preferredWorkType, ResumeWritingStatus writingStatus, String portfolioUrl) {
         return Resume.create(
                 member,
                 introduction,
                 careerYears,
                 career,
                 preferredWorkType,
-                publiclyVisible,
-                aiMatchingEnabled
+                writingStatus,
+                portfolioUrl
         );
     }
 
