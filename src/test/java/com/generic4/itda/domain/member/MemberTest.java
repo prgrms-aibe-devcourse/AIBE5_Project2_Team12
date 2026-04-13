@@ -43,6 +43,22 @@ class MemberTest {
         assertThat(member.getStatus()).isEqualTo(UserStatus.ACTIVE);
     }
 
+    @DisplayName("메모는 trim 후 저장하고 비어 있으면 null로 정규화한다")
+    @ParameterizedTest
+    @MethodSource("memoNormalizationSource")
+    void normalizeMemo(String memo, String expectedMemo) {
+        Member member = createMember(
+                "test@example.com",
+                "hashed-password",
+                "홍길동",
+                "길동",
+                memo,
+                "010-1234-5678"
+        );
+
+        assertThat(member.getMemo()).isEqualTo(expectedMemo);
+    }
+
     @DisplayName("유효하지 않은 데이터가 주어지면 회원 생성에 실패한다")
     @ParameterizedTest(name = "[{index}] {0}")
     @MethodSource("invalidMemberSource")
@@ -249,6 +265,14 @@ class MemberTest {
                         "길동",
                         null
                 )
+        );
+    }
+
+    static Stream<Arguments> memoNormalizationSource() {
+        return Stream.of(
+                Arguments.of("  내부 메모  ", "내부 메모"),
+                Arguments.of(" ", null),
+                Arguments.of(null, null)
         );
     }
 }

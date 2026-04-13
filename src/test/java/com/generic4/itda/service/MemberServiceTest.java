@@ -61,6 +61,7 @@ class MemberServiceTest {
         assertThat(savedMember.getHashedPassword()).isEqualTo("encoded-password");
         assertThat(savedMember.getName()).isEqualTo("홍길동");
         assertThat(savedMember.getNickname()).isEqualTo("홍길동");
+        assertThat(savedMember.getMemo()).isNull();
         assertThat(savedMember.getPhone().getValue()).isEqualTo("01012345678");
         assertThat(savedMember.getRole()).isEqualTo(UserRole.USER);
         assertThat(savedMember.getType()).isEqualTo(UserType.INDIVIDUAL);

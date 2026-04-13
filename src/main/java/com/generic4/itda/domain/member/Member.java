@@ -58,6 +58,9 @@ public class Member extends BaseTimeEntity {
     @Column(length = 100)
     private String nickname;
 
+    @Column(length = 255)
+    private String memo;
+
     @Embedded
     private Phone phone;
 
@@ -73,11 +76,9 @@ public class Member extends BaseTimeEntity {
     @Column(nullable = false)
     private UserStatus status;
 
-    // 프로필 메모 추가 여부
-
     @Builder(access = AccessLevel.PRIVATE)
-    private Member(Email email, String hashedPassword, String name, String nickname, Phone phone, UserRole role,
-            UserType type, UserStatus status) {
+    private Member(Email email, String hashedPassword, String name, String nickname, String memo, Phone phone,
+            UserRole role, UserType type, UserStatus status) {
         Assert.notNull(email, "email은 필수값입니다.");
         Assert.hasText(hashedPassword, "비밀번호는 필수값입니다.");
         Assert.hasText(name, "이름은 필수값입니다.");
@@ -87,18 +88,21 @@ public class Member extends BaseTimeEntity {
         this.hashedPassword = hashedPassword;
         this.name = name.trim();
         this.nickname = StringUtils.hasText(nickname) ? nickname.trim() : name.trim();
+        this.memo = StringUtils.hasText(memo) ? memo.trim() : null;
         this.phone = phone;
         this.role = role != null ? role : UserRole.USER;
         this.type = type != null ? type : UserType.INDIVIDUAL;
         this.status = status != null ? status : UserStatus.ACTIVE;
     }
 
-    public static Member create(String email, String hashedPassword, String name, String nickname, String phone) {
+    public static Member create(String email, String hashedPassword, String name, String nickname, String memo,
+            String phone) {
         return Member.builder()
                 .email(new Email(email))
                 .hashedPassword(hashedPassword)
                 .name(name)
                 .nickname(StringUtils.hasText(nickname) ? nickname : null)
+                .memo(memo)
                 .phone(new Phone(phone))
                 .role(UserRole.USER)
                 .type(UserType.INDIVIDUAL)

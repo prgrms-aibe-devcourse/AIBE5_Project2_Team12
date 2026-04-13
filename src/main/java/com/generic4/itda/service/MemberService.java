@@ -27,6 +27,7 @@ public class MemberService {
                 passwordEncoder.encode(signUpForm.getPassword()),
                 signUpForm.getName(),
                 signUpForm.getNickname(),
+                null,
                 signUpForm.getPhone()
         );
 
