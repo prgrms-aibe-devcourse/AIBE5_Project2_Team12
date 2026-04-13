@@ -1,7 +1,9 @@
 package com.generic4.itda.domain.member;
 
+import com.generic4.itda.domain.file.StoredFile;
 import com.generic4.itda.domain.shared.BaseTimeEntity;
 import jakarta.persistence.Cacheable;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
@@ -11,6 +13,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -76,9 +79,12 @@ public class Member extends BaseTimeEntity {
     @Column(nullable = false)
     private UserStatus status;
 
+    @OneToOne(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true, optional = true)
+    private ProfileImage profileImage;
+
     @Builder(access = AccessLevel.PRIVATE)
     private Member(Email email, String hashedPassword, String name, String nickname, String memo, Phone phone,
-            UserRole role, UserType type, UserStatus status) {
+            UserRole role, UserType type, UserStatus status, ProfileImage profileImage) {
         Assert.notNull(email, "email은 필수값입니다.");
         Assert.hasText(hashedPassword, "비밀번호는 필수값입니다.");
         Assert.hasText(name, "이름은 필수값입니다.");
@@ -93,6 +99,7 @@ public class Member extends BaseTimeEntity {
         this.role = role != null ? role : UserRole.USER;
         this.type = type != null ? type : UserType.INDIVIDUAL;
         this.status = status != null ? status : UserStatus.ACTIVE;
+        this.profileImage = profileImage;
     }
 
     public static Member create(String email, String hashedPassword, String name, String nickname, String memo,
@@ -128,6 +135,24 @@ public class Member extends BaseTimeEntity {
         this.name = name.trim();
         this.nickname = (nickname != null && !nickname.isBlank()) ? nickname.trim() : name.trim();
         this.phone = new Phone(phone);
+    }
+
+    public void updateProfile(StoredFile file, String memo) {
+        this.memo = StringUtils.hasText(memo) ? memo.trim() : null;
+
+        if (file == null) {
+            return;
+        }
+
+        if (this.profileImage == null) {
+            this.profileImage = ProfileImage.create(this, file);
+        } else {
+            this.profileImage.changeFile(file);
+        }
+    }
+
+    public void removeProfileImage() {
+        this.profileImage = null;
     }
 
     // TODO - 사업자 등록 편의 메서드

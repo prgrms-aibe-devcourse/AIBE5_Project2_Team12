@@ -1,5 +1,6 @@
 package com.generic4.itda.domain.member;
 
+import com.generic4.itda.domain.file.StoredFile;
 import static com.generic4.itda.fixture.MemberFixture.createMember;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -154,6 +155,65 @@ class MemberTest {
 
         assertThatThrownBy(() -> member.update(name, nickname, phone))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @DisplayName("프로필을 수정하면 메모를 정규화하고 프로필 이미지를 생성한다")
+    @Test
+    void updateProfileCreatesProfileImage() {
+        Member member = createMember();
+        StoredFile storedFile = createStoredFile("avatar.png", "stored-avatar.png", "/files/profile/stored-avatar.png");
+
+        member.updateProfile(storedFile, "  프로필 메모  ");
+
+        assertThat(member.getMemo()).isEqualTo("프로필 메모");
+        assertThat(member.getProfileImage()).isNotNull();
+        assertThat(member.getProfileImage().getMember()).isSameAs(member);
+        assertThat(member.getProfileImage().getFile()).isSameAs(storedFile);
+    }
+
+    @DisplayName("기존 프로필 이미지가 있으면 새 파일로 교체한다")
+    @Test
+    void updateProfileReplacesExistingImageFile() {
+        Member member = createMember();
+        StoredFile firstFile = createStoredFile("avatar.png", "stored-avatar.png", "/files/profile/stored-avatar.png");
+        StoredFile secondFile = createStoredFile("avatar-2.png", "stored-avatar-2.png",
+                "/files/profile/stored-avatar-2.png");
+
+        member.updateProfile(firstFile, "첫 메모");
+        ProfileImage profileImage = member.getProfileImage();
+
+        member.updateProfile(secondFile, "  두 번째 메모  ");
+
+        assertThat(member.getMemo()).isEqualTo("두 번째 메모");
+        assertThat(member.getProfileImage()).isSameAs(profileImage);
+        assertThat(member.getProfileImage().getFile()).isSameAs(secondFile);
+    }
+
+    @DisplayName("프로필 이미지 파일이 없으면 메모만 수정한다")
+    @Test
+    void updateProfileOnlyNormalizesMemoWhenFileIsMissing() {
+        Member member = createMember();
+
+        member.updateProfile(null, "  소개 메모  ");
+
+        assertThat(member.getMemo()).isEqualTo("소개 메모");
+        assertThat(member.getProfileImage()).isNull();
+    }
+
+    @DisplayName("프로필 이미지 삭제 시 연관관계를 제거한다")
+    @Test
+    void removeProfileImage() {
+        Member member = createMember();
+        StoredFile storedFile = createStoredFile("avatar.png", "stored-avatar.png", "/files/profile/stored-avatar.png");
+        member.updateProfile(storedFile, "메모");
+
+        member.removeProfileImage();
+
+        assertThat(member.getProfileImage()).isNull();
+    }
+
+    private StoredFile createStoredFile(String originalName, String storedName, String fileUrl) {
+        return StoredFile.create(originalName, storedName, fileUrl, "image/png", 1024L);
     }
 
     static Stream<Arguments> validMemberSource() {
