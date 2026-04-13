@@ -93,4 +93,21 @@ class MemberControllerTest {
 
         then(memberService).should(never()).signUp(any());
     }
+
+    @Test
+    @DisplayName("지원하지 않는 숫자-only 연락처 형식은 DTO 검증에서 차단한다")
+    void blockUnsupportedNumericPhoneAtValidationLayer() throws Exception {
+        mockMvc.perform(post("/signup")
+                        .with(csrf())
+                        .param("email", "new-user@example.com")
+                        .param("password", "password123!")
+                        .param("name", "홍길동")
+                        .param("nickname", "길동")
+                        .param("phone", "123"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("signup"))
+                .andExpect(model().attributeHasFieldErrors("signUpForm", "phone"));
+
+        then(memberService).should(never()).signUp(any());
+    }
 }
