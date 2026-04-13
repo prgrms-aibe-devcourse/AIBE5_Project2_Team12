@@ -46,9 +46,12 @@
 - 구현 스키마 확장은 `matching_attachments`, `matching_reviews` 기준으로 진행한다.
 - 현재 ERD에는 `initiator_type`, `participation_status`가 없다.
 - 현재 인증 principal에는 `memberId`가 없으므로 리뷰 생성/수정 검증에는 principal 확장 또는 `email` 기반 회원 재조회가 필요하다.
-- `profile_image.member_id`, `resume_attachments(resume_id, display_order)`, `resume_skills(resume_id, skill_id)`, `proposal_position_skills(proposal_position_id, skill_id)`는 중복 없이 관리한다.
+- 현재 ERD와 코드 모두 `members.profile_image_id` 기준으로 프로필 이미지 1:1을 관리한다.
+- `resume_attachments(resume_id, display_order)`, `resume_skills(resume_id, skill_id)`, `proposal_position_skills(proposal_position_id, skill_id)`는 중복 없이 관리한다.
 - 명시적 시작 승인 / 종료 승인 버튼 모델은 현재 MVP 백로그에 포함하지 않는다.
 - `StoredFile.contentType`은 MIME 문자열(`String` / `varchar`)로 유지하고, enum 대신 허용 MIME type 검증으로 다룬다.
+- 현재 ERD와 코드 모두 `Member`가 `ProfileImage` 1:1 연관관계 주인이고, `ProfileImage`는 `StoredFile`을 참조하는 별도 엔티티다.
+- `ProfileImage`를 제거하고 `StoredFile`로 통합할지 여부는 프로필 이미지 서비스 책임을 먼저 정리한 뒤 다시 결정한다.
 
 ## 2.1 이번 스프린트에서 바로 나와야 하는 산출물
 
@@ -73,7 +76,8 @@
 - 프리랜서 진입 규칙을 `canApplyDirectly`, `canBeListed`, `canBeRecommended` 기준으로 분리
 - `Member.memo` 반영 여부와 노출 범위 정리
 - `Resume.status`, `Resume.writingStatus`, `Resume.portfolioUrl` 반영
-- `ProfileImage`, `ResumeAttachment` 엔티티/리포지토리 추가
+- `ProfileImage` 서비스 책임과 `StoredFile` 경계 정리
+- `ResumeAttachment` 엔티티/리포지토리 추가
 - 프리랜서 전용 화면/서비스 접근 제어 구현
 - `resume_skill` 엔티티, 리포지토리, 테스트 추가
 - 기존 `Resume`와 연결되는 스킬 등록 API 또는 서비스 추가

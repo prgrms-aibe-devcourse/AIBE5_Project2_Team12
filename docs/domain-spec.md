@@ -40,13 +40,14 @@
 - `Resume`는 `careerYears`, `career` JSON, `preferredWorkType`, `publiclyVisible`, `aiMatchingEnabled`를 가진다.
 - `Skill`은 별도 엔티티이며 `name`이 유니크하다.
 - 파일은 로컬 저장 + `StoredFile` 메타데이터 저장 패턴을 사용한다.
+- `ProfileImage`는 `StoredFile`을 감싸는 별도 엔티티이며, 현재 ERD와 코드 모두 `Member`를 1:1 연관관계 주인으로 둔다.
 
 현재 ERD와 코드가 어긋나는 부분도 있다.
 
 - ERD에는 `members.memo`가 있지만 현재 코드에는 없다.
 - ERD에는 `resumes.status`, `resumes.writing_status`, `resumes.portfolio_url`이 있지만 현재 코드에는 없다.
 - ERD는 `resumes.career`를 nullable로 보지만 현재 코드는 필수로 검증한다.
-- ERD에는 `profile_image`, `resume_attachments`가 있지만 현재 코드 엔티티는 아직 없다.
+- ERD에는 `resume_attachments`가 있지만 현재 코드 엔티티는 아직 없다.
 - `stored_file.content_type`은 ERDCloud 표기와 별개로 현재 구현 기준 MIME 문자열(`String` / `varchar`)로 본다.
 
 따라서 신규 도메인은 현재 패턴을 깨지 않는 선에서 추가하는 것이 우선이다.
@@ -110,7 +111,9 @@
 ### 4.2 File Asset
 
 - `StoredFile`은 실제 업로드 파일의 메타데이터 루트다.
-- `ProfileImage`는 회원 프로필 대표 이미지를 연결한다.
+- `ProfileImage`는 회원 프로필 대표 이미지를 연결하는 별도 엔티티다.
+- 현재 ERD와 코드 모두 `Member`를 `ProfileImage` 1:1 연관관계 주인으로 두고, 회원 조회 시 프로필 이미지를 필요할 때만 지연 로딩하는 방향을 택한다.
+- `ProfileImage`를 제거하고 `StoredFile`로 통합할지 여부는 프로필 이미지 서비스 책임을 정리한 뒤 다시 결정한다.
 - `ResumeAttachment`는 이력서에 연결되는 첨부 파일 목록이다.
 - 애플리케이션 레벨에서는 `/files/profile/**`, `/files/proposal/**`, `/files/resume/**` 공개 경로를 이미 사용한다.
 - 현재 ERD에는 제안서 첨부파일 연결 테이블은 없다.
@@ -178,6 +181,7 @@
 | `type`            | enum(`CORPORATE`, `INDIVIDUAL`) | Y  | 회원 유형             |
 | `status`          | enum(`ACTIVE`, `INACTIVE`)      | Y  | 계정 상태             |
 | `memo`            | varchar                         | N  | 내부 메모             |
+| `profile_image_id`| bigint                          | N  | 대표 프로필 이미지 FK    |
 | `created_at`      | timestamp                       | Y  | 생성 시각             |
 | `modified_at`     | timestamp                       | Y  | 수정 시각             |
 
@@ -192,6 +196,9 @@
 - `phone`은 지원 가능한 국내 전화번호 형식만 허용하고, 하이픈을 제거한 값으로 정규화해 저장한다.
 - `delete()`와 `restore()`는 물리 삭제가 아니라 `status` 변경 기반 soft delete / restore다.
 - `memo`는 현재 ERD에는 있지만 현재 코드 엔티티에는 아직 없다.
+- 현재 ERD와 코드 모두 `profile_image_id` FK로 `ProfileImage`를 참조하고, `Member`가 1:1 연관관계 주인이다.
+- `profile_image_id`는 optional이며, 회원이 프로필 이미지를 등록한 경우에만 값을 가진다.
+- 회원당 대표 프로필 이미지는 1개이므로 `members.profile_image_id` 1:1 제약으로 관리한다.
 
 ### 5.2 resumes
 
@@ -231,15 +238,15 @@
 | 필드            | 타입        | 필수 | 설명       |
 |---------------|-----------|----|----------|
 | `id`          | bigint    | Y  | PK       |
-| `member_id`   | bigint    | Y  | 회원       |
 | `file_id`     | bigint    | Y  | 파일 메타데이터 |
 | `created_at`  | timestamp | Y  | 생성 시각    |
 | `modified_at` | timestamp | Y  | 수정 시각    |
 
 규칙은 아래와 같다.
 
-- 용도상 회원당 대표 프로필 이미지는 1개이므로 `UNIQUE (member_id)`를 강제한다.
-- 현재 ERD에는 존재하지만 현재 코드 엔티티는 아직 없다.
+- 회원과의 1:1 연결은 `profile_images`가 아니라 `members.profile_image_id` FK에서 관리한다.
+- `file_id`는 필수이며, `ProfileImage`는 현재 `StoredFile`을 감싼 얇은 래퍼다.
+- 현재 `ProfileImage`는 `StoredFile`을 감싼 얇은 래퍼로 유지하고, 프로필 이미지 서비스 경계를 확인한 뒤 통합 여부를 다시 본다.
 
 ### 5.4 stored_files
 

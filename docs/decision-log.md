@@ -82,6 +82,10 @@
 ### 파일 자산
 
 - 현재 애플리케이션에는 `/files/profile/**`, `/files/resume/**`, `/files/proposal/**` 저장 경로가 있다.
+- 회원-프로필 이미지 1:1은 현재 모델에서 `Member`를 연관관계 주인으로 둔다.
+- 이유는 현재 JPA 1:1 사용 패턴에서 연관관계 주인 쪽 지연 로딩이 더 안정적이어서, 회원 조회 시 프로필 이미지를 필요할 때만 읽게 하려는 목적이다.
+- 현재 ERD와 코드 모두 `members.profile_image_id` FK 기준으로 이 관계를 표현한다.
+- `ProfileImage`는 아직 `StoredFile`에 흡수하지 않고, 프로필 이미지 전용 정책과 라이프사이클을 담는 별도 엔티티로 유지한다.
 - 다만 ERD에 `proposal_attachments`가 없으므로 제안서 파일은 아직 정식 도메인 연관 자산으로 취급하지 않는다.
 - 매칭 단위 계약서와 완료 증빙 파일은 `matching_attachments` 공통 집합으로 둔다.
 - `matching_attachments`는 `matching_id`, `member_id`, `file_id`, `attachment_type`를 유지한다.
@@ -95,6 +99,8 @@
 
 - `proposal_position` 상세 필드 확장 여부
 - 제안서 파일을 정식 도메인 자산으로 승격할지 여부
+- `ProfileImage`를 제거하고 `StoredFile`로 통합할지 여부
+- 위 통합 여부는 프로필 이미지 서비스에서 책임 경계가 실제로 어떻게 나뉘는지 확인한 뒤 다시 결정한다.
 - `matching.initiator_type`, `requested_by_member_id` 추가 여부
 - 참여자별 완료 증빙을 여러 파일로 허용할지, 제출 묶음 엔티티로 확장할지
 - 리뷰 평점 스케일과 완료 이후 수정 허용 범위

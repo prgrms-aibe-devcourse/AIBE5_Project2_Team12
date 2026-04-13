@@ -30,6 +30,8 @@
 - 계약서와 완료 증빙은 `matching_attachments(matching_id, member_id, file_id, attachment_type)`로 관리한다.
 - `ACCEPTED -> IN_PROGRESS`는 양측 계약서 업로드, `IN_PROGRESS -> COMPLETED`는 양측 완료 증빙과 상호 리뷰를 조건으로 둔다.
 - 리뷰는 `matching_reviews` 종속 집합으로 두고, 생성/수정 검증은 `matching.client_member_id`, `matching.freelancer_member_id`, 로그인 회원과 `reviewer_member_id` 기준으로 처리한다.
+- 현재 ERD와 코드에서는 회원-프로필 이미지 1:1의 연관관계 주인을 `Member`로 두고, `ProfileImage`는 별도 엔티티로 유지한다.
+- `ProfileImage`를 제거하고 `StoredFile`로 통합할지 여부는 프로필 이미지 서비스 책임을 먼저 정리한 뒤 재논의한다.
 - 명시적 시작/종료 승인 버튼과 `proposal_attachments`는 현재 보류다.
 
 ## 1. 프로젝트 개요
