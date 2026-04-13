@@ -3,6 +3,7 @@ package com.generic4.itda.domain.member;
 import com.generic4.itda.domain.file.StoredFile;
 import com.generic4.itda.domain.shared.BaseTimeEntity;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -22,24 +23,18 @@ public class ProfileImage extends BaseTimeEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne
-    @JoinColumn(name = "member_id", nullable = false, unique = true)
-    private Member member;
-
-    @OneToOne
+    @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "file_id", nullable = false, unique = true)
     private StoredFile file;
 
-    private ProfileImage(Member member, StoredFile file) {
-        Assert.notNull(member, "회원은 필수 입력값입니다.");
+    private ProfileImage(StoredFile file) {
         Assert.notNull(file, "파일은 필수 입력값입니다.");
 
-        this.member = member;
         this.file = file;
     }
 
-    public static ProfileImage create(Member member, StoredFile file) {
-        return new ProfileImage(member, file);
+    public static ProfileImage create(StoredFile file) {
+        return new ProfileImage(file);
     }
 
     public void changeFile(StoredFile file) {

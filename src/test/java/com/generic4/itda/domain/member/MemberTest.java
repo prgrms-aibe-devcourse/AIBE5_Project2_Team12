@@ -1,10 +1,10 @@
 package com.generic4.itda.domain.member;
 
-import com.generic4.itda.domain.file.StoredFile;
 import static com.generic4.itda.fixture.MemberFixture.createMember;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.generic4.itda.domain.file.StoredFile;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Named;
@@ -167,7 +167,6 @@ class MemberTest {
 
         assertThat(member.getMemo()).isEqualTo("프로필 메모");
         assertThat(member.getProfileImage()).isNotNull();
-        assertThat(member.getProfileImage().getMember()).isSameAs(member);
         assertThat(member.getProfileImage().getFile()).isSameAs(storedFile);
     }
 

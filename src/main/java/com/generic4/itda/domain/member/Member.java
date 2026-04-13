@@ -9,10 +9,12 @@ import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
@@ -79,7 +81,8 @@ public class Member extends BaseTimeEntity {
     @Column(nullable = false)
     private UserStatus status;
 
-    @OneToOne(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true, optional = true)
+    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true, optional = true)
+    @JoinColumn(name = "profile_image_id", nullable = false)
     private ProfileImage profileImage;
 
     @Builder(access = AccessLevel.PRIVATE)
@@ -145,7 +148,7 @@ public class Member extends BaseTimeEntity {
         }
 
         if (this.profileImage == null) {
-            this.profileImage = ProfileImage.create(this, file);
+            this.profileImage = ProfileImage.create(file);
         } else {
             this.profileImage.changeFile(file);
         }
