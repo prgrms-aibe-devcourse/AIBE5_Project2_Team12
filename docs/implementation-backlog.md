@@ -281,7 +281,9 @@
 - 하드 필터 규칙 구현
 - 점수화 규칙 구현
 - Top 3 선정 로직 구현
+- 추천 결과 저장 모델 구현
 - 추천 결과 캐시 설계
+- 이력서 임베딩 캐시 설계
 - Top 3에 대한 LLM 설명 생성 연결
 - 추천 결과 조회 API 구현
 
@@ -291,14 +293,20 @@
 - `resume.writing_status = DONE`
 - `publiclyVisible = true`
 - `aiMatchingEnabled = true`
-- `preferred_work_type`와 `proposal.work_type`
-- `career_years`
 - `proposal_position_skill.importance = ESSENTIAL`
+
+현재 점수화 기준은 아래를 우선한다.
+
+- `embedding similarity`
+- `preferred_work_type`와 `proposal.work_type`의 호환성
+- 우대 스킬 겹침 정도
+- `career_years`
 
 현재 모델의 제약은 아래와 같다.
 
 - `proposal_position_skill`은 현재 스킬 ID와 중요도만 표현하므로 세부 요구 수준은 담기 어렵다.
 - 직무 마스터 `position`에는 기본 스킬 템플릿이 없어서 생성 보조 재사용성이 낮다.
+- `proposal_position`에 경력 최소/최대 범위가 없어서 `career_years`는 강한 하드 필터보다 점수 항목으로 해석하는 편이 안전하다.
 
 검증은 아래와 같다.
 
@@ -311,6 +319,8 @@
 
 - 추천 후보군 하드 필터
 - Top 3 선정 로직
+- `recommendation_runs`, `recommendation_results` 기반 결과 저장
+- `resume_embeddings` 기반 이력서 임베딩 캐시
 - 설명 가능한 추천 응답 포맷
 
 ### Phase 7. 운영 화면과 품질 관리

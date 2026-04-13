@@ -538,6 +538,93 @@
 이 매트릭스는 현재 ERD에서 직접 드러나지 않는 운영 해석을 정리한 것이다.
 코드 구현 전 서비스 정책과 다르면 여기부터 먼저 맞추는 편이 안전하다.
 
+### 5.16 recommendation_runs
+
+추천 실행 1회를 저장하는 루트다.
+MVP에서는 캐시 키와 실행 이력을 함께 담당한다.
+
+| 필드                     | 타입                                                   | 필수 | 설명                    |
+|------------------------|------------------------------------------------------|----|-----------------------|
+| `id`                   | bigint                                               | Y  | PK                    |
+| `proposal_position_id` | bigint                                               | Y  | 추천 대상 모집 단위           |
+| `request_fingerprint`  | varchar(128)                                         | Y  | 추천 입력 해시              |
+| `algorithm_version`    | varchar(50)                                          | Y  | 추천 알고리즘 버전            |
+| `candidate_count`      | integer                                              | Y  | 하드 필터 통과 후 점수 계산 대상 수 |
+| `top_k`                | integer                                              | Y  | 저장 결과 개수, MVP 기본값 3    |
+| `hard_filter_stats`    | json                                                 | N  | 필터별 통과/탈락 집계          |
+| `status`               | enum(`PENDING`, `RUNNING`, `COMPUTED`, `FAILED`)     | Y  | 실행 상태                 |
+| `error_message`        | text                                                 | N  | 실패 사유                 |
+| `created_at`           | timestamp                                            | Y  | 생성 시각                 |
+| `modified_at`          | timestamp                                            | Y  | 수정 시각                 |
+| `created_by`           | varchar                                              | N  | 감사 정보                 |
+| `modified_by`          | varchar                                              | N  | 감사 정보                 |
+
+규칙은 아래와 같다.
+
+- `UNIQUE (proposal_position_id, request_fingerprint, algorithm_version)`를 강제한다.
+- 같은 `proposal_position`, 같은 fingerprint, 같은 알고리즘 버전이면 기존 실행 결과를 재사용한다.
+- `request_fingerprint`는 최소한 `proposal`, `proposal_position`, `proposal_position_skill`, 추천 파라미터를 반영해야 한다.
+- MVP에서는 `created_at`을 추천 실행 시작 시각, `modified_at`을 최종 상태 반영 시각으로 사용하고 별도 `started_at`, `finished_at` 컬럼은 두지 않는다.
+- MVP에서는 `input_snapshot_json`, `stale` 플래그, 프롬프트 버전 컬럼을 두지 않고 캐시 키와 재계산 규칙으로 단순화한다.
+- `resumes`, `resume_skills`, `publicly_visible`, `ai_matching_enabled` 변경 시 해당 이력서가 포함된 기존 추천 실행은 재사용하지 않고 새로 계산한다.
+
+### 5.17 recommendation_results
+
+추천 실행 안에서 실제 Top K 결과를 저장하는 테이블이다.
+MVP에서는 전체 후보 랭킹이 아니라 응답에 노출할 결과만 저장한다.
+
+| 필드                      | 타입                                           | 필수 | 설명                 |
+|-------------------------|----------------------------------------------|----|--------------------|
+| `id`                   | bigint                                       | Y  | PK                 |
+| `recommendation_run_id` | bigint                                       | Y  | 상위 추천 실행           |
+| `resume_id`             | bigint                                       | Y  | 추천된 이력서            |
+| `rank`                  | integer                                      | Y  | 추천 순위              |
+| `final_score`           | numeric(5,4)                                 | Y  | 최종 점수              |
+| `embedding_score`       | numeric(5,4)                                 | Y  | 임베딩 유사도 점수         |
+| `reason_facts`          | json                                         | Y  | 추천 근거 구조화 데이터      |
+| `llm_reason`            | text                                         | N  | 사용자 노출용 추천 설명       |
+| `llm_status`            | enum(`PENDING`, `READY`, `FAILED`)           | Y  | 설명 생성 상태           |
+| `created_at`            | timestamp                                    | Y  | 생성 시각, 최초 결과 저장 시각  |
+| `modified_at`           | timestamp                                    | Y  | 수정 시각, 설명 상태 반영 시각  |
+| `created_by`            | varchar                                      | N  | 감사 정보              |
+| `modified_by`           | varchar                                      | N  | 감사 정보              |
+
+규칙은 아래와 같다.
+
+- `UNIQUE (recommendation_run_id, resume_id)`를 강제한다.
+- `UNIQUE (recommendation_run_id, rank)`를 강제한다.
+- 추천 설명은 `resume`에 저장하지 않고 `recommendation_result.llm_reason`에 저장한다.
+- `llm_status = READY`이면 `llm_reason`가 존재해야 한다.
+- MVP에서는 Top 3 점수 계산 직후 `recommendation_results`를 저장하고, `created_at`을 최초 결과 저장 시각으로 사용한다.
+- `llm_status = READY` 또는 `FAILED`로 바뀌는 시점의 설명 생성 결과 반영 시각은 `modified_at`으로 해석하고, 별도 `llm_generated_at` 컬럼은 두지 않는다.
+- `reason_facts`에는 최소한 필수 스킬 충족 여부, 우대 스킬 겹침, 근무 형태 호환성, 경력 적합 해석, 임베딩 유사도가 포함돼야 한다.
+- MVP에서는 `skill_score`, `work_type_score`, `career_score`, `llm_model`, `prompt_version` 컬럼을 별도로 두지 않고 `reason_facts`에 포함해 관리한다.
+
+### 5.18 resume_embeddings
+
+추천에 사용하는 이력서 임베딩 캐시다.
+MVP에서는 반복 비용이 큰 이력서 쪽만 영속화하고, `proposal_position` 임베딩은 요청 시 계산한다.
+
+| 필드                | 타입          | 필수 | 설명         |
+|-------------------|-------------|----|------------|
+| `id`              | bigint      | Y  | PK         |
+| `resume_id`       | bigint      | Y  | 대상 이력서     |
+| `source_hash`     | varchar(128)| Y  | 임베딩 원문 해시  |
+| `embedding_model` | varchar(100)| Y  | 임베딩 모델     |
+| `embedding_vector`| json        | Y  | 임베딩 벡터 값   |
+| `created_at`      | timestamp   | Y  | 생성 시각      |
+| `modified_at`     | timestamp   | Y  | 수정 시각      |
+| `created_by`      | varchar     | N  | 감사 정보      |
+| `modified_by`     | varchar     | N  | 감사 정보      |
+
+규칙은 아래와 같다.
+
+- MVP에서는 임베딩 모델을 하나만 사용하더라도 향후 전환 비용을 줄이기 위해 `UNIQUE (resume_id, embedding_model)`를 강제한다.
+- MVP에서는 `resume_id + embedding_model` 기준 최신 임베딩 캐시 한 줄만 유지하고, `created_at`은 캐시 레코드 최초 생성 시각, `modified_at`은 마지막 임베딩 재생성 시각으로 사용한다. 별도 `generated_at` 컬럼은 두지 않는다.
+- `source_hash`는 `introduction`, `career`, `preferred_work_type`, `portfolio_url`, `resume_skills`를 기준으로 계산한다.
+- 현재 source hash와 저장된 hash가 다르면 임베딩을 재생성한다.
+- `proposal_position_embeddings` 테이블은 MVP에서 만들지 않는다. 현재는 `proposal_position` 입력을 요청 시 임베딩하고, 최종 추천 결과만 `recommendation_runs`와 `recommendation_results`로 재사용한다.
+
 ## 6. 상태 모델
 
 ### 6.1 Proposal 상태
