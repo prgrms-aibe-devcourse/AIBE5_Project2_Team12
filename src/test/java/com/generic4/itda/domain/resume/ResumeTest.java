@@ -447,6 +447,27 @@ class ResumeTest {
         assertThat(resume.getWritingStatus()).isEqualTo(ResumeWritingStatus.WRITING);
     }
 
+    @DisplayName("이력서를 삭제하면 상태가 INACTIVE로 변경된다")
+    @Test
+    void deleteResume() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+
+        resume.delete();
+
+        assertThat(resume.getStatus()).isEqualTo(ResumeStatus.INACTIVE);
+    }
+
+    @DisplayName("삭제된 이력서를 복원하면 상태가 ACTIVE로 변경된다")
+    @Test
+    void restoreResume() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        resume.delete();
+
+        resume.restore();
+
+        assertThat(resume.getStatus()).isEqualTo(ResumeStatus.ACTIVE);
+    }
+
     @DisplayName("수정 시 유효한 포트폴리오 URL이면 저장된다")
     @Test
     void updateWithValidPortfolioUrl() {

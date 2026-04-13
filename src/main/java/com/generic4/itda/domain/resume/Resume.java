@@ -73,6 +73,7 @@ public class Resume extends BaseEntity {
         Assert.isTrue(careerYears >= 0, "경력 연차는 음수일 수 없습니다.");
         Assert.notNull(career, "경력은 필수값입니다.");
         Assert.notNull(writingStatus, "작성 상태는 필수 입력값입니다.");
+        String normalizedPortfolioUrl = normalizePortfolioUrl(portfolioUrl);
 
         this.member = member;
         this.introduction = introduction;
@@ -83,11 +84,7 @@ public class Resume extends BaseEntity {
         this.aiMatchingEnabled = aiMatchingEnabled == null || aiMatchingEnabled;
         this.writingStatus = writingStatus;
         this.status = status == null ? ResumeStatus.ACTIVE : status;
-        if (StringUtils.hasText(portfolioUrl)) {
-            portfolioUrl = portfolioUrl.trim();
-            Assert.isTrue(isValidUrl(portfolioUrl), "포트폴리오 URL은 유효한 URL형식이어야 합니다.");
-        }
-        this.portfolioUrl = portfolioUrl;
+        this.portfolioUrl = normalizedPortfolioUrl;
     }
 
     public static Resume create(
@@ -126,18 +123,14 @@ public class Resume extends BaseEntity {
         Assert.isTrue(careerYears >= 0, "경력 연차는 음수일 수 없습니다.");
         Assert.notNull(career, "경력은 필수값입니다.");
         Assert.notNull(writingStatus, "작성 상태는 필수값입니다.");
+        String normalizedPortfolioUrl = normalizePortfolioUrl(portfolioUrl);
 
         this.introduction = introduction;
         this.careerYears = careerYears;
         this.career = career;
         this.preferredWorkType = workType == null ? WorkType.SITE : workType;
         this.writingStatus = writingStatus;
-
-        if (StringUtils.hasText(portfolioUrl)) {
-            portfolioUrl = portfolioUrl.trim();
-            Assert.isTrue(isValidUrl(portfolioUrl), "포트폴리오 URL은 유효한 URL형식이어야 합니다.");
-        }
-        this.portfolioUrl = portfolioUrl;
+        this.portfolioUrl = normalizedPortfolioUrl;
     }
 
     public void togglePubliclyVisible() {
@@ -147,6 +140,25 @@ public class Resume extends BaseEntity {
     public void toggleAiMatchingEnabled() {
         this.aiMatchingEnabled = !this.aiMatchingEnabled;
     }
+
+    public void delete() {
+        this.status = ResumeStatus.INACTIVE;
+    }
+
+    public void restore() {
+        this.status = ResumeStatus.ACTIVE;
+    }
+
+    private String normalizePortfolioUrl(String portfolioUrl) {
+        if (!StringUtils.hasText(portfolioUrl)) {
+            return null;
+        }
+
+        String trimmedPortfolioUrl = portfolioUrl.trim();
+        Assert.isTrue(isValidUrl(trimmedPortfolioUrl), "포트폴리오 URL은 유효한 URL형식이어야 합니다.");
+        return trimmedPortfolioUrl;
+    }
+
     private boolean isValidUrl(String url) {
         try {
             URI.create(url);
