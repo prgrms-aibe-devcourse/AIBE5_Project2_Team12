@@ -29,6 +29,16 @@
 - MVP에서는 `proposal.overview`를 두지 않는다.
 - 리스트와 카드의 미리보기 텍스트는 별도 `overview`가 아니라 `description` 발췌본으로 처리한다.
 
+### 추천 엔진 운영 선택
+
+- MVP에서는 `pgvector` extension을 도입하지 않는다.
+- MVP에서는 외부 MQ를 도입하지 않는다.
+- 추천 결과는 `recommendation_runs`, `recommendation_results`에 저장하고, 이력서 임베딩은 `resume_embeddings`에 캐시한다.
+- `proposal_position` 임베딩은 MVP에서 별도 테이블로 영속화하지 않고 요청 시 계산한다.
+- `pgvector`는 기존 PostgreSQL 확장으로 수용 가능하지만 extension 설치, 인덱스 튜닝, 마이그레이션 관리 부담이 생긴다.
+- 외부 MQ는 브로커 운영 외에도 재시도, DLQ, 중복 소비 방지, 적체 모니터링 같은 운영 복잡도를 크게 늘린다.
+- 따라서 Top 3 설명 생성은 `recommendation_results.llm_status` 상태 전이와 동일 row 업데이트로 관리한다.
+
 ### 예산
 
 - `proposal.total_budget_*`는 전체 프로젝트 예산이다.
@@ -96,6 +106,7 @@
 - 문서와 ERD가 충돌하면 우선 현재 ERD 기준으로 맞춘다.
 - 단, 코드에 이미 구현된 제약과 다르면 `domain-spec.md`의 "현재 코드 기준 제약"에 차이를 명시한다.
 - 추천 엔진은 `proposal_position_skill`을 정규화된 요구 스킬 source로 사용한다.
+- 추천 엔진의 MVP 운영 모델은 기존 PostgreSQL과 애플리케이션 내부 비동기 처리 범위에서 해결한다.
 
 ## 4. 지금 팀이 자주 확인해야 할 질문
 

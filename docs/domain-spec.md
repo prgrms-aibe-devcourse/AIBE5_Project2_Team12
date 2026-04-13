@@ -83,6 +83,8 @@
 - `resume.ai_matching_enabled`는 그 전제 조건을 만족한 이력서 중 AI 추천 후보군 포함 여부만 추가로 제어한다.
 - MVP 추천 엔진을 위해 `recommendation_runs`, `recommendation_results`, `resume_embeddings`를 ERD에 추가한다.
 - `proposal_position_embeddings`는 MVP에서 추가하지 않는다.
+- MVP에서는 `resume_embeddings.embedding_vector`를 `jsonb`로 저장하고 `pgvector` extension은 도입하지 않는다.
+- MVP에서는 외부 MQ를 두지 않고 `recommendation_results.llm_status` 상태 전이로 설명 생성 흐름을 관리한다.
 
 ## 4. 권장 집합 경계
 
@@ -604,6 +606,7 @@ MVP에서는 전체 후보 랭킹이 아니라 응답에 노출할 결과만 저
 - `llm_status = READY` 또는 `FAILED`로 바뀌는 시점의 설명 생성 결과 반영 시각은 `modified_at`으로 해석하고, 별도 `llm_generated_at` 컬럼은 두지 않는다.
 - `reason_facts`에는 최소한 필수 스킬 충족 여부, 우대 스킬 겹침, 근무 형태 호환성, 경력 적합 해석, 임베딩 유사도가 포함돼야 한다.
 - MVP에서는 `skill_score`, `work_type_score`, `career_score`, `llm_model`, `prompt_version` 컬럼을 별도로 두지 않고 `reason_facts`에 포함해 관리한다.
+- MVP에서는 외부 MQ 없이 결과 row 생성 후 동일 row의 `llm_status`, `llm_reason`, `modified_at` 업데이트로 설명 생성 흐름을 관리한다.
 
 ### 5.18 resume_embeddings
 
@@ -628,6 +631,7 @@ MVP에서는 반복 비용이 큰 이력서 쪽만 영속화하고, `proposal_po
 - MVP에서는 `resume_id + embedding_model` 기준 최신 임베딩 캐시 한 줄만 유지하고, `created_at`은 캐시 레코드 최초 생성 시각, `modified_at`은 마지막 임베딩 재생성 시각으로 사용한다. 별도 `generated_at` 컬럼은 두지 않는다.
 - `source_hash`는 `introduction`, `career`, `preferred_work_type`, `portfolio_url`, `resume_skills`를 기준으로 계산한다.
 - 현재 source hash와 저장된 hash가 다르면 임베딩을 재생성한다.
+- MVP에서는 `embedding_vector`를 `jsonb`로 저장하고, `pgvector` extension과 ANN 인덱스는 도입하지 않는다.
 - `proposal_position_embeddings` 테이블은 MVP에서 만들지 않는다. 현재는 `proposal_position` 입력을 요청 시 임베딩하고, 최종 추천 결과만 `recommendation_runs`와 `recommendation_results`로 재사용한다.
 
 ## 6. 상태 모델

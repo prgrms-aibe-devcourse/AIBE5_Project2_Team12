@@ -167,8 +167,12 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 - 구조화된 필드가 충분하면 코사인 유사도 또는 벡터 유사도 방식을 우선 활용한다.
 - 구조화가 부족하면 룰 베이스 fallback으로 품질 저하를 완충한다.
 - LLM 설명은 응답으로 노출되는 Top 3 후보에 대해서만 생성한다.
-- 매 요청마다 전부 재생성하지 않고 세션 또는 캐시를 활용해 비용을 제어한다.
+- 매 요청마다 전부 재생성하지 않고 DB 저장 결과와 캐시를 활용해 비용을 제어한다.
 - 현재 정규화된 요구 스킬 기준은 `proposal_position_skill`이다.
+- MVP에서는 `pgvector` extension과 외부 MQ를 도입하지 않는다.
+- `pgvector`는 기존 PostgreSQL 안에서 해결되더라도 extension 설치, 인덱스 튜닝, 마이그레이션 관리 부담이 생긴다.
+- 외부 MQ는 브로커 운영, 재시도, DLQ, 중복 소비 방지 같은 비동기 운영 복잡도를 추가한다.
+- 따라서 MVP는 `recommendation_runs`, `recommendation_results`, `resume_embeddings`와 앱 내부 비동기 처리만으로 시작한다.
 
 ### 5.3 설명 가능한 추천
 
