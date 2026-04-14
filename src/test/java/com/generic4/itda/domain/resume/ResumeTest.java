@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.generic4.itda.domain.file.StoredFile;
 import com.generic4.itda.domain.member.Member;
+import com.generic4.itda.domain.skill.Skill;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -670,6 +671,120 @@ class ResumeTest {
         assertThatThrownBy(() -> resume.removeFile(null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("삭제할 첨부 파일은 필수값입니다.");
+    }
+
+    @DisplayName("스킬을 추가하면 스킬 목록에 등록된다")
+    @Test
+    void addSkillAppendsToSkillList() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        Skill skill = Skill.create("Java", "백엔드 언어");
+
+        resume.addSkill(skill, Proficiency.ADVANCED);
+
+        assertThat(resume.getSkills()).hasSize(1);
+        assertThat(resume.getSkills().get(0).getSkill()).isEqualTo(skill);
+        assertThat(resume.getSkills().get(0).getProficiency()).isEqualTo(Proficiency.ADVANCED);
+    }
+
+    @DisplayName("스킬을 삭제하면 스킬 목록에서 제거된다")
+    @Test
+    void removeSkillDeletesFromSkillList() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        Skill skill = Skill.create("Java", "백엔드 언어");
+        resume.addSkill(skill, Proficiency.ADVANCED);
+
+        resume.removeSkill(skill);
+
+        assertThat(resume.getSkills()).isEmpty();
+    }
+
+    @DisplayName("존재하지 않는 스킬을 삭제해도 스킬 목록이 변하지 않는다")
+    @Test
+    void removeNonExistentSkillDoesNotChangeSkillList() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        Skill skill = Skill.create("Java", "백엔드 언어");
+        Skill otherSkill = Skill.create("Python", "스크립트 언어");
+        resume.addSkill(skill, Proficiency.ADVANCED);
+
+        resume.removeSkill(otherSkill);
+
+        assertThat(resume.getSkills()).hasSize(1);
+    }
+
+    @DisplayName("스킬을 수정하면 숙련도가 변경된다")
+    @Test
+    void updateSkillChangesProficiency() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        Skill skill = Skill.create("Java", "백엔드 언어");
+        resume.addSkill(skill, Proficiency.BEGINNER);
+
+        resume.updateSkill(skill, Proficiency.ADVANCED);
+
+        assertThat(resume.getSkills().get(0).getProficiency()).isEqualTo(Proficiency.ADVANCED);
+    }
+
+    @DisplayName("null 스킬을 추가하면 실패한다")
+    @Test
+    void failWhenAddSkillIsNull() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+
+        assertThatThrownBy(() -> resume.addSkill(null, Proficiency.BEGINNER))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("스킬은 필수 입력값입니다.");
+    }
+
+    @DisplayName("null 숙련도로 스킬을 추가하면 실패한다")
+    @Test
+    void failWhenAddProficiencyIsNull() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        Skill skill = Skill.create("Java", "백엔드 언어");
+
+        assertThatThrownBy(() -> resume.addSkill(skill, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("숙련도는 필수 입력값입니다.");
+    }
+
+    @DisplayName("null 스킬을 삭제하면 실패한다")
+    @Test
+    void failWhenRemoveSkillIsNull() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+
+        assertThatThrownBy(() -> resume.removeSkill(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("스킬은 필수 입력값입니다.");
+    }
+
+    @DisplayName("존재하지 않는 스킬을 수정하면 실패한다")
+    @Test
+    void failWhenUpdateNonExistentSkill() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        Skill skill = Skill.create("Java", "백엔드 언어");
+
+        assertThatThrownBy(() -> resume.updateSkill(skill, Proficiency.ADVANCED))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("기존에 없는 스킬은 업데이트 할 수 없습니다.");
+    }
+
+    @DisplayName("null 스킬로 수정하면 실패한다")
+    @Test
+    void failWhenUpdateSkillIsNull() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+
+        assertThatThrownBy(() -> resume.updateSkill(null, Proficiency.ADVANCED))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("스킬은 필수 입력값입니다.");
+    }
+
+    @DisplayName("null 숙련도로 스킬을 수정하면 실패한다")
+    @Test
+    void failWhenUpdateProficiencyIsNull() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        Skill skill = Skill.create("Java", "백엔드 언어");
+        resume.addSkill(skill, Proficiency.BEGINNER);
+
+        assertThatThrownBy(() -> resume.updateSkill(skill, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("숙련도는 필수 입력값입니다.");
     }
 
     private static StoredFile createStoredFile(String originalName) {

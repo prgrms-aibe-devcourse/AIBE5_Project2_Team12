@@ -3,6 +3,7 @@ package com.generic4.itda.domain.resume;
 import com.generic4.itda.domain.file.StoredFile;
 import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.shared.BaseEntity;
+import com.generic4.itda.domain.skill.Skill;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
@@ -25,14 +26,12 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.ToString;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@ToString(callSuper = false)
 public class Resume extends BaseEntity {
 
     @Id
@@ -72,6 +71,10 @@ public class Resume extends BaseEntity {
     @OneToMany(mappedBy = "resume", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("displayOrder ASC")
     private final List<ResumeAttachment> attachments = new ArrayList<>();
+
+    @OneToMany(mappedBy = "resume", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("proficiency desc")
+    private final List<ResumeSkill> skills = new ArrayList<>();
 
     @Builder(access = AccessLevel.PRIVATE)
     private Resume(Member member, String introduction, Byte careerYears, CareerPayload career,
@@ -177,6 +180,31 @@ public class Resume extends BaseEntity {
                 attachments.get(i).changeDisplayOrder(i);
             }
         }
+    }
+
+    public void addSkill(Skill skill, Proficiency proficiency) {
+        Assert.notNull(skill, "스킬은 필수 입력값입니다.");
+        Assert.notNull(proficiency, "숙련도는 필수 입력값입니다.");
+
+        ResumeSkill resumeSkill = ResumeSkill.create(this, skill, proficiency);
+        this.skills.add(resumeSkill);
+    }
+
+    public void removeSkill(Skill skill) {
+        Assert.notNull(skill, "스킬은 필수 입력값입니다.");
+        this.skills.removeIf(resumeSkill -> resumeSkill.getSkill().equals(skill));
+    }
+
+    public void updateSkill(Skill skill, Proficiency proficiency) {
+        Assert.notNull(skill, "스킬은 필수 입력값입니다.");
+        Assert.notNull(proficiency, "숙련도는 필수 입력값입니다.");
+
+        ResumeSkill storedSkill = this.skills.stream()
+                .filter(resumeSkill -> resumeSkill.getSkill().equals(skill))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("기존에 없는 스킬은 업데이트 할 수 없습니다."));
+
+        storedSkill.update(skill, proficiency);
     }
 
     private String normalizePortfolioUrl(String portfolioUrl) {
