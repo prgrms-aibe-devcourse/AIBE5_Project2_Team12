@@ -82,7 +82,7 @@ public class Member extends BaseTimeEntity {
     private UserStatus status;
 
     @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true, optional = true)
-    @JoinColumn(name = "profile_image_id", nullable = false)
+    @JoinColumn(name = "profile_image_id", nullable = true)
     private ProfileImage profileImage;
 
     @Builder(access = AccessLevel.PRIVATE)
