@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title layout:title-pattern="$LAYOUT_TITLE | $CONTENT_TITLE">IT-da</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        [x-cloak] { display: none !important; }
+        .fade-up { transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900" x-data="{ loaded: false }" x-init="setTimeout(() => loaded = true, 50); lucide.createIcons();">
+<div th:replace="~{fragments/header :: headerFragment}"></div>
+<div layout:fragment="content"></div>
+<script>
+    document.addEventListener('alpine:initialized', () => { lucide.createIcons(); });
+</script>
+</body>
+</html>

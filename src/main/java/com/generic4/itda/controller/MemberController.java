@@ -21,24 +21,24 @@ public class MemberController {
 
     @GetMapping("/signup")
     public String signupForm(@ModelAttribute("signUpForm") MemberSignUpForm signUpForm) {
-        return "signup";
+        return "auth/signup";
     }
 
     @PostMapping("/signup")
     public String signUp(@Valid @ModelAttribute("signUpForm") MemberSignUpForm signUpForm,
             BindingResult bindingResult) {
         if (bindingResult.hasErrors()) {
-            return "signup";
+            return "auth/signup";
         }
 
         try {
             memberService.signUp(signUpForm);
         } catch (DuplicateEmailException ex) {
             bindingResult.rejectValue("email", "duplicate", ex.getMessage());
-            return "signup";
+            return "auth/signup";
         } catch (IllegalArgumentException ex) {
             bindingResult.reject("signupFailed", ex.getMessage());
-            return "signup";
+            return "auth/signup";
         }
 
         return "redirect:/login?signupSuccess=true";
@@ -50,6 +50,6 @@ public class MemberController {
             Model model) {
         model.addAttribute("loginError", error);
         model.addAttribute("signupSuccess", signupSuccess);
-        return "login";
+        return "auth/login";
     }
 }

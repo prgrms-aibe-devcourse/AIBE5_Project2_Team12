@@ -39,7 +39,7 @@ class MemberControllerTest {
     void renderSignupPage() throws Exception {
         mockMvc.perform(get("/signup"))
                 .andExpect(status().isOk())
-                .andExpect(view().name("signup"))
+                .andExpect(view().name("auth/signup"))
                 .andExpect(model().attributeExists("signUpForm"));
     }
 
@@ -74,7 +74,7 @@ class MemberControllerTest {
                         .param("nickname", "길동")
                         .param("phone", "010-1234-5678"))
                 .andExpect(status().isOk())
-                .andExpect(view().name("signup"))
+                .andExpect(view().name("auth/signup"))
                 .andExpect(model().attributeHasFieldErrors("signUpForm", "email"));
     }
 
@@ -88,7 +88,7 @@ class MemberControllerTest {
                         .param("name", "")
                         .param("phone", "010 1234 5678"))
                 .andExpect(status().isOk())
-                .andExpect(view().name("signup"))
+                .andExpect(view().name("auth/signup"))
                 .andExpect(model().attributeHasFieldErrors("signUpForm", "email", "password", "name", "phone"));
 
         then(memberService).should(never()).signUp(any());
@@ -105,7 +105,7 @@ class MemberControllerTest {
                         .param("nickname", "길동")
                         .param("phone", "123"))
                 .andExpect(status().isOk())
-                .andExpect(view().name("signup"))
+                .andExpect(view().name("auth/signup"))
                 .andExpect(model().attributeHasFieldErrors("signUpForm", "phone"));
 
         then(memberService).should(never()).signUp(any());
