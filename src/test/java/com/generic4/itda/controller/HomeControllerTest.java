@@ -38,7 +38,7 @@ class HomeControllerTest {
     void renderHomePageForGuest() throws Exception {
         mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
-                .andExpect(view().name("index"))
+                .andExpect(view().name("landing"))
                 .andExpect(model().attribute("authenticated", false));
     }
 
@@ -56,7 +56,7 @@ class HomeControllerTest {
                                 List.of(new SimpleGrantedAuthority("ROLE_USER"))
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(view().name("index"))
+                .andExpect(view().name("landing"))
                 .andExpect(model().attribute("authenticated", true))
                 .andExpect(model().attribute("memberName", "홍길동"))
                 .andExpect(model().attribute("memberEmail", "member@example.com"))
