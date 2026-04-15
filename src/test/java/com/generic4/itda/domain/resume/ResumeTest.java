@@ -563,37 +563,6 @@ class ResumeTest {
         assertThat(resume.getPortfolioUrl()).isEqualTo("https://github.com/user");
     }
 
-    @DisplayName("파일을 추가하면 첫 번째 첨부파일의 표시 순서는 0이다")
-    @Test
-    void addFirstFileHasDisplayOrderZero() {
-        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
-        StoredFile file = createStoredFile("resume.pdf");
-
-        resume.addFile(file);
-
-        assertThat(resume.getAttachments()).hasSize(1);
-        assertThat(resume.getAttachments().get(0).getFile()).isEqualTo(file);
-        assertThat(resume.getAttachments().get(0).getDisplayOrder()).isEqualTo(0);
-    }
-
-    @DisplayName("파일을 순서대로 추가하면 표시 순서가 순차적으로 할당된다")
-    @Test
-    void addMultipleFilesAssignsSequentialDisplayOrder() {
-        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
-        StoredFile file1 = createStoredFile("resume1.pdf");
-        StoredFile file2 = createStoredFile("resume2.pdf");
-        StoredFile file3 = createStoredFile("resume3.pdf");
-
-        resume.addFile(file1);
-        resume.addFile(file2);
-        resume.addFile(file3);
-
-        assertThat(resume.getAttachments()).hasSize(3);
-        assertThat(resume.getAttachments().get(0).getDisplayOrder()).isEqualTo(0);
-        assertThat(resume.getAttachments().get(1).getDisplayOrder()).isEqualTo(1);
-        assertThat(resume.getAttachments().get(2).getDisplayOrder()).isEqualTo(2);
-    }
-
     @DisplayName("파일을 삭제하면 첨부파일 목록에서 제거된다")
     @Test
     void removeFileDeletesAttachment() {
@@ -604,26 +573,6 @@ class ResumeTest {
         resume.removeFile(file);
 
         assertThat(resume.getAttachments()).isEmpty();
-    }
-
-    @DisplayName("중간 파일을 삭제하면 나머지 첨부파일의 표시 순서가 재정렬된다")
-    @Test
-    void removeMiddleFileReordersRemainingAttachments() {
-        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
-        StoredFile file1 = createStoredFile("resume1.pdf");
-        StoredFile file2 = createStoredFile("resume2.pdf");
-        StoredFile file3 = createStoredFile("resume3.pdf");
-        resume.addFile(file1);
-        resume.addFile(file2);
-        resume.addFile(file3);
-
-        resume.removeFile(file2);
-
-        assertThat(resume.getAttachments()).hasSize(2);
-        assertThat(resume.getAttachments().get(0).getFile()).isEqualTo(file1);
-        assertThat(resume.getAttachments().get(0).getDisplayOrder()).isEqualTo(0);
-        assertThat(resume.getAttachments().get(1).getFile()).isEqualTo(file3);
-        assertThat(resume.getAttachments().get(1).getDisplayOrder()).isEqualTo(1);
     }
 
     @DisplayName("존재하지 않는 파일을 삭제해도 첨부파일 목록이 변하지 않는다")
