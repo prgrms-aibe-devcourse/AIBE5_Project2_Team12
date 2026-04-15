@@ -39,37 +39,37 @@ public class Resume extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Long id; // PK
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(nullable = false, updatable = false, referencedColumnName = "id")
-    private Member member;
+    @JoinColumn(name = "member_id", nullable = false, unique = true, updatable = false, referencedColumnName = "id")
+    private Member member; // 회원 id
 
     @Lob
     @Column(columnDefinition = "TEXT")
-    private String introduction;
+    private String introduction; // 자기소개
 
-    private Byte careerYears;
+    private Byte careerYears; // 경력 연차
 
     @Lob
     @Column(columnDefinition = "TEXT")
     @Convert(converter = CareerPayloadJsonConverter.class)
-    private CareerPayload career;
+    private CareerPayload career; // 경력 상세 JSON
 
     @Enumerated(EnumType.STRING)
-    private WorkType preferredWorkType;
+    private WorkType preferredWorkType; // 선호 근무 형태
 
-    private boolean publiclyVisible;
+    private boolean publiclyVisible; // 공개 여부
 
-    private boolean aiMatchingEnabled;
-
-    @Enumerated(EnumType.STRING)
-    private ResumeWritingStatus writingStatus;
+    private boolean aiMatchingEnabled; // AI추천 노출 여부
 
     @Enumerated(EnumType.STRING)
-    private ResumeStatus status;
+    private ResumeWritingStatus writingStatus; // 작성 상태
 
-    private String portfolioUrl;
+    @Enumerated(EnumType.STRING)
+    private ResumeStatus status; // 이력서 상태
+
+    private String portfolioUrl; // 포트폴리오 주소
 
     @OneToMany(mappedBy = "resume", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("createdAt asc")
