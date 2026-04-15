@@ -136,18 +136,11 @@ public class Proposal extends BaseEntity {
     }
 
     public ProposalPosition addPosition(Position position, Long headCount, Long unitBudgetMin, Long unitBudgetMax) {
-        return ProposalPosition.create(this, position, headCount, unitBudgetMin, unitBudgetMax);
-    }
-
-    void registerPosition(ProposalPosition proposalPosition) {
-        Assert.notNull(proposalPosition, "모집 단위는 필수값입니다.");
-        Assert.state(proposalPosition.getProposal() == this, "해당 모집 단위는 이 제안서에 속해야 합니다.");
-        Assert.state(isPositionNotDuplicated(proposalPosition, proposalPosition.getPosition()),
-                "같은 제안서에는 동일한 직무를 중복 등록할 수 없습니다.");
-
-        if (!this.positions.contains(proposalPosition)) {
-            this.positions.add(proposalPosition);
-        }
+        ProposalPosition proposalPosition = ProposalPosition.create(this, position, headCount, unitBudgetMin,
+                unitBudgetMax);
+        validatePositionChange(proposalPosition, proposalPosition.getPosition());
+        this.positions.add(proposalPosition);
+        return proposalPosition;
     }
 
     void validatePositionChange(ProposalPosition proposalPosition, Position position) {

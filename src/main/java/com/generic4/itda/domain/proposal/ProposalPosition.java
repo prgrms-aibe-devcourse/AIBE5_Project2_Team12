@@ -86,7 +86,7 @@ public class ProposalPosition extends BaseEntity {
 
     public static ProposalPosition create(Proposal proposal, Position position, Long headCount,
             Long unitBudgetMin, Long unitBudgetMax) {
-        ProposalPosition proposalPosition = ProposalPosition.builder()
+        return ProposalPosition.builder()
                 .proposal(proposal)
                 .position(position)
                 .headCount(headCount)
@@ -94,9 +94,6 @@ public class ProposalPosition extends BaseEntity {
                 .unitBudgetMin(unitBudgetMin)
                 .unitBudgetMax(unitBudgetMax)
                 .build();
-
-        proposal.registerPosition(proposalPosition);
-        return proposalPosition;
     }
 
     public void update(Position position, Long headCount, Long unitBudgetMin, Long unitBudgetMax) {
@@ -117,19 +114,10 @@ public class ProposalPosition extends BaseEntity {
     }
 
     public ProposalPositionSkill addSkill(Skill skill, ProposalPositionSkillImportance importance) {
-        return ProposalPositionSkill.create(this, skill, importance);
-    }
-
-    void registerSkill(ProposalPositionSkill proposalPositionSkill) {
-        Assert.notNull(proposalPositionSkill, "요구 스킬은 필수값입니다.");
-        Assert.state(proposalPositionSkill.getProposalPosition() == this,
-                "해당 요구 스킬은 이 모집 단위에 속해야 합니다.");
-        Assert.state(isSkillNotDuplicated(proposalPositionSkill.getSkill()),
-                "같은 모집 단위에는 동일한 스킬을 중복 등록할 수 없습니다.");
-
-        if (!this.skills.contains(proposalPositionSkill)) {
-            this.skills.add(proposalPositionSkill);
-        }
+        ProposalPositionSkill proposalPositionSkill = ProposalPositionSkill.create(this, skill, importance);
+        validateSkillChange(proposalPositionSkill.getSkill());
+        this.skills.add(proposalPositionSkill);
+        return proposalPositionSkill;
     }
 
     public void removeSkill(Skill skill) {
@@ -146,6 +134,11 @@ public class ProposalPosition extends BaseEntity {
 
     void detachFromProposal() {
         this.proposal = null;
+    }
+
+    void validateSkillChange(Skill skill) {
+        Assert.notNull(skill, "스킬은 필수값입니다.");
+        Assert.state(isSkillNotDuplicated(skill), "같은 모집 단위에는 동일한 스킬을 중복 등록할 수 없습니다.");
     }
 
     private boolean isSkillNotDuplicated(Skill skill) {

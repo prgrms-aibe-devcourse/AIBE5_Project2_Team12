@@ -91,6 +91,6 @@ class ProposalPositionSkillTest {
                 8L
         );
 
-        return ProposalPosition.create(proposal, Position.create("백엔드 개발자"), 1L, 2_000_000L, 3_000_000L);
+        return proposal.addPosition(Position.create("백엔드 개발자"), 1L, 2_000_000L, 3_000_000L);
     }
 }

@@ -28,7 +28,7 @@ class ProposalPositionTest {
         assertThat(proposalPosition.getUnitBudgetMin()).isEqualTo(3_000_000L);
         assertThat(proposalPosition.getUnitBudgetMax()).isEqualTo(5_000_000L);
         assertThat(proposalPosition.getStatus()).isEqualTo(ProposalPositionStatus.OPEN);
-        assertThat(proposal.getPositions()).containsExactly(proposalPosition);
+        assertThat(proposal.getPositions()).isEmpty();
     }
 
     @DisplayName("상위 제안서가 없으면 생성에 실패한다")
@@ -115,8 +115,8 @@ class ProposalPositionTest {
         Proposal proposal = createProposal();
         Position backend = Position.create("백엔드 개발자");
         Position frontend = Position.create("프론트엔드 개발자");
-        ProposalPosition.create(proposal, backend, 1L, 2_000_000L, 3_000_000L);
-        ProposalPosition proposalPosition = ProposalPosition.create(proposal, frontend, 1L, 2_000_000L, 3_000_000L);
+        proposal.addPosition(backend, 1L, 2_000_000L, 3_000_000L);
+        ProposalPosition proposalPosition = proposal.addPosition(frontend, 1L, 2_000_000L, 3_000_000L);
 
         assertThatThrownBy(() -> proposalPosition.update(backend, 2L, 3_000_000L, 4_000_000L))
                 .isInstanceOf(IllegalStateException.class)

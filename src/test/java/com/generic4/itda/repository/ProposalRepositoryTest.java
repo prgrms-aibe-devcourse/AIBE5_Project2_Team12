@@ -99,6 +99,42 @@ class ProposalRepositoryTest {
         assertThat(countRows("ProposalPositionSkill")).isZero();
     }
 
+    @DisplayName("모집 단위에서 요구 스킬을 제거하면 orphan removal로 DB에서도 삭제된다")
+    @Test
+    void removeSkillWithOrphanRemoval() {
+        Member member = memberRepository.save(createMember());
+        Position backend = persist(Position.create("백엔드 개발자"));
+        Skill java = persist(Skill.create("Java", "백엔드 언어"));
+        Skill spring = persist(Skill.create("Spring Boot", "웹 프레임워크"));
+
+        Proposal proposal = Proposal.create(
+                member,
+                "AI 기반 매칭 플랫폼 구축",
+                "원본 입력",
+                "최종 제안서 본문",
+                10_000_000L,
+                20_000_000L,
+                ProposalWorkType.HYBRID,
+                "서울",
+                12L
+        );
+        ProposalPosition proposalPosition = proposal.addPosition(backend, 2L, 4_000_000L, 6_000_000L);
+        proposalPosition.addSkill(java, ProposalPositionSkillImportance.ESSENTIAL);
+        proposalPosition.addSkill(spring, ProposalPositionSkillImportance.PREFERENCE);
+        proposalRepository.saveAndFlush(proposal);
+
+        proposalPosition.removeSkill(java);
+        proposalRepository.saveAndFlush(proposal);
+        entityManager.clear();
+
+        Proposal persistedProposal = proposalRepository.findById(proposal.getId()).orElseThrow();
+        ProposalPosition persistedPosition = persistedProposal.getPositions().get(0);
+
+        assertThat(persistedPosition.getSkills()).hasSize(1);
+        assertThat(persistedPosition.getSkills().get(0).getSkill().getName()).isEqualTo("Spring Boot");
+        assertThat(countRows("ProposalPositionSkill")).isEqualTo(1L);
+    }
+
     @DisplayName("같은 직무 마스터를 같은 제안서 안에 중복 저장할 수 없다")
     @Test
     void failWhenPositionMasterIsDuplicatedWithinProposal() {

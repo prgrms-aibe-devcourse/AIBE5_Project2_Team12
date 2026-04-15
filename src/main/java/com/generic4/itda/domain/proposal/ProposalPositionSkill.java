@@ -60,9 +60,7 @@ public class ProposalPositionSkill extends BaseTimeEntity {
 
     public static ProposalPositionSkill create(ProposalPosition proposalPosition, Skill skill,
             ProposalPositionSkillImportance importance) {
-        ProposalPositionSkill proposalPositionSkill = new ProposalPositionSkill(proposalPosition, skill, importance);
-        proposalPosition.registerSkill(proposalPositionSkill);
-        return proposalPositionSkill;
+        return new ProposalPositionSkill(proposalPosition, skill, importance);
     }
 
     public void changeImportance(ProposalPositionSkillImportance importance) {
