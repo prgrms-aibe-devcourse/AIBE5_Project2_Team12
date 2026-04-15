@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.generic4.itda.domain.file.StoredFile;
 import com.generic4.itda.domain.member.Member;
+import com.generic4.itda.domain.resume.ResumeSkill;
 import com.generic4.itda.domain.skill.Skill;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -631,8 +632,9 @@ class ResumeTest {
         resume.addSkill(skill, Proficiency.ADVANCED);
 
         assertThat(resume.getSkills()).hasSize(1);
-        assertThat(resume.getSkills().get(0).getSkill()).isEqualTo(skill);
-        assertThat(resume.getSkills().get(0).getProficiency()).isEqualTo(Proficiency.ADVANCED);
+        ResumeSkill addedSkill = resume.getSkills().iterator().next();
+        assertThat(addedSkill.getSkill()).isEqualTo(skill);
+        assertThat(addedSkill.getProficiency()).isEqualTo(Proficiency.ADVANCED);
     }
 
     @DisplayName("스킬을 삭제하면 스킬 목록에서 제거된다")
@@ -669,7 +671,7 @@ class ResumeTest {
 
         resume.updateSkill(skill, Proficiency.ADVANCED);
 
-        assertThat(resume.getSkills().get(0).getProficiency()).isEqualTo(Proficiency.ADVANCED);
+        assertThat(resume.getSkills().iterator().next().getProficiency()).isEqualTo(Proficiency.ADVANCED);
     }
 
     @DisplayName("null 스킬을 추가하면 실패한다")

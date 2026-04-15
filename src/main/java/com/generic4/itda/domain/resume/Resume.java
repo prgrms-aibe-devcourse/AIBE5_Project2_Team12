@@ -21,12 +21,14 @@ import jakarta.persistence.OneToOne;
 import jakarta.persistence.OrderBy;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SortComparator;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
@@ -74,7 +76,8 @@ public class Resume extends BaseEntity {
     private final List<ResumeAttachment> attachments = new ArrayList<>();
 
     @OneToMany(mappedBy = "resume", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    private final List<ResumeSkill> skills = new ArrayList<>();
+    @SortComparator(ResumeSkillComparator.class)
+    private final SortedSet<ResumeSkill> skills = new TreeSet<>(new ResumeSkillComparator());
 
     @Builder(access = AccessLevel.PRIVATE)
     private Resume(Member member, String introduction, Byte careerYears, CareerPayload career,
@@ -180,6 +183,8 @@ public class Resume extends BaseEntity {
         Assert.notNull(proficiency, "숙련도는 필수 입력값입니다.");
 
         ResumeSkill resumeSkill = ResumeSkill.create(this, skill, proficiency);
+        Assert.state(!this.skills.contains(resumeSkill), "이미 등록된 스킬입니다.");
+
         this.skills.add(resumeSkill);
     }
 
@@ -198,12 +203,6 @@ public class Resume extends BaseEntity {
                 .orElseThrow(() -> new IllegalStateException("기존에 없는 스킬은 업데이트 할 수 없습니다."));
 
         storedSkill.update(skill, proficiency);
-    }
-
-    public List<ResumeSkill> getSortedSkills() {
-        return this.skills.stream()
-                .sorted(Comparator.comparingInt((ResumeSkill s) -> s.getProficiency().getPriority()).reversed())
-                .toList();
     }
 
     private String normalizePortfolioUrl(String portfolioUrl) {

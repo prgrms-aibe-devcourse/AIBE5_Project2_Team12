@@ -3,8 +3,6 @@ package com.generic4.itda.repository;
 import static com.generic4.itda.fixture.MemberFixture.createMember;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.generic4.itda.fixture.MemberFixture;
-
 import com.generic4.itda.annotation.H2RepositoryTest;
 import com.generic4.itda.domain.file.StoredFile;
 import com.generic4.itda.domain.member.Member;
@@ -15,8 +13,10 @@ import com.generic4.itda.domain.resume.ResumeSkill;
 import com.generic4.itda.domain.resume.ResumeWritingStatus;
 import com.generic4.itda.domain.resume.WorkType;
 import com.generic4.itda.domain.skill.Skill;
+import com.generic4.itda.fixture.MemberFixture;
 import jakarta.persistence.EntityManager;
 import java.util.List;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -58,8 +58,7 @@ class ResumeAssociationTest {
     class SkillSortingTest {
 
         /**
-         * skills 컬렉션에 @OrderBy가 없으므로 DB 조회 순서에 의존하지 않습니다.
-         * getSortedSkills()는 Proficiency.priority 기준 내림차순으로 정렬합니다:
+         * skills 컬렉션에 @OrderBy가 없으므로 DB 조회 순서에 의존하지 않습니다. getSortedSkills()는 Proficiency.priority 기준 내림차순으로 정렬합니다:
          * ADVANCED(3) > INTERMEDIATE(2) > BEGINNER(1)
          */
         @DisplayName("BEGINNER·INTERMEDIATE·ADVANCED 순으로 삽입해도 getSortedSkills()는 priority 내림차순으로 반환한다")
@@ -82,9 +81,8 @@ class ResumeAssociationTest {
             em.clear();
 
             Resume found = resumeRepository.findById(resume.getId()).orElseThrow();
-            List<ResumeSkill> sorted = found.getSortedSkills();
 
-            assertThat(sorted)
+            assertThat(found.getSkills())
                     .extracting(ResumeSkill::getProficiency)
                     .containsExactly(Proficiency.ADVANCED, Proficiency.INTERMEDIATE, Proficiency.BEGINNER);
         }
@@ -108,7 +106,7 @@ class ResumeAssociationTest {
             em.clear();
 
             Resume found = resumeRepository.findById(resume.getId()).orElseThrow();
-            List<ResumeSkill> sorted = found.getSortedSkills();
+            List<ResumeSkill> sorted = List.copyOf(found.getSkills());
 
             assertThat(sorted).hasSize(3);
             assertThat(sorted.subList(0, 2))
@@ -127,8 +125,7 @@ class ResumeAssociationTest {
     class AttachmentSortingTest {
 
         /**
-         * attachments는 @OrderBy("createdAt asc")로 정렬됩니다.
-         * 파일별로 saveAndFlush 후 Thread.sleep을 사용해 createdAt 차이를 보장합니다.
+         * attachments는 @OrderBy("createdAt asc")로 정렬됩니다. 파일별로 saveAndFlush 후 Thread.sleep을 사용해 createdAt 차이를 보장합니다.
          */
         @DisplayName("가장 먼저 생성된 파일이 attachments 리스트의 첫 번째로 조회된다")
         @Test
@@ -218,7 +215,7 @@ class ResumeAssociationTest {
 
             Resume afterRemoval = resumeRepository.findById(resume.getId()).orElseThrow();
             assertThat(afterRemoval.getSkills()).hasSize(1);
-            assertThat(afterRemoval.getSkills().get(0).getSkill().getName()).isEqualTo("Python");
+            assertThat(afterRemoval.getSkills().iterator().next().getSkill().getName()).isEqualTo("Python");
 
             Long count = em.createQuery(
                             "SELECT COUNT(rs) FROM ResumeSkill rs WHERE rs.resume.id = :id", Long.class)
@@ -392,9 +389,8 @@ class ResumeAssociationTest {
     class CascadePersistTest {
 
         /**
-         * Member, Skill, StoredFile은 Resume 에서 cascade되지 않으므로 직접 영속화합니다.
-         * ResumeSkill과 ResumeAttachment는 Resume.skills / Resume.attachments 컬렉션에
-         * CascadeType.ALL이 설정되어 있어 resumeRepository.save(resume) 한 번으로 함께 저장됩니다.
+         * Member, Skill, StoredFile은 Resume 에서 cascade되지 않으므로 직접 영속화합니다. ResumeSkill과 ResumeAttachment는 Resume.skills /
+         * Resume.attachments 컬렉션에 CascadeType.ALL이 설정되어 있어 resumeRepository.save(resume) 한 번으로 함께 저장됩니다.
          */
         @DisplayName("resumeRepository.save() 한 번으로 ResumeSkill, ResumeAttachment가 함께 저장된다")
         @Test
@@ -440,9 +436,8 @@ class ResumeAssociationTest {
             assertThat(skillCount).isEqualTo(2L);
             assertThat(attachmentCount).isEqualTo(1L);
 
-            // getSortedSkills(): priority 내림차순 — ADVANCED(3) > BEGINNER(1)
-            List<ResumeSkill> sorted = found.getSortedSkills();
-            assertThat(sorted)
+            // getSkills(): TreeSet — priority 내림차순 ADVANCED(3) > BEGINNER(1)
+            assertThat(found.getSkills())
                     .extracting(ResumeSkill::getProficiency)
                     .containsExactly(Proficiency.ADVANCED, Proficiency.BEGINNER);
 
@@ -485,6 +480,54 @@ class ResumeAssociationTest {
             assertThat(found.getAttachments())
                     .extracting(a -> a.getFile().getId())
                     .containsExactly(file0.getId(), file1.getId(), file2.getId());
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 스킬 중복 방지 — DB 저장 후 재조회 시나리오
+    // ═══════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("스킬 중복 방지 — DB 저장 후 재조회")
+    class SkillDuplicateTest {
+
+        /**
+         * DB에 스킬을 저장한 뒤 재조회하면, addSkill 중복 방지 로직이 올바르게 동작한다.
+         */
+        @DisplayName("DB에 저장된 스킬과 동일한 스킬을 같은 숙련도로 추가하면 예외가 발생한다")
+        @Test
+        void addDuplicateSkill_afterPersist_sameProficiency_throwsException() {
+            Resume resume = resumeRepository.findById(savedResume.getId()).orElseThrow();
+            Skill java = Skill.create("Java", null);
+            em.persist(java);
+            resume.addSkill(java, Proficiency.ADVANCED);
+            resumeRepository.saveAndFlush(resume);
+            em.clear();
+
+            Resume reloaded = resumeRepository.findById(resume.getId()).orElseThrow();
+            Skill managedJava = em.find(Skill.class, java.getId());
+
+            Assertions.assertThatThrownBy(() -> reloaded.addSkill(managedJava, Proficiency.ADVANCED))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("이미 등록된 스킬입니다.");
+        }
+
+        @DisplayName("DB에 저장된 스킬과 동일한 스킬을 다른 숙련도로 추가하면 예외가 발생한다")
+        @Test
+        void addDuplicateSkill_afterPersist_differentProficiency_throwsException() {
+            Resume resume = resumeRepository.findById(savedResume.getId()).orElseThrow();
+            Skill java = Skill.create("Java", null);
+            em.persist(java);
+            resume.addSkill(java, Proficiency.BEGINNER);
+            resumeRepository.saveAndFlush(resume);
+            em.clear();
+
+            Resume reloaded = resumeRepository.findById(resume.getId()).orElseThrow();
+            Skill managedJava = em.find(Skill.class, java.getId());
+
+            Assertions.assertThatThrownBy(() -> reloaded.addSkill(managedJava, Proficiency.BEGINNER))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("이미 등록된 스킬입니다.");
         }
     }
 
