@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class ResumeTest {
 
@@ -735,6 +736,70 @@ class ResumeTest {
         assertThatThrownBy(() -> resume.updateSkill(skill, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("숙련도는 필수 입력값입니다.");
+    }
+
+    @DisplayName("같은 id를 가진 다른 StoredFile 인스턴스로 파일을 삭제할 수 있다")
+    @Test
+    void removeFileByDifferentInstanceWithSameId() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        StoredFile original = createStoredFile("resume.pdf");
+        ReflectionTestUtils.setField(original, "id", 1L);
+        resume.addFile(original);
+
+        StoredFile sameIdButDifferentInstance = createStoredFile("different-name.pdf");
+        ReflectionTestUtils.setField(sameIdButDifferentInstance, "id", 1L);
+
+        resume.removeFile(sameIdButDifferentInstance);
+
+        assertThat(resume.getAttachments()).isEmpty();
+    }
+
+    @DisplayName("같은 id를 가진 다른 Skill 인스턴스로 스킬을 삭제할 수 있다")
+    @Test
+    void removeSkillByDifferentInstanceWithSameId() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        Skill original = Skill.create("Java", "백엔드 언어");
+        ReflectionTestUtils.setField(original, "id", 1L);
+        resume.addSkill(original, Proficiency.ADVANCED);
+
+        Skill sameIdButDifferentInstance = Skill.create("Java", "다른 설명");
+        ReflectionTestUtils.setField(sameIdButDifferentInstance, "id", 1L);
+
+        resume.removeSkill(sameIdButDifferentInstance);
+
+        assertThat(resume.getSkills()).isEmpty();
+    }
+
+    @DisplayName("같은 id를 가진 다른 Skill 인스턴스로 스킬 숙련도를 수정할 수 있다")
+    @Test
+    void updateSkillByDifferentInstanceWithSameId() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        Skill original = Skill.create("Java", "백엔드 언어");
+        ReflectionTestUtils.setField(original, "id", 1L);
+        resume.addSkill(original, Proficiency.BEGINNER);
+
+        Skill sameIdButDifferentInstance = Skill.create("Java", "다른 설명");
+        ReflectionTestUtils.setField(sameIdButDifferentInstance, "id", 1L);
+
+        resume.updateSkill(sameIdButDifferentInstance, Proficiency.ADVANCED);
+
+        assertThat(resume.getSkills().iterator().next().getProficiency()).isEqualTo(Proficiency.ADVANCED);
+    }
+
+    @DisplayName("같은 id를 가진 다른 Skill 인스턴스를 추가하면 중복으로 거부된다")
+    @Test
+    void addSkillWithSameIdButDifferentInstanceIsRejectedAsDuplicate() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        Skill original = Skill.create("Java", "백엔드 언어");
+        ReflectionTestUtils.setField(original, "id", 1L);
+        resume.addSkill(original, Proficiency.BEGINNER);
+
+        Skill sameIdButDifferentInstance = Skill.create("다른이름", "다른설명");
+        ReflectionTestUtils.setField(sameIdButDifferentInstance, "id", 1L);
+
+        assertThatThrownBy(() -> resume.addSkill(sameIdButDifferentInstance, Proficiency.ADVANCED))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("이미 등록된 스킬입니다.");
     }
 
     @Test
