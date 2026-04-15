@@ -3,6 +3,8 @@ package com.generic4.itda.repository;
 import static com.generic4.itda.fixture.MemberFixture.createMember;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.generic4.itda.fixture.MemberFixture;
+
 import com.generic4.itda.annotation.H2RepositoryTest;
 import com.generic4.itda.domain.file.StoredFile;
 import com.generic4.itda.domain.member.Member;
@@ -378,6 +380,111 @@ class ResumeAssociationTest {
                     .setParameter("id", resume.getId())
                     .getSingleResult();
             assertThat(count).isZero();
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 신규 Resume 저장 — CascadeType.ALL
+    // ═══════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("신규 Resume 저장 — CascadeType.ALL")
+    class CascadePersistTest {
+
+        /**
+         * Member, Skill, StoredFile은 Resume 에서 cascade되지 않으므로 직접 영속화합니다.
+         * ResumeSkill과 ResumeAttachment는 Resume.skills / Resume.attachments 컬렉션에
+         * CascadeType.ALL이 설정되어 있어 resumeRepository.save(resume) 한 번으로 함께 저장됩니다.
+         */
+        @DisplayName("resumeRepository.save() 한 번으로 ResumeSkill, ResumeAttachment가 함께 저장된다")
+        @Test
+        void singleSave_cascadesResumeSkillAndAttachment() {
+            // Resume cascade 대상이 아닌 엔티티는 직접 영속화
+            Member member = memberRepository.save(
+                    MemberFixture.createMember("new@test.com", "hashed-pw", "신규회원", "010-9999-0001"));
+
+            Skill java = Skill.create("Java", null);
+            Skill kotlin = Skill.create("Kotlin", null);
+            em.persist(java);
+            em.persist(kotlin);
+            em.flush();
+
+            StoredFile file = storedFileRepository.save(toStoredFile("portfolio.pdf", "portfolio-s.pdf"));
+
+            // 루트 엔티티 생성 후 자식 연결 — 별도 save 없음
+            Resume resume = Resume.create(member, "신규 자기소개", (byte) 5, new CareerPayload(),
+                    WorkType.HYBRID, ResumeWritingStatus.WRITING, null);
+            resume.addSkill(java, Proficiency.BEGINNER);
+            resume.addSkill(kotlin, Proficiency.ADVANCED);
+            resume.addFile(file);
+
+            // 단일 save() 호출로 전체 애그리거트 저장
+            resumeRepository.saveAndFlush(resume);
+            Long resumeId = resume.getId();
+            em.clear();
+
+            // 재조회: 영속성 컨텍스트 간섭 없이 DB 상태 직접 검증
+            Resume found = resumeRepository.findById(resumeId).orElseThrow();
+            assertThat(found.getSkills()).hasSize(2);
+            assertThat(found.getAttachments()).hasSize(1);
+
+            // JPQL로 실제 DB 레코드 수 검증
+            Long skillCount = em.createQuery(
+                            "SELECT COUNT(rs) FROM ResumeSkill rs WHERE rs.resume.id = :id", Long.class)
+                    .setParameter("id", resumeId)
+                    .getSingleResult();
+            Long attachmentCount = em.createQuery(
+                            "SELECT COUNT(ra) FROM ResumeAttachment ra WHERE ra.resume.id = :id", Long.class)
+                    .setParameter("id", resumeId)
+                    .getSingleResult();
+            assertThat(skillCount).isEqualTo(2L);
+            assertThat(attachmentCount).isEqualTo(1L);
+
+            // getSortedSkills(): priority 내림차순 — ADVANCED(3) > BEGINNER(1)
+            List<ResumeSkill> sorted = found.getSortedSkills();
+            assertThat(sorted)
+                    .extracting(ResumeSkill::getProficiency)
+                    .containsExactly(Proficiency.ADVANCED, Proficiency.BEGINNER);
+
+            // 첨부파일 파일 ID 검증
+            assertThat(found.getAttachments().get(0).getFile().getId()).isEqualTo(file.getId());
+        }
+
+        @DisplayName("신규 Resume에 파일을 순차적으로 추가하면 createdAt asc 순으로 조회된다")
+        @Test
+        void newResume_multipleFiles_orderedByCreatedAtAsc() throws InterruptedException {
+            Member member = memberRepository.save(
+                    MemberFixture.createMember("order@test.com", "hashed-pw", "정렬회원", "010-9999-0002"));
+
+            Resume resume = Resume.create(member, "자기소개", (byte) 0, new CareerPayload(),
+                    WorkType.REMOTE, ResumeWritingStatus.WRITING, null);
+            resumeRepository.saveAndFlush(resume);
+
+            // 파일별 개별 flush + sleep으로 createdAt 차이 보장
+            StoredFile file0 = storedFileRepository.save(toStoredFile("cv1.pdf", "cv1-s.pdf"));
+            resume.addFile(file0);
+            resumeRepository.saveAndFlush(resume);
+
+            Thread.sleep(20);
+
+            StoredFile file1 = storedFileRepository.save(toStoredFile("cv2.pdf", "cv2-s.pdf"));
+            resume.addFile(file1);
+            resumeRepository.saveAndFlush(resume);
+
+            Thread.sleep(20);
+
+            StoredFile file2 = storedFileRepository.save(toStoredFile("cv3.pdf", "cv3-s.pdf"));
+            resume.addFile(file2);
+            resumeRepository.saveAndFlush(resume);
+
+            em.clear();
+
+            // @OrderBy("createdAt asc"): 가장 먼저 추가된 파일이 인덱스 0
+            Resume found = resumeRepository.findById(resume.getId()).orElseThrow();
+            assertThat(found.getAttachments()).hasSize(3);
+            assertThat(found.getAttachments())
+                    .extracting(a -> a.getFile().getId())
+                    .containsExactly(file0.getId(), file1.getId(), file2.getId());
         }
     }
 

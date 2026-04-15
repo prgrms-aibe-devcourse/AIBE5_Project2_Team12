@@ -164,7 +164,7 @@ public class Resume extends BaseEntity {
 
     public void addFile(StoredFile file) {
         Assert.notNull(file, "첨부 파일은 필수값입니다.");
-        Assert.state(this.attachments.size() <= 10, "첨부파일은 최대 10개까지 등록할 수 있습니다.");
+        Assert.state(this.attachments.size() < 10, "첨부파일은 최대 10개까지 등록할 수 있습니다.");
 
         ResumeAttachment attachment = ResumeAttachment.create(this, file);
         this.attachments.add(attachment);

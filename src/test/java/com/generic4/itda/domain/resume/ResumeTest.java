@@ -603,7 +603,7 @@ class ResumeTest {
     @Test
     void failWhenAttachmentsExceedMaxLimit() {
         Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
-        for (int i = 0; i <= 10; i++) {
+        for (int i = 0; i < 10; i++) {
             resume.addFile(createStoredFile("file" + i + ".pdf"));
         }
 
