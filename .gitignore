@@ -290,4 +290,5 @@ gradle-app.setting
 
 HELP.md
 .env
+.env.properties
 .playwright-cli
