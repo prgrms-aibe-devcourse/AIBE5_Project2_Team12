@@ -8,6 +8,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -167,6 +168,85 @@ class StoredFileTest {
             StoredFile storedFile = createStoredFile("avatar.png", "stored-uuid.png", "/files/stored-uuid.png", "image/png", 0L);
 
             assertThat(storedFile.hasSameStoredName("other-uuid.png")).isFalse();
+        }
+    }
+
+    @Nested
+    @DisplayName("equals and hashCode")
+    class EqualsAndHashCode {
+
+        @Test
+        @DisplayName("같은 참조이면 동등하다")
+        void sameReference_isEqual() {
+            StoredFile file = createStoredFile("a.png", "s.png", "/files/s.png", "image/png", 0L);
+
+            assertThat(file).isEqualTo(file);
+        }
+
+        @Test
+        @DisplayName("id가 null인 두 인스턴스는 동등하지 않다")
+        void nullIdInstances_areNotEqualToEachOther() {
+            StoredFile file1 = createStoredFile("a.png", "s1.png", "/files/s1.png", "image/png", 0L);
+            StoredFile file2 = createStoredFile("a.png", "s2.png", "/files/s2.png", "image/png", 0L);
+
+            assertThat(file1).isNotEqualTo(file2);
+        }
+
+        @Test
+        @DisplayName("같은 id를 가지면 동등하다")
+        void sameId_areEqual() {
+            StoredFile file1 = createStoredFile("a.png", "s1.png", "/files/s1.png", "image/png", 0L);
+            StoredFile file2 = createStoredFile("b.pdf", "s2.pdf", "/files/s2.pdf", "application/pdf", 100L);
+            ReflectionTestUtils.setField(file1, "id", 1L);
+            ReflectionTestUtils.setField(file2, "id", 1L);
+
+            assertThat(file1).isEqualTo(file2);
+        }
+
+        @Test
+        @DisplayName("다른 id를 가지면 동등하지 않다")
+        void differentId_areNotEqual() {
+            StoredFile file1 = createStoredFile("a.png", "s1.png", "/files/s1.png", "image/png", 0L);
+            StoredFile file2 = createStoredFile("a.png", "s2.png", "/files/s2.png", "image/png", 0L);
+            ReflectionTestUtils.setField(file1, "id", 1L);
+            ReflectionTestUtils.setField(file2, "id", 2L);
+
+            assertThat(file1).isNotEqualTo(file2);
+        }
+
+        @Test
+        @DisplayName("null과 비교하면 동등하지 않다")
+        void notEqualToNull() {
+            StoredFile file = createStoredFile("a.png", "s.png", "/files/s.png", "image/png", 0L);
+
+            assertThat(file).isNotEqualTo(null);
+        }
+
+        @Test
+        @DisplayName("다른 타입과 비교하면 동등하지 않다")
+        void notEqualToDifferentType() {
+            StoredFile file = createStoredFile("a.png", "s.png", "/files/s.png", "image/png", 0L);
+
+            assertThat(file).isNotEqualTo("a.png");
+        }
+
+        @Test
+        @DisplayName("id가 null이면 hashCode는 0이다")
+        void nullIdHashCode_isZero() {
+            StoredFile file = createStoredFile("a.png", "s.png", "/files/s.png", "image/png", 0L);
+
+            assertThat(file.hashCode()).isZero();
+        }
+
+        @Test
+        @DisplayName("같은 id를 가지면 hashCode가 동일하다")
+        void sameId_haveSameHashCode() {
+            StoredFile file1 = createStoredFile("a.png", "s1.png", "/files/s1.png", "image/png", 0L);
+            StoredFile file2 = createStoredFile("b.pdf", "s2.pdf", "/files/s2.pdf", "application/pdf", 100L);
+            ReflectionTestUtils.setField(file1, "id", 42L);
+            ReflectionTestUtils.setField(file2, "id", 42L);
+
+            assertThat(file1.hashCode()).isEqualTo(file2.hashCode());
         }
     }
 
