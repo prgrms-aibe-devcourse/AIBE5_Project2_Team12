@@ -21,6 +21,8 @@
 - `position`은 공용 직무 마스터다.
 - `proposal_position_skill`은 실제 모집 단위별 요구 스킬 집합이다.
 - 요구 스킬 테이블의 FK 기준은 `proposal_position.id`다.
+- 같은 제안서 안에서는 같은 직무 마스터를 중복 등록하지 않는다.
+- `proposal_position_skill.importance`는 null 저장을 허용하지 않고, 입력이 비어 있으면 `PREFERENCE`를 기본값으로 사용한다.
 
 ### AI 브리프 저장 모델
 
