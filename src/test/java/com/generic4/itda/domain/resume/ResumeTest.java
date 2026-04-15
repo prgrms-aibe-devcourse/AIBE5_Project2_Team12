@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.generic4.itda.domain.file.StoredFile;
 import com.generic4.itda.domain.member.Member;
-import com.generic4.itda.domain.resume.ResumeSkill;
 import com.generic4.itda.domain.skill.Skill;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -736,6 +735,18 @@ class ResumeTest {
         assertThatThrownBy(() -> resume.updateSkill(skill, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("숙련도는 필수 입력값입니다.");
+    }
+
+    @Test
+    @DisplayName("스킬 이름만 동일한 스킬 등록은 실패한다.")
+    void failWhenAddSkillHavingDuplicateSkillName() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        Skill skill = Skill.create("Java", "백엔드 언어");
+        resume.addSkill(skill, Proficiency.BEGINNER);
+
+        assertThatThrownBy(() -> resume.addSkill(skill, Proficiency.ADVANCED))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("이미 등록된 스킬입니다.");
     }
 
     private static StoredFile createStoredFile(String originalName) {
