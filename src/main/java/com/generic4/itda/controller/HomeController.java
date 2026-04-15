@@ -16,13 +16,13 @@ public class HomeController {
         model.addAttribute("authenticated", authenticated);
 
         if (!authenticated) {
-            return "index";
+            return "landing";
         }
 
         model.addAttribute("memberName", itDaPrincipal.getName());
         model.addAttribute("memberEmail", itDaPrincipal.getEmail());
         model.addAttribute("memberRole", itDaPrincipal.getRole().name());
 
-        return "index";
+        return "landing";
     }
 }
