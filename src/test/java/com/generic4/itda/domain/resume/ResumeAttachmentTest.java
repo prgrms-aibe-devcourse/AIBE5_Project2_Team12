@@ -7,8 +7,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.generic4.itda.domain.file.StoredFile;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 class ResumeAttachmentTest {
 
@@ -18,17 +16,16 @@ class ResumeAttachmentTest {
         Resume resume = createResume();
         StoredFile file = createStoredFile("resume.pdf");
 
-        ResumeAttachment attachment = ResumeAttachment.create(resume, file, 0);
+        ResumeAttachment attachment = ResumeAttachment.create(resume, file);
 
         assertThat(attachment.getResume()).isEqualTo(resume);
         assertThat(attachment.getFile()).isEqualTo(file);
-        assertThat(attachment.getDisplayOrder()).isEqualTo(0);
     }
 
     @DisplayName("이력서가 누락되면 이력서 첨부파일 생성에 실패한다")
     @Test
     void failWhenResumeIsNull() {
-        assertThatThrownBy(() -> ResumeAttachment.create(null, createStoredFile("resume.pdf"), 0))
+        assertThatThrownBy(() -> ResumeAttachment.create(null, createStoredFile("resume.pdf")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("이력서는 필수값입니다.");
     }
@@ -36,39 +33,9 @@ class ResumeAttachmentTest {
     @DisplayName("첨부 파일이 누락되면 이력서 첨부파일 생성에 실패한다")
     @Test
     void failWhenFileIsNull() {
-        assertThatThrownBy(() -> ResumeAttachment.create(createResume(), null, 0))
+        assertThatThrownBy(() -> ResumeAttachment.create(createResume(), null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("첨부 파일은 필수값입니다.");
-    }
-
-    @DisplayName("표시 순서가 음수이면 이력서 첨부파일 생성에 실패한다")
-    @ParameterizedTest
-    @ValueSource(ints = {-1, -10})
-    void failWhenDisplayOrderIsNegative(int displayOrder) {
-        assertThatThrownBy(() -> ResumeAttachment.create(createResume(), createStoredFile("resume.pdf"), displayOrder))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("표시 순서는 음수일 수 없습니다.");
-    }
-
-    @DisplayName("유효한 표시 순서로 변경하면 순서가 업데이트된다")
-    @Test
-    void changeDisplayOrderWithValidValue() {
-        ResumeAttachment attachment = ResumeAttachment.create(createResume(), createStoredFile("resume.pdf"), 0);
-
-        attachment.changeDisplayOrder(2);
-
-        assertThat(attachment.getDisplayOrder()).isEqualTo(2);
-    }
-
-    @DisplayName("표시 순서를 음수로 변경하면 실패한다")
-    @ParameterizedTest
-    @ValueSource(ints = {-1, -5})
-    void failWhenChangeDisplayOrderIsNegative(int displayOrder) {
-        ResumeAttachment attachment = ResumeAttachment.create(createResume(), createStoredFile("resume.pdf"), 0);
-
-        assertThatThrownBy(() -> attachment.changeDisplayOrder(displayOrder))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("표시 순서는 음수일 수 없습니다.");
     }
 
     private static Resume createResume() {
@@ -96,6 +63,7 @@ class ResumeAttachmentTest {
     }
 
     private static StoredFile createStoredFile(String originalName) {
-        return StoredFile.create(originalName, "stored-" + originalName, "/files/" + originalName, "application/pdf", 1024L);
+        return StoredFile.create(originalName, "stored-" + originalName, "/files/" + originalName, "application/pdf",
+                1024L);
     }
 }

@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.generic4.itda.domain.file.StoredFile;
 import com.generic4.itda.domain.member.Member;
+import com.generic4.itda.domain.resume.ResumeSkill;
+import com.generic4.itda.domain.skill.Skill;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -562,37 +564,6 @@ class ResumeTest {
         assertThat(resume.getPortfolioUrl()).isEqualTo("https://github.com/user");
     }
 
-    @DisplayName("파일을 추가하면 첫 번째 첨부파일의 표시 순서는 0이다")
-    @Test
-    void addFirstFileHasDisplayOrderZero() {
-        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
-        StoredFile file = createStoredFile("resume.pdf");
-
-        resume.addFile(file);
-
-        assertThat(resume.getAttachments()).hasSize(1);
-        assertThat(resume.getAttachments().get(0).getFile()).isEqualTo(file);
-        assertThat(resume.getAttachments().get(0).getDisplayOrder()).isEqualTo(0);
-    }
-
-    @DisplayName("파일을 순서대로 추가하면 표시 순서가 순차적으로 할당된다")
-    @Test
-    void addMultipleFilesAssignsSequentialDisplayOrder() {
-        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
-        StoredFile file1 = createStoredFile("resume1.pdf");
-        StoredFile file2 = createStoredFile("resume2.pdf");
-        StoredFile file3 = createStoredFile("resume3.pdf");
-
-        resume.addFile(file1);
-        resume.addFile(file2);
-        resume.addFile(file3);
-
-        assertThat(resume.getAttachments()).hasSize(3);
-        assertThat(resume.getAttachments().get(0).getDisplayOrder()).isEqualTo(0);
-        assertThat(resume.getAttachments().get(1).getDisplayOrder()).isEqualTo(1);
-        assertThat(resume.getAttachments().get(2).getDisplayOrder()).isEqualTo(2);
-    }
-
     @DisplayName("파일을 삭제하면 첨부파일 목록에서 제거된다")
     @Test
     void removeFileDeletesAttachment() {
@@ -603,26 +574,6 @@ class ResumeTest {
         resume.removeFile(file);
 
         assertThat(resume.getAttachments()).isEmpty();
-    }
-
-    @DisplayName("중간 파일을 삭제하면 나머지 첨부파일의 표시 순서가 재정렬된다")
-    @Test
-    void removeMiddleFileReordersRemainingAttachments() {
-        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
-        StoredFile file1 = createStoredFile("resume1.pdf");
-        StoredFile file2 = createStoredFile("resume2.pdf");
-        StoredFile file3 = createStoredFile("resume3.pdf");
-        resume.addFile(file1);
-        resume.addFile(file2);
-        resume.addFile(file3);
-
-        resume.removeFile(file2);
-
-        assertThat(resume.getAttachments()).hasSize(2);
-        assertThat(resume.getAttachments().get(0).getFile()).isEqualTo(file1);
-        assertThat(resume.getAttachments().get(0).getDisplayOrder()).isEqualTo(0);
-        assertThat(resume.getAttachments().get(1).getFile()).isEqualTo(file3);
-        assertThat(resume.getAttachments().get(1).getDisplayOrder()).isEqualTo(1);
     }
 
     @DisplayName("존재하지 않는 파일을 삭제해도 첨부파일 목록이 변하지 않는다")
@@ -653,7 +604,7 @@ class ResumeTest {
     @Test
     void failWhenAttachmentsExceedMaxLimit() {
         Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
-        for (int i = 0; i <= 10; i++) {
+        for (int i = 0; i < 10; i++) {
             resume.addFile(createStoredFile("file" + i + ".pdf"));
         }
 
@@ -670,6 +621,121 @@ class ResumeTest {
         assertThatThrownBy(() -> resume.removeFile(null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("삭제할 첨부 파일은 필수값입니다.");
+    }
+
+    @DisplayName("스킬을 추가하면 스킬 목록에 등록된다")
+    @Test
+    void addSkillAppendsToSkillList() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        Skill skill = Skill.create("Java", "백엔드 언어");
+
+        resume.addSkill(skill, Proficiency.ADVANCED);
+
+        assertThat(resume.getSkills()).hasSize(1);
+        ResumeSkill addedSkill = resume.getSkills().iterator().next();
+        assertThat(addedSkill.getSkill()).isEqualTo(skill);
+        assertThat(addedSkill.getProficiency()).isEqualTo(Proficiency.ADVANCED);
+    }
+
+    @DisplayName("스킬을 삭제하면 스킬 목록에서 제거된다")
+    @Test
+    void removeSkillDeletesFromSkillList() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        Skill skill = Skill.create("Java", "백엔드 언어");
+        resume.addSkill(skill, Proficiency.ADVANCED);
+
+        resume.removeSkill(skill);
+
+        assertThat(resume.getSkills()).isEmpty();
+    }
+
+    @DisplayName("존재하지 않는 스킬을 삭제해도 스킬 목록이 변하지 않는다")
+    @Test
+    void removeNonExistentSkillDoesNotChangeSkillList() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        Skill skill = Skill.create("Java", "백엔드 언어");
+        Skill otherSkill = Skill.create("Python", "스크립트 언어");
+        resume.addSkill(skill, Proficiency.ADVANCED);
+
+        resume.removeSkill(otherSkill);
+
+        assertThat(resume.getSkills()).hasSize(1);
+    }
+
+    @DisplayName("스킬을 수정하면 숙련도가 변경된다")
+    @Test
+    void updateSkillChangesProficiency() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        Skill skill = Skill.create("Java", "백엔드 언어");
+        resume.addSkill(skill, Proficiency.BEGINNER);
+
+        resume.updateSkill(skill, Proficiency.ADVANCED);
+
+        assertThat(resume.getSkills().iterator().next().getProficiency()).isEqualTo(Proficiency.ADVANCED);
+    }
+
+    @DisplayName("null 스킬을 추가하면 실패한다")
+    @Test
+    void failWhenAddSkillIsNull() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+
+        assertThatThrownBy(() -> resume.addSkill(null, Proficiency.BEGINNER))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("스킬은 필수 입력값입니다.");
+    }
+
+    @DisplayName("null 숙련도로 스킬을 추가하면 실패한다")
+    @Test
+    void failWhenAddProficiencyIsNull() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        Skill skill = Skill.create("Java", "백엔드 언어");
+
+        assertThatThrownBy(() -> resume.addSkill(skill, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("숙련도는 필수 입력값입니다.");
+    }
+
+    @DisplayName("null 스킬을 삭제하면 실패한다")
+    @Test
+    void failWhenRemoveSkillIsNull() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+
+        assertThatThrownBy(() -> resume.removeSkill(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("스킬은 필수 입력값입니다.");
+    }
+
+    @DisplayName("존재하지 않는 스킬을 수정하면 실패한다")
+    @Test
+    void failWhenUpdateNonExistentSkill() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        Skill skill = Skill.create("Java", "백엔드 언어");
+
+        assertThatThrownBy(() -> resume.updateSkill(skill, Proficiency.ADVANCED))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("기존에 없는 스킬은 업데이트 할 수 없습니다.");
+    }
+
+    @DisplayName("null 스킬로 수정하면 실패한다")
+    @Test
+    void failWhenUpdateSkillIsNull() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+
+        assertThatThrownBy(() -> resume.updateSkill(null, Proficiency.ADVANCED))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("스킬은 필수 입력값입니다.");
+    }
+
+    @DisplayName("null 숙련도로 스킬을 수정하면 실패한다")
+    @Test
+    void failWhenUpdateProficiencyIsNull() {
+        Resume resume = createResume(createMember(), "백엔드 개발자입니다.", (byte) 3, createCareerPayload());
+        Skill skill = Skill.create("Java", "백엔드 언어");
+        resume.addSkill(skill, Proficiency.BEGINNER);
+
+        assertThatThrownBy(() -> resume.updateSkill(skill, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("숙련도는 필수 입력값입니다.");
     }
 
     private static StoredFile createStoredFile(String originalName) {

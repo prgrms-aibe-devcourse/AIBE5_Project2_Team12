@@ -3,6 +3,7 @@ package com.generic4.itda.domain.resume;
 import com.generic4.itda.domain.file.StoredFile;
 import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.shared.BaseEntity;
+import com.generic4.itda.domain.skill.Skill;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
@@ -21,18 +22,19 @@ import jakarta.persistence.OrderBy;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.ToString;
+import org.hibernate.annotations.SortComparator;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@ToString(callSuper = false)
 public class Resume extends BaseEntity {
 
     @Id
@@ -70,8 +72,12 @@ public class Resume extends BaseEntity {
     private String portfolioUrl;
 
     @OneToMany(mappedBy = "resume", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("displayOrder ASC")
+    @OrderBy("createdAt asc")
     private final List<ResumeAttachment> attachments = new ArrayList<>();
+
+    @OneToMany(mappedBy = "resume", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @SortComparator(ResumeSkillComparator.class)
+    private final SortedSet<ResumeSkill> skills = new TreeSet<>(new ResumeSkillComparator());
 
     @Builder(access = AccessLevel.PRIVATE)
     private Resume(Member member, String introduction, Byte careerYears, CareerPayload career,
@@ -161,22 +167,42 @@ public class Resume extends BaseEntity {
 
     public void addFile(StoredFile file) {
         Assert.notNull(file, "첨부 파일은 필수값입니다.");
-        Assert.state(this.attachments.size() <= 10, "첨부파일은 최대 10개까지 등록할 수 있습니다.");
+        Assert.state(this.attachments.size() < 10, "첨부파일은 최대 10개까지 등록할 수 있습니다.");
 
-        int order = this.attachments.size();
-        ResumeAttachment attachment = ResumeAttachment.create(this, file, order);
+        ResumeAttachment attachment = ResumeAttachment.create(this, file);
         this.attachments.add(attachment);
     }
 
     public void removeFile(StoredFile file) {
         Assert.notNull(file, "삭제할 첨부 파일은 필수값입니다.");
+        this.attachments.removeIf(attachment -> attachment.getFile().equals(file));
+    }
 
-        boolean isRemoved = this.attachments.removeIf(attachment -> attachment.getFile().equals(file));
-        if (isRemoved) {
-            for (int i = 0; i < attachments.size(); i++) {
-                attachments.get(i).changeDisplayOrder(i);
-            }
-        }
+    public void addSkill(Skill skill, Proficiency proficiency) {
+        Assert.notNull(skill, "스킬은 필수 입력값입니다.");
+        Assert.notNull(proficiency, "숙련도는 필수 입력값입니다.");
+
+        ResumeSkill resumeSkill = ResumeSkill.create(this, skill, proficiency);
+        Assert.state(!this.skills.contains(resumeSkill), "이미 등록된 스킬입니다.");
+
+        this.skills.add(resumeSkill);
+    }
+
+    public void removeSkill(Skill skill) {
+        Assert.notNull(skill, "스킬은 필수 입력값입니다.");
+        this.skills.removeIf(resumeSkill -> resumeSkill.getSkill().equals(skill));
+    }
+
+    public void updateSkill(Skill skill, Proficiency proficiency) {
+        Assert.notNull(skill, "스킬은 필수 입력값입니다.");
+        Assert.notNull(proficiency, "숙련도는 필수 입력값입니다.");
+
+        ResumeSkill storedSkill = this.skills.stream()
+                .filter(resumeSkill -> resumeSkill.getSkill().equals(skill))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("기존에 없는 스킬은 업데이트 할 수 없습니다."));
+
+        storedSkill.update(skill, proficiency);
     }
 
     private String normalizePortfolioUrl(String portfolioUrl) {
