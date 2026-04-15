@@ -183,7 +183,11 @@ public class Resume extends BaseEntity {
         Assert.notNull(proficiency, "숙련도는 필수 입력값입니다.");
 
         ResumeSkill resumeSkill = ResumeSkill.create(this, skill, proficiency);
-        Assert.state(!this.skills.contains(resumeSkill), "이미 등록된 스킬입니다.");
+        boolean isExist = this.skills.stream()
+                .anyMatch(rs -> rs.getSkill().equals(skill));
+        if (isExist) {
+            throw new IllegalStateException("이미 등록된 스킬입니다.");
+        }
 
         this.skills.add(resumeSkill);
     }
