@@ -235,19 +235,18 @@ class ProposalTest {
         assertThat(proposalPosition.getProposal()).isNull();
     }
 
-    @DisplayName("같은 직무 마스터를 같은 제안서 안에 여러 줄로 둘 수 있다")
+    @DisplayName("같은 직무 마스터를 같은 제안서 안에 중복 등록할 수 없다")
     @Test
-    void allowDuplicatedPositionMasterWithinProposal() {
+    void failWhenPositionMasterIsDuplicatedWithinProposal() {
         Proposal proposal = createProposal("원본 입력");
         Position backend = Position.create("백엔드 개발자");
 
         proposal.addPosition(backend, 1L, 3_000_000L, 4_000_000L);
-        proposal.addPosition(backend, 2L, 4_000_000L, 6_000_000L);
 
-        assertThat(proposal.getPositions()).hasSize(2);
-        assertThat(proposal.getPositions())
-                .extracting(ProposalPosition::getPosition)
-                .containsExactly(backend, backend);
+        assertThatThrownBy(() -> proposal.addPosition(backend, 2L, 4_000_000L, 6_000_000L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("같은 제안서에는 동일한 직무를 중복 등록할 수 없습니다.");
+        assertThat(proposal.getPositions()).hasSize(1);
     }
 
     private Proposal createProposal(String rawInputText) {

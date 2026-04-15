@@ -338,7 +338,7 @@
 | `id`                   | bigint                          | Y  | PK    |
 | `proposal_position_id` | bigint                          | Y  | 모집 단위 |
 | `skill_id`             | bigint                          | Y  | 스킬    |
-| `importance`           | enum(`PREFERENCE`, `ESSENTIAL`) | N  | 우대/필수 |
+| `importance`           | enum(`PREFERENCE`, `ESSENTIAL`) | Y  | 우대/필수 |
 | `created_at`           | timestamp                       | Y  | 생성 시각 |
 | `modified_at`          | timestamp                       | Y  | 수정 시각 |
 
@@ -353,6 +353,7 @@
 - 이 테이블의 FK 기준은 `proposal_position.id`다.
 - 따라서 이름이 비슷하더라도 직무 마스터 `position`의 기본 스킬 템플릿으로 해석하지 않는다.
 - 한 모집 단위 안에서 같은 스킬을 중복 저장하지 않도록 `UNIQUE (proposal_position_id, skill_id)`를 강제한다.
+- `importance`는 null 저장을 허용하지 않으며, 입력이 비어 있으면 기본값 `PREFERENCE`로 보정한다.
 
 ### 5.9 proposals
 
@@ -413,7 +414,7 @@
 - 수락된 매칭 취소, 반려, 정원 변경으로 여석이 다시 생기면 명시적 재계산 후 `OPEN`으로 되돌릴 수 있다.
 - `CLOSED`이면 신규 요청과 지원을 받을 수 없다.
 - 현재 ERD에는 포지션별 제목, 요구사항 요약, 근무 형태, 경력 범위, 정렬 순서가 없다.
-- 현재 ERD에는 같은 `proposal_id + position_id` 중복을 막는 제약이 보이지 않는다.
+- 같은 제안서 안에서는 같은 직무 마스터를 중복 등록하지 않도록 `UNIQUE (proposal_id, position_id)`를 강제한다.
 
 ### 5.11 resume_skills
 

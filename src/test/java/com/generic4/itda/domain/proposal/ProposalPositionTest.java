@@ -109,6 +109,20 @@ class ProposalPositionTest {
         assertThat(proposalPosition.getStatus()).isEqualTo(ProposalPositionStatus.OPEN);
     }
 
+    @DisplayName("같은 제안서 안에 이미 존재하는 직무로 모집 단위를 수정할 수 없다")
+    @Test
+    void failWhenUpdatePositionToDuplicatedPosition() {
+        Proposal proposal = createProposal();
+        Position backend = Position.create("백엔드 개발자");
+        Position frontend = Position.create("프론트엔드 개발자");
+        ProposalPosition.create(proposal, backend, 1L, 2_000_000L, 3_000_000L);
+        ProposalPosition proposalPosition = ProposalPosition.create(proposal, frontend, 1L, 2_000_000L, 3_000_000L);
+
+        assertThatThrownBy(() -> proposalPosition.update(backend, 2L, 3_000_000L, 4_000_000L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("같은 제안서에는 동일한 직무를 중복 등록할 수 없습니다.");
+    }
+
     @DisplayName("모집 상태를 변경할 수 있다")
     @Test
     void changeStatus() {

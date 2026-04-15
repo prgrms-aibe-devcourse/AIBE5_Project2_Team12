@@ -11,6 +11,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Column;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
@@ -44,6 +45,7 @@ public class ProposalPositionSkill extends BaseTimeEntity {
     private Skill skill;
 
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private ProposalPositionSkillImportance importance;
 
     private ProposalPositionSkill(ProposalPosition proposalPosition, Skill skill,
@@ -53,7 +55,7 @@ public class ProposalPositionSkill extends BaseTimeEntity {
 
         this.proposalPosition = proposalPosition;
         this.skill = skill;
-        this.importance = importance;
+        this.importance = normalizeImportance(importance);
     }
 
     public static ProposalPositionSkill create(ProposalPosition proposalPosition, Skill skill,
@@ -64,10 +66,14 @@ public class ProposalPositionSkill extends BaseTimeEntity {
     }
 
     public void changeImportance(ProposalPositionSkillImportance importance) {
-        this.importance = importance;
+        this.importance = normalizeImportance(importance);
     }
 
     void detachFromProposalPosition() {
         this.proposalPosition = null;
+    }
+
+    private ProposalPositionSkillImportance normalizeImportance(ProposalPositionSkillImportance importance) {
+        return importance == null ? ProposalPositionSkillImportance.PREFERENCE : importance;
     }
 }

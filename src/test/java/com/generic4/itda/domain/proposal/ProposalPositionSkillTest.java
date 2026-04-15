@@ -8,8 +8,6 @@ import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.skill.Skill;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.NullSource;
 
 class ProposalPositionSkillTest {
 
@@ -54,19 +52,30 @@ class ProposalPositionSkillTest {
                 .hasMessage("스킬은 필수값입니다.");
     }
 
-    @DisplayName("중요도는 null로 비울 수 있다")
-    @ParameterizedTest
-    @NullSource
-    void changeImportance(ProposalPositionSkillImportance importance) {
+    @DisplayName("중요도가 없으면 기본값으로 PREFERENCE를 사용한다")
+    @Test
+    void createWithDefaultImportanceWhenNull() {
+        ProposalPositionSkill proposalPositionSkill = ProposalPositionSkill.create(
+                createProposalPosition(),
+                Skill.create("Java", "백엔드 언어"),
+                null
+        );
+
+        assertThat(proposalPositionSkill.getImportance()).isEqualTo(ProposalPositionSkillImportance.PREFERENCE);
+    }
+
+    @DisplayName("중요도를 null로 변경하면 기본값으로 PREFERENCE를 사용한다")
+    @Test
+    void changeImportanceToDefaultWhenNull() {
         ProposalPositionSkill proposalPositionSkill = ProposalPositionSkill.create(
                 createProposalPosition(),
                 Skill.create("Java", "백엔드 언어"),
                 ProposalPositionSkillImportance.ESSENTIAL
         );
 
-        proposalPositionSkill.changeImportance(importance);
+        proposalPositionSkill.changeImportance(null);
 
-        assertThat(proposalPositionSkill.getImportance()).isEqualTo(importance);
+        assertThat(proposalPositionSkill.getImportance()).isEqualTo(ProposalPositionSkillImportance.PREFERENCE);
     }
 
     private ProposalPosition createProposalPosition() {

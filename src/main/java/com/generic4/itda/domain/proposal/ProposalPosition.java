@@ -16,6 +16,8 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.AccessLevel;
@@ -26,6 +28,14 @@ import lombok.ToString;
 import org.springframework.util.Assert;
 
 @Entity
+@Table(
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_proposal_position_proposal_id_and_position_id",
+                        columnNames = {"proposal_id", "position_id"}
+                )
+        }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @ToString(callSuper = false)
@@ -93,6 +103,7 @@ public class ProposalPosition extends BaseEntity {
         Assert.notNull(position, "직무는 필수값입니다.");
         validateHeadCount(headCount);
         validateBudgetRange(unitBudgetMin, unitBudgetMax);
+        this.proposal.validatePositionChange(this, position);
 
         this.position = position;
         this.headCount = headCount;

@@ -142,10 +142,19 @@ public class Proposal extends BaseEntity {
     void registerPosition(ProposalPosition proposalPosition) {
         Assert.notNull(proposalPosition, "모집 단위는 필수값입니다.");
         Assert.state(proposalPosition.getProposal() == this, "해당 모집 단위는 이 제안서에 속해야 합니다.");
+        Assert.state(isPositionNotDuplicated(proposalPosition, proposalPosition.getPosition()),
+                "같은 제안서에는 동일한 직무를 중복 등록할 수 없습니다.");
 
         if (!this.positions.contains(proposalPosition)) {
             this.positions.add(proposalPosition);
         }
+    }
+
+    void validatePositionChange(ProposalPosition proposalPosition, Position position) {
+        Assert.notNull(proposalPosition, "모집 단위는 필수값입니다.");
+        Assert.notNull(position, "직무는 필수값입니다.");
+        Assert.state(isPositionNotDuplicated(proposalPosition, position),
+                "같은 제안서에는 동일한 직무를 중복 등록할 수 없습니다.");
     }
 
     public void removePosition(ProposalPosition proposalPosition) {
@@ -160,6 +169,23 @@ public class Proposal extends BaseEntity {
     private static void validateMember(Member member) {
         Assert.notNull(member, "클라이언트 회원은 필수값입니다.");
         Assert.isTrue(member.getStatus() == UserStatus.ACTIVE, "활성 회원만 제안서를 작성할 수 있습니다.");
+    }
+
+    private boolean isPositionNotDuplicated(ProposalPosition source, Position target) {
+        return this.positions.stream()
+                .filter(existing -> existing != source)
+                .map(ProposalPosition::getPosition)
+                .noneMatch(existing -> hasSamePosition(existing, target));
+    }
+
+    private boolean hasSamePosition(Position source, Position target) {
+        if (source == target) {
+            return true;
+        }
+        if (source.getId() != null && target.getId() != null) {
+            return source.getId().equals(target.getId());
+        }
+        return source.getName().equals(target.getName());
     }
 
     private static void validateBudgetRange(Long budgetMin, Long budgetMax, String label) {
