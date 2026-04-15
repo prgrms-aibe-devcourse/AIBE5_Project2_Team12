@@ -15,6 +15,8 @@ import com.generic4.itda.domain.resume.ResumeWritingStatus;
 import com.generic4.itda.domain.resume.WorkType;
 import jakarta.persistence.EntityManager;
 import java.util.List;
+import java.util.Optional;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -255,6 +257,48 @@ class ResumeRepositoryTest {
         assertThatThrownBy(() -> resumeRepository.saveAndFlush(secondResume))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
+
+    @DisplayName("회원 ID로 이력서를 조회할 수 있다")
+    @Test
+    void findByMemberId_success() {
+        // given
+        Member member = memberRepository.save(createMember());
+
+        Resume resume = Resume.create(
+                member,
+                "백엔드 개발자입니다.",
+                (byte) 3,
+                createCareerPayload(),
+                WorkType.HYBRID,
+                ResumeWritingStatus.WRITING,
+                "https://github.com/user1"
+        );
+
+        Resume saved = resumeRepository.saveAndFlush(resume);
+        entityManager.clear();
+
+        // when
+        Optional<Resume> result = resumeRepository.findByMemberId(member.getId());
+
+        // then
+        assertThat(result).isPresent();
+        assertThat(result.get().getId()).isEqualTo(saved.getId());
+        assertThat(result.get().getMember().getId()).isEqualTo(member.getId());
+    }
+
+    @DisplayName("존재하지 않는 회원 ID로 조회하면 결과가 없다")
+    @Test
+    void findByMemberId_returnsEmptyWhenNotFound() {
+        // given
+        Long nonExistingMemberId = 999999L;
+
+        // when
+        Optional<Resume> result = resumeRepository.findByMemberId(nonExistingMemberId);
+
+        // then
+        assertThat(result).isEmpty();
+    }
+
 
     private static CareerPayload createCareerPayload() {
         CareerItemPayload item = new CareerItemPayload();
