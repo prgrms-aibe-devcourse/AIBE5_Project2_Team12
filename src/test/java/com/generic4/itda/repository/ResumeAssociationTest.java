@@ -2,6 +2,7 @@ package com.generic4.itda.repository;
 
 import static com.generic4.itda.fixture.MemberFixture.createMember;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.generic4.itda.annotation.H2RepositoryTest;
 import com.generic4.itda.domain.file.StoredFile;
@@ -526,6 +527,32 @@ class ResumeAssociationTest {
             Skill managedJava = em.find(Skill.class, java.getId());
 
             Assertions.assertThatThrownBy(() -> reloaded.addSkill(managedJava, Proficiency.BEGINNER))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("이미 등록된 스킬입니다.");
+        }
+    }
+
+    @Nested
+    @DisplayName("스킬 중복 방지 — 영속성 통합 검증")
+    class SkillDuplicateIntegrationTest {
+
+        @DisplayName("이미 특정 스킬이 등록된 이력서에, 동일한 스킬을 다른 숙련도로 추가 저장하려 하면 예외가 발생한다")
+        @Test
+        void addSkill_withSameSkillButDifferentProficiency_throwsException() {
+            // 1. 준비: Java 스킬을 BEGINNER로 저장
+            Resume resume = resumeRepository.findById(savedResume.getId()).orElseThrow();
+            Skill java = Skill.create("Java", null);
+            em.persist(java);
+            resume.addSkill(java, Proficiency.BEGINNER);
+            resumeRepository.saveAndFlush(resume);
+            em.clear();
+
+            // 2. 실행: 동일한 Java 스킬을 ADVANCED로 추가 시도
+            Resume reloaded = resumeRepository.findById(resume.getId()).orElseThrow();
+            Skill managedJava = em.find(Skill.class, java.getId());
+
+            // 3. 검증: 도메인 로직에 의해 IllegalStateException 발생 확인
+            assertThatThrownBy(() -> reloaded.addSkill(managedJava, Proficiency.ADVANCED))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessage("이미 등록된 스킬입니다.");
         }

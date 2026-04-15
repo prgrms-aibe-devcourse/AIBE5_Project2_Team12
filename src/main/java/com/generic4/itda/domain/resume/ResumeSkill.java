@@ -11,6 +11,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -18,6 +20,14 @@ import lombok.NoArgsConstructor;
 import org.springframework.util.Assert;
 
 @Entity
+@Table(
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_resume_skill_resume_id_skill_id",
+                        columnNames = {"resume_id", "skill_id"}
+                )
+        }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ResumeSkill extends BaseTimeEntity {
@@ -62,8 +72,12 @@ public class ResumeSkill extends BaseTimeEntity {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof ResumeSkill that)) return false;
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof ResumeSkill that)) {
+            return false;
+        }
         return id != null && id.equals(that.id);
     }
 
