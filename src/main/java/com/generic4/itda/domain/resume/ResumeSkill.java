@@ -2,17 +2,8 @@ package com.generic4.itda.domain.resume;
 
 import com.generic4.itda.domain.shared.BaseTimeEntity;
 import com.generic4.itda.domain.skill.Skill;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.*;
+
 import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -36,16 +27,18 @@ public class ResumeSkill extends BaseTimeEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "resume_id")
+    // 필수 연관관계이므로 DB에서도 null을 허용하지 않음
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "resume_id", nullable = false)
     private Resume resume;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "skill_id")
+    // 필수 연관관계이므로 DB에서도 null을 허용하지 않음
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "skill_id", nullable = false)
     private Skill skill;
 
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false)  // 필수값이므로 DB에서도 null 방어
     private Proficiency proficiency;
 
     private ResumeSkill(Resume resume, Skill skill, Proficiency proficiency) {
