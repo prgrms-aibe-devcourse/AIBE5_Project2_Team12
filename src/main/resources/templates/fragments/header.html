@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+
+<header th:fragment="headerFragment" class="px-8 py-6 flex items-center justify-between bg-white border-b border-slate-200 shadow-sm relative z-10">
+    <a th:href="@{/}" class="flex items-center gap-2 transition-transform hover:scale-[1.02] active:scale-95">
+        <img th:src="@{/IT-da_logo.png}" alt="IT-da Logo" class="h-12 w-auto" />
+    </a>
+
+    <div class="flex items-center">
+        <div sec:authorize="isAnonymous()">
+            <a th:href="@{/login}"
+               class="px-5 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
+                로그인
+            </a>
+        </div>
+
+        <div sec:authorize="isAuthenticated()" class="flex items-center gap-4">
+            <form th:action="@{/logout}" method="post" class="inline">
+                <button type="submit" class="text-[11px] font-bold text-slate-400 hover:text-red-500 transition-colors ml-2 uppercase tracking-tighter">
+                    로그아웃
+                </button>
+            </form>
+
+            <div class="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
+                <i data-lucide="user" class="w-5 h-5 text-slate-400"></i>
+            </div>
+        </div>
+    </div>
+</header>
+</html>

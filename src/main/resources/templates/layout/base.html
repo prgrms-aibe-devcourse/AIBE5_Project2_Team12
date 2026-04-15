@@ -16,6 +16,7 @@
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900" x-data="{ loaded: false }" x-init="setTimeout(() => loaded = true, 50); lucide.createIcons();">
+<div th:replace="~{fragments/header :: headerFragment}"></div>
 <div layout:fragment="content"></div>
 <script>
     document.addEventListener('alpine:initialized', () => { lucide.createIcons(); });
