@@ -15,6 +15,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
@@ -55,7 +56,8 @@ public class ResumeEmbedding extends BaseEntity {
     private String embeddingModel;
 
     @Convert(converter = EmbeddingVectorConverter.class)
-    @Column(nullable = false, columnDefinition = "jsonb")
+    @Lob
+    @Column(nullable = false, columnDefinition = "TEXT")
     private EmbeddingVector embeddingVector;
 
     private ResumeEmbedding(Resume resume, SourceHash sourceHash, String embeddingModel,
