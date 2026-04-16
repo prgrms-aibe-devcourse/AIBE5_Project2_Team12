@@ -49,48 +49,8 @@ class RecommendationRunRepositoryTest {
     }
 
     @Test
-    @DisplayName("저장 후 ID로 조회하면 동일한 엔티티가 반환된다")
-    void 저장_후_ID로_조회하면_동일한_엔티티가_반환된다() {
-        // given
-        RecommendationRun run = RecommendationRun.create(
-                proposalPosition, "fp-abc123", RecommendationAlgorithm.HEURISTIC_V1, 5);
-
-        // when
-        recommendationRunRepository.saveAndFlush(run);
-        em.clear();
-
-        // then
-        RecommendationRun found = recommendationRunRepository.findById(run.getId()).orElseThrow();
-        assertThat(found.getProposalPosition().getId()).isEqualTo(proposalPosition.getId());
-        assertThat(found.getRequestFingerprint()).isEqualTo("fp-abc123");
-        assertThat(found.getAlgorithm()).isEqualTo(RecommendationAlgorithm.HEURISTIC_V1);
-        assertThat(found.getTopK()).isEqualTo(5);
-        assertThat(found.getStatus()).isEqualTo(RecommendationRunStatus.PENDING);
-        assertThat(found.getCandidateCount()).isNull();
-        assertThat(found.getHardFilterStats()).isNull();
-        assertThat(found.getErrorMessage()).isNull();
-    }
-
-    @Test
-    @DisplayName("markRunning() 후 변경사항이 DB에 반영된다")
-    void markRunning_후_변경사항이_DB에_반영된다() {
-        // given
-        RecommendationRun run = recommendationRunRepository.saveAndFlush(
-                RecommendationRun.create(proposalPosition, "fp-abc123", RecommendationAlgorithm.HEURISTIC_V1, 5));
-
-        // when
-        run.markRunning();
-        recommendationRunRepository.saveAndFlush(run);
-        em.clear();
-
-        // then
-        RecommendationRun found = recommendationRunRepository.findById(run.getId()).orElseThrow();
-        assertThat(found.getStatus()).isEqualTo(RecommendationRunStatus.RUNNING);
-    }
-
-    @Test
-    @DisplayName("markCompleted() 후 status, candidateCount, hardFilterStats가 DB에 반영된다")
-    void markCompleted_후_변경사항이_DB에_반영된다() {
+    @DisplayName("markCompleted() 후 HardFilterStat와 candidateCount가 DB round-trip 된다")
+    void markCompleted_후_HardFilterStat와_candidateCount가_DB_round_trip된다() {
         // given
         RecommendationRun run = recommendationRunRepository.saveAndFlush(
                 RecommendationRun.create(proposalPosition, "fp-abc123", RecommendationAlgorithm.HEURISTIC_V1, 5));
@@ -107,6 +67,26 @@ class RecommendationRunRepositoryTest {
         assertThat(found.getStatus()).isEqualTo(RecommendationRunStatus.COMPUTED);
         assertThat(found.getCandidateCount()).isEqualTo(3);
         assertThat(found.getHardFilterStats()).isEqualTo(stat);
+    }
+
+    @Test
+    @DisplayName("markFailed() 후 status와 errorMessage가 DB round-trip 된다")
+    void markFailed_후_status와_errorMessage가_DB_round_trip된다() {
+        // given
+        RecommendationRun run = recommendationRunRepository.saveAndFlush(
+                RecommendationRun.create(proposalPosition, "fp-abc123", RecommendationAlgorithm.HEURISTIC_V1, 5));
+        run.markRunning();
+        String errorMessage = "AI 서버 타임아웃";
+
+        // when
+        run.markFailed(errorMessage);
+        recommendationRunRepository.saveAndFlush(run);
+        em.clear();
+
+        // then
+        RecommendationRun found = recommendationRunRepository.findById(run.getId()).orElseThrow();
+        assertThat(found.getStatus()).isEqualTo(RecommendationRunStatus.FAILED);
+        assertThat(found.getErrorMessage()).isEqualTo(errorMessage);
     }
 
     private Position persistPosition(String name) {

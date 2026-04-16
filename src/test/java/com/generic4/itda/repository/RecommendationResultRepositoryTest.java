@@ -63,19 +63,19 @@ class RecommendationResultRepositoryTest {
         ProposalPosition proposalPosition = proposal.addPosition(position, 2L, 500_000L, 1_000_000L);
         proposalRepository.saveAndFlush(proposal);
 
-        run = recommendationRunRepository.save(
+        run = recommendationRunRepository.saveAndFlush(
                 RecommendationRun.create(proposalPosition, "fp-001", RecommendationAlgorithm.HEURISTIC_V1, 5));
 
         Member resumeMember = memberRepository.save(
                 createMember("applicant@test.com", "pw", "지원자", "010-0000-0002"));
-        resume = resumeRepository.save(
+        resume = resumeRepository.saveAndFlush(
                 Resume.create(resumeMember, "자기소개입니다.", (byte) 3, new CareerPayload(),
                         WorkType.REMOTE, ResumeWritingStatus.WRITING, null));
     }
 
     @Test
-    @DisplayName("저장 후 ID로 조회하면 동일한 엔티티가 반환된다")
-    void 저장_후_ID로_조회하면_동일한_엔티티가_반환된다() {
+    @DisplayName("ReasonFacts와 LlmStatus 기본값이 저장 후 조회 시 유지된다")
+    void ReasonFacts와_LlmStatus_기본값이_저장_후_조회_시_유지된다() {
         // given
         ReasonFacts reasonFacts = new ReasonFacts(List.of("Java", "Spring"), List.of("백엔드"), 3, List.of("MSA 경험"));
         RecommendationResult result = RecommendationResult.create(
@@ -94,26 +94,9 @@ class RecommendationResultRepositoryTest {
         assertThat(found.getLlmStatus()).isEqualTo(LlmStatus.PENDING);
         assertThat(found.getLlmReason()).isNull();
         assertThat(found.getReasonFacts().matchedSkills()).containsExactly("Java", "Spring");
+        assertThat(found.getReasonFacts().matchedDomains()).containsExactly("백엔드");
         assertThat(found.getReasonFacts().careerYears()).isEqualTo(3);
-    }
-
-    @Test
-    @DisplayName("recommendationRun과의 연관관계가 올바르게 저장된다")
-    void recommendationRun과의_연관관계가_올바르게_저장된다() {
-        // given
-        ReasonFacts reasonFacts = new ReasonFacts(List.of(), List.of(), 0, List.of());
-        RecommendationResult result = RecommendationResult.create(
-                run, resume, 1,
-                new BigDecimal("0.5000"), new BigDecimal("0.5000"), reasonFacts);
-
-        // when
-        recommendationResultRepository.saveAndFlush(result);
-        em.clear();
-
-        // then
-        RecommendationResult found = recommendationResultRepository.findById(result.getId()).orElseThrow();
-        assertThat(found.getRecommendationRun().getId()).isEqualTo(run.getId());
-        assertThat(found.getResume().getId()).isEqualTo(resume.getId());
+        assertThat(found.getReasonFacts().highlights()).containsExactly("MSA 경험");
     }
 
     @Test

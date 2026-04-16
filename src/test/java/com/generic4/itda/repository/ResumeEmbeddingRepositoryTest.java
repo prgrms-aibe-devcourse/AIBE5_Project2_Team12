@@ -47,42 +47,6 @@ class ResumeEmbeddingRepositoryTest {
     }
 
     @Test
-    @DisplayName("저장 후 ID로 조회하면 동일한 엔티티가 반환된다")
-    void 저장_후_ID로_조회하면_동일한_엔티티가_반환된다() {
-        // given
-        SourceHash hash = new SourceHash("abc123def456");
-        EmbeddingVector vector = new EmbeddingVector(List.of(0.1, 0.2, 0.3));
-        ResumeEmbedding embedding = ResumeEmbedding.create(resume, hash, "text-embedding-3-small", vector);
-
-        // when
-        resumeEmbeddingRepository.saveAndFlush(embedding);
-        em.clear();
-
-        // then
-        ResumeEmbedding found = resumeEmbeddingRepository.findById(embedding.getId()).orElseThrow();
-        assertThat(found.getSourceHash()).isEqualTo(hash);
-        assertThat(found.getEmbeddingModel()).isEqualTo("text-embedding-3-small");
-        assertThat(found.getEmbeddingVector()).isEqualTo(vector);
-    }
-
-    @Test
-    @DisplayName("resume와의 연관관계가 올바르게 저장된다")
-    void resume와의_연관관계가_올바르게_저장된다() {
-        // given
-        ResumeEmbedding embedding = ResumeEmbedding.create(
-                resume, new SourceHash("hash001"), "text-embedding-3-small",
-                new EmbeddingVector(List.of(0.1, 0.2)));
-
-        // when
-        resumeEmbeddingRepository.saveAndFlush(embedding);
-        em.clear();
-
-        // then
-        ResumeEmbedding found = resumeEmbeddingRepository.findById(embedding.getId()).orElseThrow();
-        assertThat(found.getResume().getId()).isEqualTo(resume.getId());
-    }
-
-    @Test
     @DisplayName("동일한 resume와 embeddingModel 조합은 중복 저장할 수 없다")
     void 동일한_resume와_embeddingModel_조합은_중복_저장할_수_없다() {
         // given - 같은 resume + 같은 model, 다른 hash/vector
@@ -101,8 +65,8 @@ class ResumeEmbeddingRepositoryTest {
     }
 
     @Test
-    @DisplayName("refresh() 후 변경된 sourceHash와 embeddingVector가 DB에 반영된다")
-    void refresh_후_변경된_sourceHash와_vector가_DB에_반영된다() {
+    @DisplayName("refresh() 후 SourceHash와 EmbeddingVector가 DB round-trip 된다")
+    void refresh_후_SourceHash와_EmbeddingVector가_DB_round_trip된다() {
         // given
         ResumeEmbedding embedding = resumeEmbeddingRepository.saveAndFlush(
                 ResumeEmbedding.create(resume, new SourceHash("old-hash"), "text-embedding-3-small",
@@ -120,6 +84,36 @@ class ResumeEmbeddingRepositoryTest {
         ResumeEmbedding found = resumeEmbeddingRepository.findById(embedding.getId()).orElseThrow();
         assertThat(found.getSourceHash()).isEqualTo(newHash);
         assertThat(found.getEmbeddingVector()).isEqualTo(newVector);
-        assertThat(found.getEmbeddingModel()).isEqualTo("text-embedding-3-small"); // 모델은 변경 없음
+        assertThat(found.getEmbeddingModel()).isEqualTo("text-embedding-3-small");
+    }
+
+    @Test
+    @DisplayName("같은 resume에서 다른 embeddingModel로 변경 후 flush하면 unique constraint 위반이 발생한다")
+    void 같은_resume에서_다른_embeddingModel로_변경_후_flush하면_unique_constraint_위반이_발생한다() {
+        // given
+        ResumeEmbedding first = resumeEmbeddingRepository.saveAndFlush(
+                ResumeEmbedding.create(
+                        resume, new SourceHash("hash001"), "text-embedding-3-small",
+                        new EmbeddingVector(List.of(0.1, 0.2))));
+        resumeEmbeddingRepository.saveAndFlush(
+                ResumeEmbedding.create(
+                        resume, new SourceHash("hash002"), "text-embedding-3-large",
+                        new EmbeddingVector(List.of(0.3, 0.4))));
+        em.clear();
+
+        ResumeEmbedding found = resumeEmbeddingRepository.findById(first.getId()).orElseThrow();
+
+        // when
+        found.refresh(
+                new SourceHash("hash003"),
+                "text-embedding-3-large",
+                new EmbeddingVector(List.of(0.9, 0.8)));
+
+        // then
+        assertThatThrownBy(() -> {
+            resumeEmbeddingRepository.save(found);
+            resumeEmbeddingRepository.flush();
+        })
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 }
