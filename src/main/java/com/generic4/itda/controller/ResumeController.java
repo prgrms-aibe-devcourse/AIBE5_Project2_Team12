@@ -14,11 +14,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-
+import org.springframework.web.bind.annotation.*;
 
 @Controller
 @RequestMapping("/resume")
@@ -72,6 +68,7 @@ public class ResumeController {
             addMemberAttributes(model, principal);
             model.addAttribute("resumeSkillForm", new ResumeSkillForm());
             model.addAttribute("isNew", true);
+            model.addAttribute("editing", true);
             return "freelancer/resumeForm";
         }
 
@@ -91,6 +88,7 @@ public class ResumeController {
             addMemberAttributes(model, principal);
             model.addAttribute("resumeSkillForm", new ResumeSkillForm());
             model.addAttribute("isNew", true);
+            model.addAttribute("editing", true);
             return "freelancer/resumeForm";
         }
 
@@ -98,25 +96,28 @@ public class ResumeController {
     }
 
     @GetMapping("/edit")
-    public String editForm(@AuthenticationPrincipal ItDaPrincipal principal, Model model) {
+    public String editForm(
+            @AuthenticationPrincipal ItDaPrincipal principal,
+            @RequestParam(value = "mode", required = false) String mode,
+            Model model
+    ) {
         Resume resume = resumeService.findByEmail(principal.getEmail());
 
-        ResumeForm form = new ResumeForm();
-        form.setIntroduction(resume.getIntroduction());
-        form.setCareerYears(resume.getCareerYears());
-        form.setCareer(resume.getCareer());
-        form.setPreferredWorkType(resume.getPreferredWorkType());
-        form.setPortfolioUrl(resume.getPortfolioUrl());
-        form.setWritingStatus(resume.getWritingStatus());
-        form.setPubliclyVisible(resume.isPubliclyVisible());
-        form.setAiMatchingEnabled(resume.isAiMatchingEnabled());
+        // DTO 변환 로직을 하단 전용 메서드로 호출
+        ResumeForm form = convertToForm(resume);
 
         addCommonAttributes(model);
         addMemberAttributes(model, principal);
+
+        // mode=modify가 있으면 수정 가능(true), 없으면 조회 전용(false)
+        boolean isEditable = "modify".equals(mode);
+
         model.addAttribute("resumeForm", form);
         model.addAttribute("resumeSkillForm", new ResumeSkillForm());
         model.addAttribute("resume", resume);
         model.addAttribute("isNew", false);
+        model.addAttribute("editable", isEditable);
+
         return "freelancer/resumeForm";
     }
 
@@ -127,16 +128,12 @@ public class ResumeController {
             BindingResult bindingResult,
             Model model
     ) {
+        // 1. 유효성 검사 실패 시
         if (bindingResult.hasErrors()) {
-            Resume resume = null;
-            try {
-                resume = resumeService.findByEmail(principal.getEmail());
-            } catch (IllegalStateException ignored) {}
             addCommonAttributes(model);
             addMemberAttributes(model, principal);
-            model.addAttribute("resumeSkillForm", new ResumeSkillForm());
-            model.addAttribute("resume", resume);
             model.addAttribute("isNew", false);
+            model.addAttribute("editable", true); // 에러가 났으니 다시 수정할 수 있게 true 유지
             return "freelancer/resumeForm";
         }
 
@@ -153,40 +150,67 @@ public class ResumeController {
                     form.isAiMatchingEnabled()
             );
         } catch (IllegalStateException e) {
-            // "이력서가 존재하지 않습니다" 에러가 터지면 여기로 들어옵니다.
-            // 데이터가 없으니 신규 생성(/resume/new)으로 보내버리거나 에러 메시지를 띄웁니다.
             return "redirect:/resume/new";
         }
 
+        // 2. 저장 완료 후: 파라미터 없이 리다이렉트 -> mode가 없으므로 다시 '조회 모드(readonly)'가 됨
         return "redirect:/resume/edit";
+    }
+
+    // 중복 코드 방지를 위한 변환 메서드
+    private ResumeForm convertToForm(Resume resume) {
+        ResumeForm form = new ResumeForm();
+        form.setIntroduction(resume.getIntroduction());
+        form.setCareerYears(resume.getCareerYears());
+        form.setCareer(resume.getCareer());
+        form.setPreferredWorkType(resume.getPreferredWorkType());
+        form.setPortfolioUrl(resume.getPortfolioUrl());
+        form.setWritingStatus(resume.getWritingStatus());
+        form.setPubliclyVisible(resume.isPubliclyVisible());
+        form.setAiMatchingEnabled(resume.isAiMatchingEnabled());
+        return form;
     }
 
     @PostMapping("/skill/add")
     public String addSkill(
             @AuthenticationPrincipal ItDaPrincipal principal,
             @Valid @ModelAttribute("resumeSkillForm") ResumeSkillForm form,
-            BindingResult bindingResult
+            BindingResult bindingResult,
+            Model model
     ) {
-        if (!bindingResult.hasErrors()) {
-            try {
-                resumeService.addSkill(principal.getEmail(), form.getSkillId(), form.getProficiency());
-            } catch (IllegalStateException e) {
-                // 이미 등록된 스킬
-            }
+        if (bindingResult.hasErrors()) {
+            return renderEditPageForSkillForm(principal, model, true);
         }
-        return "redirect:/resume/edit";
+
+        try {
+            resumeService.addSkill(principal.getEmail(), form.getSkillId(), form.getProficiency());
+        } catch (IllegalStateException e) {
+            bindingResult.reject("skillAddFailed", e.getMessage());
+            return renderEditPageForSkillForm(principal, model, true);
+        }
+
+        return "redirect:/resume/edit?mode=modify";
     }
 
     @PostMapping("/skill/update")
     public String updateSkill(
             @AuthenticationPrincipal ItDaPrincipal principal,
             @Valid @ModelAttribute("resumeSkillForm") ResumeSkillForm form,
-            BindingResult bindingResult
+            BindingResult bindingResult,
+            Model model
     ) {
-        if (!bindingResult.hasErrors()) {
-            resumeService.updateSkill(principal.getEmail(), form.getSkillId(), form.getProficiency());
+        if (bindingResult.hasErrors()) {
+            return renderEditPageForSkillForm(principal, model, true);
         }
-        return "redirect:/resume/edit";
+
+        try {
+            resumeService.updateSkill(principal.getEmail(), form.getSkillId(), form.getProficiency());
+        } catch (IllegalStateException e) {
+            bindingResult.reject("skillUpdateFailed", e.getMessage());
+            return renderEditPageForSkillForm(principal, model, true);
+        }
+
+        return "redirect:/resume/edit?mode=modify";
     }
 
     @PostMapping("/skill/remove")
@@ -194,8 +218,12 @@ public class ResumeController {
             @AuthenticationPrincipal ItDaPrincipal principal,
             @ModelAttribute("resumeSkillForm") ResumeSkillForm form
     ) {
+        if (form.getSkillId() == null) {
+            return "redirect:/resume/edit";
+        }
+
         resumeService.removeSkill(principal.getEmail(), form.getSkillId());
-        return "redirect:/resume/edit";
+        return "redirect:/resume/edit?mode=modify";
     }
 
     private void addCommonAttributes(Model model) {
@@ -209,5 +237,32 @@ public class ResumeController {
         model.addAttribute("memberName", principal.getName());
         model.addAttribute("memberEmail", principal.getEmail());
         model.addAttribute("memberPhone", principal.getPhone());
+    }
+
+    private String renderEditPageForSkillForm(ItDaPrincipal principal, Model model, boolean editing) {
+        Resume resume;
+        try {
+            resume = resumeService.findByEmail(principal.getEmail());
+        } catch (IllegalStateException e) {
+            return "redirect:/resume/new";
+        }
+
+        ResumeForm form = new ResumeForm();
+        form.setIntroduction(resume.getIntroduction());
+        form.setCareerYears(resume.getCareerYears());
+        form.setCareer(resume.getCareer());
+        form.setPreferredWorkType(resume.getPreferredWorkType());
+        form.setPortfolioUrl(resume.getPortfolioUrl());
+        form.setWritingStatus(resume.getWritingStatus());
+        form.setPubliclyVisible(resume.isPubliclyVisible());
+        form.setAiMatchingEnabled(resume.isAiMatchingEnabled());
+
+        addCommonAttributes(model);
+        addMemberAttributes(model, principal);
+        model.addAttribute("resumeForm", form);
+        model.addAttribute("resume", resume);
+        model.addAttribute("isNew", false);
+        model.addAttribute("editable", editing);
+        return "freelancer/resumeForm";
     }
 }
