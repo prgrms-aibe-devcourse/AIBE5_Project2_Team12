@@ -2,6 +2,7 @@ package com.generic4.itda.domain.recommendation;
 
 import com.generic4.itda.domain.proposal.ProposalPosition;
 import com.generic4.itda.domain.recommendation.constant.RecommendationAlgorithm;
+import com.generic4.itda.domain.recommendation.constant.RecommendationRunStatus;
 import com.generic4.itda.domain.recommendation.converter.HardFilterStatConverter;
 import com.generic4.itda.domain.recommendation.vo.HardFilterStat;
 import com.generic4.itda.domain.shared.BaseEntity;
@@ -63,7 +64,7 @@ public class RecommendationRun extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private RecommendationAlgorithm.RecommendationRunStatus status;
+    private RecommendationRunStatus status;
 
     @Column(columnDefinition = "TEXT")
     private String errorMessage;
@@ -84,7 +85,7 @@ public class RecommendationRun extends BaseEntity {
         this.algorithm = algorithm;
         this.topK = topK;
 
-        this.status = RecommendationAlgorithm.RecommendationRunStatus.PENDING;
+        this.status = RecommendationRunStatus.PENDING;
     }
 
     public static RecommendationRun create(
@@ -97,47 +98,47 @@ public class RecommendationRun extends BaseEntity {
     }
 
     public void markRunning() {
-        Assert.state(this.status == RecommendationAlgorithm.RecommendationRunStatus.PENDING,
+        Assert.state(this.status == RecommendationRunStatus.PENDING,
                 "PENDING 상태에서만 실행 시작할 수 있습니다.");
 
-        this.status = RecommendationAlgorithm.RecommendationRunStatus.RUNNING;
+        this.status = RecommendationRunStatus.RUNNING;
         this.errorMessage = null;
     }
 
     public void markCompleted(HardFilterStat stat) {
-        Assert.state(this.status == RecommendationAlgorithm.RecommendationRunStatus.RUNNING,
+        Assert.state(this.status == RecommendationRunStatus.RUNNING,
                 "RUNNING 상태에서만 완료 처리할 수 있습니다.");
         Assert.notNull(stat, "하드 필터 통계는 필수입니다.");
 
-        this.status = RecommendationAlgorithm.RecommendationRunStatus.COMPUTED;
+        this.status = RecommendationRunStatus.COMPUTED;
         this.hardFilterStats = stat;
         this.candidateCount = stat.finalCount();
         this.errorMessage = null;
     }
 
     public void markFailed(String errorMessage) {
-        Assert.state(this.status == RecommendationAlgorithm.RecommendationRunStatus.RUNNING,
+        Assert.state(this.status == RecommendationRunStatus.RUNNING,
                 "RUNNING 상태에서만 완료 처리할 수 있습니다.");
         Assert.hasText(errorMessage, "실패 사유는 필수입니다.");
 
-        this.status = RecommendationAlgorithm.RecommendationRunStatus.FAILED;
+        this.status = RecommendationRunStatus.FAILED;
         this.errorMessage = errorMessage;
     }
 
     public boolean isPending() {
-        return this.status == RecommendationAlgorithm.RecommendationRunStatus.PENDING;
+        return this.status == RecommendationRunStatus.PENDING;
     }
 
     public boolean isRunning() {
-        return this.status == RecommendationAlgorithm.RecommendationRunStatus.RUNNING;
+        return this.status == RecommendationRunStatus.RUNNING;
     }
 
     public boolean isComputed() {
-        return this.status == RecommendationAlgorithm.RecommendationRunStatus.COMPUTED;
+        return this.status == RecommendationRunStatus.COMPUTED;
     }
 
     public boolean isFailed() {
-        return this.status == RecommendationAlgorithm.RecommendationRunStatus.FAILED;
+        return this.status == RecommendationRunStatus.FAILED;
     }
 
     public boolean isTerminalStatus() {

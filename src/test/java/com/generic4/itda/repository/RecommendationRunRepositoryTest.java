@@ -11,7 +11,7 @@ import com.generic4.itda.domain.proposal.ProposalPosition;
 import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.domain.recommendation.RecommendationRun;
 import com.generic4.itda.domain.recommendation.constant.RecommendationAlgorithm;
-import com.generic4.itda.domain.recommendation.constant.RecommendationAlgorithm.RecommendationRunStatus;
+import com.generic4.itda.domain.recommendation.constant.RecommendationRunStatus;
 import com.generic4.itda.domain.recommendation.vo.HardFilterStat;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
