@@ -44,6 +44,7 @@ IT-da는 클라이언트의 프로젝트 요구사항을 구조화하고, 적합
 | Language  | Java 17                                           |
 | Framework | Spring Boot 3.5.13                                |
 | Web       | Spring MVC, Thymeleaf, Validation                 |
+| Frontend  | Tailwind CSS, Alpine.js, Lucide                   |
 | Security  | Spring Security, BCrypt, Session-based Form Login |
 | Data      | Spring Data JPA, QueryDSL, PostgreSQL, H2         |
 | Infra     | Docker Compose, GitHub Actions                    |

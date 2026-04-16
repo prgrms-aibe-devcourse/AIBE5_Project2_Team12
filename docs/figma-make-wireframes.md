@@ -47,7 +47,7 @@ Visual and UX constraints:
 - Use grayscale with very restrained accent color.
 - No gradients, glassmorphism, illustrations, stock photos, or polished marketing visuals.
 - Keep copy in Korean.
-- Make everything feel realistic for Thymeleaf + Bootstrap implementation.
+- Make everything feel realistic for Thymeleaf + Tailwind + Alpine.js + Lucide implementation.
 - Prioritize headers, sidebars, tables, cards, forms, chips, filters, comparison trays, status badges, empty states, and inline helper text.
 - Reuse a consistent layout system and repeated component patterns across all screens.
 - Show practical B2B SaaS structure, not concept-art UI.
@@ -211,7 +211,7 @@ Design constraints:
 - Low-fidelity or mid-fidelity only
 - Grayscale with restrained accent color
 - Korean copy
-- Realistic Thymeleaf + Bootstrap implementation style
+- Realistic Thymeleaf + Tailwind + Alpine.js + Lucide implementation style
 - Prefer tables, cards, forms, chips, helper text, state badges, and summary blocks
 - No marketing visuals, gradients, illustrations, or decorative concepts
 

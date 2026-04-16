@@ -310,7 +310,7 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 - 백엔드: Spring Boot, Spring Data JPA, Querydsl
 - 데이터베이스: PostgreSQL, H2
 - 보안: Spring Security
-- 프론트엔드: Thymeleaf, Bootstrap, Bootswatch, jQuery 검토
+- 프론트엔드: Thymeleaf, Tailwind CSS, Alpine.js, Lucide
 - 인프라: Docker Compose, 싱글 서버 배포
 - 파일 저장: 로컬 파일 저장 + `ResourceHandler` 노출
 - AI: 외부 LLM API
