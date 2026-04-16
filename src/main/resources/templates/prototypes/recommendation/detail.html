@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/base}">
+<head>
+    <title>추천 결과 상세</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <main class="min-h-screen bg-slate-50 px-6 py-10 lg:px-10"
+          x-data="{ activeTab: 'reason' }"
+          x-effect="$nextTick(() => window.lucide && lucide.createIcons())">
+        <div class="mx-auto flex w-full max-w-7xl flex-col gap-6">
+            <div th:replace="~{fragments/recommendation-prototype :: flowNav(${activePrototypePage})}"></div>
+            <div th:replace="~{fragments/recommendation-prototype :: screenGuide}"></div>
+
+            <section class="grid gap-6 xl:grid-cols-[1.12fr_0.88fr]">
+                <article class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/70">
+                    <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                        <div class="space-y-4">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600"
+                                      th:text="'TOP ' + ${selectedResult.rank}">TOP 1</span>
+                                <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600"
+                                      th:text="${recommendationRun.statusLabel}">계산 완료</span>
+                                <span th:classappend="${selectedResult.llmStatus == 'READY'} ? 'border-cyan-200 bg-cyan-50 text-cyan-700' : (${selectedResult.llmStatus == 'FAILED'} ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-slate-200 bg-slate-50 text-slate-600')"
+                                      class="rounded-full border px-3 py-1 text-xs font-bold"
+                                      th:text="${selectedResult.llmStatusLabel}">LLM 설명 완료</span>
+                            </div>
+
+                            <div>
+                                <p class="text-xs font-black uppercase tracking-widest text-slate-400">선택 후보</p>
+                                <h2 class="mt-2 text-4xl font-black tracking-tight text-slate-950" th:text="${selectedResult.nickname}">코드메이븐</h2>
+                                <p class="mt-2 text-sm leading-6 text-slate-500" th:text="${selectedResult.headline}">
+                                    Spring Boot · 추천 플랫폼 7년
+                                </p>
+                            </div>
+
+                            <div class="flex flex-wrap gap-2">
+                                <span th:each="skill : ${selectedResult.matchedSkills}"
+                                      class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600"
+                                      th:text="${skill}">Java</span>
+                            </div>
+                        </div>
+
+                        <div class="grid min-w-[250px] gap-3 sm:grid-cols-2">
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center">
+                                <p class="text-xs font-black uppercase tracking-wider text-slate-400">최종 점수</p>
+                                <p class="mt-2 text-3xl font-black text-slate-950" th:text="${selectedResult.finalScore} + '%'">94%</p>
+                            </div>
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center">
+                                <p class="text-xs font-black uppercase tracking-wider text-slate-400">임베딩 점수</p>
+                                <p class="mt-2 text-3xl font-black text-slate-950" th:text="${selectedResult.embeddingScore} + '%'">91%</p>
+                            </div>
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center">
+                                <p class="text-xs font-black uppercase tracking-wider text-slate-400">경력</p>
+                                <p class="mt-2 text-3xl font-black text-slate-950" th:text="${selectedResult.careerYears} + '년'">7년</p>
+                            </div>
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center">
+                                <p class="text-xs font-black uppercase tracking-wider text-slate-400">선호 근무</p>
+                                <p class="mt-2 text-xl font-black text-slate-950" th:text="${selectedResult.preferredWorkTypeLabel}">원격 선호</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 flex flex-wrap gap-3">
+                        <a href="/prototypes/recommendations/results"
+                           class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300">
+                            <i data-lucide="arrow-left" class="h-4 w-4"></i>
+                            결과 목록으로
+                        </a>
+                        <a href="#"
+                           class="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800">
+                            <i data-lucide="send" class="h-4 w-4"></i>
+                            매칭 요청 mock
+                        </a>
+                        <a href="/prototypes/recommendations/error"
+                           class="inline-flex items-center gap-2 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700 transition hover:border-blue-200">
+                            <i data-lucide="history" class="h-4 w-4"></i>
+                            실패 상태도 보기
+                        </a>
+                    </div>
+                </article>
+
+                <aside class="space-y-6">
+                    <article class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/70">
+                        <div class="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-400">
+                            <i data-lucide="binary" class="h-4 w-4"></i>
+                            추천 실행 메타
+                        </div>
+                        <div class="mt-5 space-y-4 text-sm">
+                            <div class="flex items-center justify-between">
+                                <span class="text-slate-500">request fingerprint</span>
+                                <span class="font-semibold text-slate-900" th:text="${recommendationRun.requestFingerprint}">fp-demo</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-slate-500">추천 알고리즘</span>
+                                <span class="font-semibold text-slate-900" th:text="${recommendationRun.algorithm}">HEURISTIC_V1</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-slate-500">포지션</span>
+                                <span class="font-semibold text-slate-900" th:text="${recommendationRun.positionLabel}">백엔드 개발자</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-slate-500">후보 수</span>
+                                <span class="font-semibold text-slate-900" th:text="${recommendationRun.candidateCount} + '명'">17명</span>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="rounded-[32px] border border-slate-200 bg-slate-950 p-6 text-white shadow-[0_24px_60px_-30px_rgba(15,23,42,0.7)]">
+                        <div class="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-blue-300">
+                            <i data-lucide="message-circle-more" class="h-4 w-4"></i>
+                            인터뷰 질문 preview
+                        </div>
+                        <div class="mt-5 space-y-3">
+                            <div th:each="question : ${selectedResult.interviewQuestions}"
+                                 class="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm leading-6 text-slate-200"
+                                 th:text="${question}">
+                                추천 API 재학습 없이 품질을 개선한 경험을 설명해 주세요.
+                            </div>
+                        </div>
+                    </article>
+                </aside>
+            </section>
+
+            <section class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/70">
+                <div class="flex flex-wrap gap-3">
+                    <button type="button"
+                            @click="activeTab = 'reason'"
+                            :class="activeTab === 'reason' ? 'bg-slate-950 text-white border-slate-950' : 'bg-slate-50 text-slate-500 border-slate-200'"
+                            class="rounded-2xl border px-4 py-3 text-sm font-semibold transition">
+                        추천 근거
+                    </button>
+                    <button type="button"
+                            @click="activeTab = 'resume'"
+                            :class="activeTab === 'resume' ? 'bg-slate-950 text-white border-slate-950' : 'bg-slate-50 text-slate-500 border-slate-200'"
+                            class="rounded-2xl border px-4 py-3 text-sm font-semibold transition">
+                        이력서 스냅샷
+                    </button>
+                    <button type="button"
+                            @click="activeTab = 'llm'"
+                            :class="activeTab === 'llm' ? 'bg-slate-950 text-white border-slate-950' : 'bg-slate-50 text-slate-500 border-slate-200'"
+                            class="rounded-2xl border px-4 py-3 text-sm font-semibold transition">
+                        LLM 설명 상태
+                    </button>
+                </div>
+
+                <div x-show="activeTab === 'reason'" x-cloak class="mt-6 grid gap-5 xl:grid-cols-[1fr_0.9fr]">
+                    <article class="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+                        <div class="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-400">
+                            <i data-lucide="badge-percent" class="h-4 w-4"></i>
+                            reasonFacts
+                        </div>
+                        <div class="mt-5 grid gap-5 md:grid-cols-2">
+                            <div>
+                                <p class="text-sm font-bold text-slate-900">matchedSkills</p>
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                    <span th:each="skill : ${selectedResult.matchedSkills}"
+                                          class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600"
+                                          th:text="${skill}">Java</span>
+                                </div>
+                            </div>
+                            <div>
+                                <p class="text-sm font-bold text-slate-900">matchedDomains</p>
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                    <span th:each="domain : ${selectedResult.matchedDomains}"
+                                          class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600"
+                                          th:text="${domain}">플랫폼</span>
+                                </div>
+                            </div>
+                            <div class="md:col-span-2">
+                                <p class="text-sm font-bold text-slate-900">highlights</p>
+                                <ul class="mt-3 space-y-3 text-sm leading-7 text-slate-600">
+                                    <li th:each="highlight : ${selectedResult.highlights}" class="flex gap-3">
+                                        <span class="mt-2 h-1.5 w-1.5 rounded-full bg-blue-600"></span>
+                                        <span th:text="${highlight}">대규모 매칭 API 설계</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="rounded-[28px] border border-slate-200 bg-white p-5">
+                        <div class="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-400">
+                            <i data-lucide="component" class="h-4 w-4"></i>
+                            스킬 스냅샷
+                        </div>
+                        <div class="mt-5 space-y-3">
+                            <div th:each="skill : ${selectedResult.skills}"
+                                 class="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                <span class="font-semibold text-slate-800" th:text="${skill.name}">Java</span>
+                                <span class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-600"
+                                      th:text="${skill.level}">상</span>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+
+                <div x-show="activeTab === 'resume'" x-cloak class="mt-6 grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
+                    <article class="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+                        <div class="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-400">
+                            <i data-lucide="scroll-text" class="h-4 w-4"></i>
+                            소개 / 공개 설정
+                        </div>
+                        <p class="mt-5 text-sm leading-7 text-slate-600" th:text="${resumeSnapshot.introduction}">
+                            추천 플랫폼과 B2B SaaS 백엔드 설계를 주로 맡아 왔고, 최근에는 추천 품질 실험과 운영 자동화에도 참여했습니다.
+                        </p>
+
+                        <div class="mt-5 grid gap-3 md:grid-cols-2">
+                            <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                                <p class="text-xs font-black uppercase tracking-wider text-slate-400">publiclyVisible</p>
+                                <p class="mt-2 text-lg font-black text-slate-950" th:text="${resumeSnapshot.publiclyVisible ? '공개 중' : '비공개'}">공개 중</p>
+                            </div>
+                            <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                                <p class="text-xs font-black uppercase tracking-wider text-slate-400">aiMatchingEnabled</p>
+                                <p class="mt-2 text-lg font-black text-slate-950" th:text="${resumeSnapshot.aiMatchingEnabled ? 'AI 추천 허용' : 'AI 추천 제외'}">AI 추천 허용</p>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="rounded-[28px] border border-slate-200 bg-white p-5">
+                        <div class="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-400">
+                            <i data-lucide="paperclip" class="h-4 w-4"></i>
+                            포트폴리오 / 첨부
+                        </div>
+                        <a th:href="${resumeSnapshot.portfolioUrl}"
+                           class="mt-5 flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300"
+                           target="_blank" rel="noreferrer noopener">
+                            <span class="truncate" th:text="${resumeSnapshot.portfolioUrl}">https://portfolio.itda.dev/101</span>
+                            <i data-lucide="arrow-up-right" class="h-4 w-4 text-slate-400"></i>
+                        </a>
+                        <div class="mt-4 space-y-3">
+                            <div th:each="attachment : ${resumeSnapshot.attachments}"
+                                 class="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                                <span th:text="${attachment}">프로젝트_요약.pdf</span>
+                                <i data-lucide="file-text" class="h-4 w-4 text-slate-400"></i>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+
+                <div x-show="activeTab === 'llm'" x-cloak class="mt-6 grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
+                    <article class="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+                        <div class="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-400">
+                            <i data-lucide="bot" class="h-4 w-4"></i>
+                            llm status
+                        </div>
+                        <div class="mt-5 space-y-4">
+                            <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                                <p class="text-xs font-black uppercase tracking-wider text-slate-400">상태</p>
+                                <p class="mt-2 text-2xl font-black text-slate-950" th:text="${selectedResult.llmStatusLabel}">LLM 설명 완료</p>
+                            </div>
+                            <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                                <p class="text-xs font-black uppercase tracking-wider text-slate-400">UI 처리 규칙</p>
+                                <p class="mt-2 text-sm leading-7 text-slate-600">
+                                    READY 면 설명 본문을 그대로 노출하고, PENDING 면 skeleton / placeholder, FAILED 면 fallback 문구와 운영용 힌트를 노출합니다.
+                                </p>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="rounded-[28px] border border-slate-200 bg-slate-950 p-5 text-white shadow-[0_20px_60px_-30px_rgba(15,23,42,0.7)]">
+                        <div class="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-blue-300">
+                            <i data-lucide="message-square-quote" class="h-4 w-4"></i>
+                            llmReason
+                        </div>
+                        <p class="mt-5 text-sm leading-7 text-slate-200" th:text="${selectedResult.llmReason}">
+                            추천 API 설계, 매칭 서비스 운영, AWS 인프라 경험이 동시에 확인됩니다.
+                        </p>
+                    </article>
+                </div>
+            </section>
+
+            <div th:replace="~{fragments/recommendation-prototype :: mockPayloadPanel}"></div>
+        </div>
+    </main>
+</div>
+</body>
+</html>

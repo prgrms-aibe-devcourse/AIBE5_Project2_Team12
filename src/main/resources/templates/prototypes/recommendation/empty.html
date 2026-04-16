@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/base}">
+<head>
+    <title>추천 결과 없음</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <main class="min-h-screen bg-slate-50 px-6 py-10 lg:px-10"
+          x-data="{ activeReason: 0 }"
+          x-effect="$nextTick(() => window.lucide && lucide.createIcons())">
+        <div class="mx-auto flex w-full max-w-7xl flex-col gap-6">
+            <div th:replace="~{fragments/recommendation-prototype :: flowNav(${activePrototypePage})}"></div>
+            <div th:replace="~{fragments/recommendation-prototype :: screenGuide}"></div>
+
+            <section class="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+                <article class="rounded-[32px] border border-amber-200 bg-white p-6 shadow-sm shadow-amber-100/80">
+                    <div class="flex items-start gap-4">
+                        <div class="flex h-16 w-16 items-center justify-center rounded-[24px] bg-amber-100 text-amber-700">
+                            <i data-lucide="search-x" class="h-8 w-8"></i>
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600"
+                                      th:text="${recommendationRun.statusLabel}">계산 완료</span>
+                                <span class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
+                                    candidateCount 0
+                                </span>
+                            </div>
+                            <h2 class="mt-4 text-4xl font-black tracking-tight text-slate-950">
+                                추천 결과가 아직 없습니다.
+                            </h2>
+                            <p class="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
+                                추천 실행은 끝났지만 공개 상태, AI 추천 허용 상태, 포지션 조건을 통과한 후보가 남지 않았습니다.
+                                사용자가 왜 비었는지 이해하고 바로 다음 액션으로 이어지도록 설명형 empty state 로 설계했습니다.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 grid gap-3 md:grid-cols-4">
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <p class="text-xs font-black uppercase tracking-wider text-slate-400">전체 후보</p>
+                            <p class="mt-2 text-2xl font-black text-slate-950" th:text="${recommendationRun.hardFilterStats.totalCandidates}">21</p>
+                        </div>
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <p class="text-xs font-black uppercase tracking-wider text-slate-400">ACTIVE 통과</p>
+                            <p class="mt-2 text-2xl font-black text-slate-950" th:text="${recommendationRun.hardFilterStats.afterActiveFilter}">15</p>
+                        </div>
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <p class="text-xs font-black uppercase tracking-wider text-slate-400">공개 여부 통과</p>
+                            <p class="mt-2 text-2xl font-black text-slate-950" th:text="${recommendationRun.hardFilterStats.afterVisibilityFilter}">4</p>
+                        </div>
+                        <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                            <p class="text-xs font-black uppercase tracking-wider text-amber-700">AI 허용 통과</p>
+                            <p class="mt-2 text-2xl font-black text-amber-800" th:text="${recommendationRun.hardFilterStats.afterAiEnabledFilter}">0</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 flex flex-wrap gap-3">
+                        <a href="/prototypes/recommendations"
+                           class="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800">
+                            <i data-lucide="sliders-horizontal" class="h-4 w-4"></i>
+                            제안서 조건 조정
+                        </a>
+                        <a href="/prototypes/recommendations/results"
+                           class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300">
+                            <i data-lucide="layers-3" class="h-4 w-4"></i>
+                            결과 목록 예시 보기
+                        </a>
+                    </div>
+                </article>
+
+                <aside class="space-y-6">
+                    <article class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/70">
+                        <div class="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-400">
+                            <i data-lucide="list-x" class="h-4 w-4"></i>
+                            비어 있는 이유
+                        </div>
+                        <div class="mt-5 flex flex-wrap gap-2">
+                            <button th:each="reason, reasonStat : ${emptyReasons}"
+                                    type="button"
+                                    th:attr="data-index=${reasonStat.index}"
+                                    @click="activeReason = Number($el.dataset.index)"
+                                    :class="activeReason === Number($el.dataset.index) ? 'bg-amber-100 border-amber-300 text-amber-800' : 'bg-slate-50 border-slate-200 text-slate-500'"
+                                    class="rounded-full border px-3 py-2 text-xs font-bold transition"
+                                    th:text="${'원인 ' + (reasonStat.index + 1)}">
+                                원인 1
+                            </button>
+                        </div>
+
+                        <div class="mt-5 space-y-3">
+                            <div th:each="reason, reasonStat : ${emptyReasons}"
+                                 th:attr="data-index=${reasonStat.index}"
+                                 x-show="activeReason === Number($el.dataset.index)"
+                                 x-cloak
+                                 class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <p class="font-bold text-slate-900" th:text="${reason.title}">AI 추천 허용 이력서 없음</p>
+                                <p class="mt-2 text-sm leading-6 text-slate-600" th:text="${reason.detail}">
+                                    후보 4명 모두 publiclyVisible 은 true 이지만 aiMatchingEnabled 가 false 입니다.
+                                </p>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/70">
+                        <div class="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-400">
+                            <i data-lucide="map" class="h-4 w-4"></i>
+                            추천 액션 가이드
+                        </div>
+                        <div class="mt-5 flex flex-col gap-3">
+                            <a th:each="action : ${fallbackActions}"
+                               th:href="${action.href}"
+                               class="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white">
+                                <span th:text="${action.label}">제안서 조건 완화하기</span>
+                                <i data-lucide="arrow-up-right" class="h-4 w-4 text-slate-400"></i>
+                            </a>
+                        </div>
+                    </article>
+                </aside>
+            </section>
+
+            <div th:replace="~{fragments/recommendation-prototype :: mockPayloadPanel}"></div>
+        </div>
+    </main>
+</div>
+</body>
+</html>

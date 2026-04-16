@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<th:block th:fragment="flowNav(activePrototypePage)">
+    <section class="rounded-[32px] border border-slate-200 bg-white/95 p-6 shadow-sm shadow-slate-200/70 backdrop-blur">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div class="space-y-3">
+                <div class="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-blue-600">
+                    <i data-lucide="orbit" class="h-3.5 w-3.5"></i>
+                    Recommendation Prototype
+                </div>
+                <div>
+                    <p class="text-3xl font-black tracking-tight text-slate-950" th:text="${screenTitle}">추천 플로우 진입</p>
+                    <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-500" th:text="${screenSubtitle}">
+                        추천 실행 전 확인해야 할 제안서 상태, 포지션 맥락, 실행 조건을 한 화면에서 보여주는 mock 진입 화면입니다.
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[11px] text-slate-500">
+                <i data-lucide="workflow" class="h-4 w-4 text-slate-400"></i>
+                <span th:text="${screenEyebrow}">Prototype Entry</span>
+            </div>
+        </div>
+
+        <div class="mt-6 flex flex-wrap gap-3">
+            <a th:each="page : ${prototypePages}"
+               th:href="${page.href}"
+               th:classappend="${page.key == activePrototypePage} ? 'border-blue-600 bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700'"
+               class="group inline-flex items-center gap-3 rounded-2xl border px-4 py-3 transition-all">
+                <span th:text="${page.step}"
+                      th:classappend="${page.key == activePrototypePage} ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200'"
+                      class="inline-flex h-8 w-8 items-center justify-center rounded-xl text-[11px] font-black">01</span>
+                <span class="text-sm font-semibold" th:text="${page.label}">진입</span>
+            </a>
+        </div>
+    </section>
+</th:block>
+
+<th:block th:fragment="screenGuide">
+    <section class="grid gap-4 xl:grid-cols-4">
+        <article class="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/70">
+            <div class="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-slate-400">
+                <i data-lucide="goal" class="h-4 w-4"></i>
+                화면 목적
+            </div>
+            <p class="mt-4 text-sm leading-7 text-slate-600" th:text="${screenGuide.purpose}">
+                화면 목적 설명
+            </p>
+        </article>
+
+        <article class="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/70">
+            <div class="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-slate-400">
+                <i data-lucide="database-zap" class="h-4 w-4"></i>
+                표시 데이터
+            </div>
+            <ul class="mt-4 space-y-3 text-sm text-slate-600">
+                <li th:each="item : ${screenGuide.displayData}" class="flex gap-3">
+                    <span class="mt-1 h-2 w-2 rounded-full bg-blue-600"></span>
+                    <span th:text="${item}">표시 데이터 항목</span>
+                </li>
+            </ul>
+        </article>
+
+        <article class="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/70">
+            <div class="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-slate-400">
+                <i data-lucide="mouse-pointer-click" class="h-4 w-4"></i>
+                사용자 액션
+            </div>
+            <ul class="mt-4 space-y-3 text-sm text-slate-600">
+                <li th:each="item : ${screenGuide.actions}" class="flex gap-3">
+                    <span class="mt-1 h-2 w-2 rounded-full bg-slate-500"></span>
+                    <span th:text="${item}">액션 항목</span>
+                </li>
+            </ul>
+        </article>
+
+        <article class="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/70">
+            <div class="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-slate-400">
+                <i data-lucide="arrow-right-left" class="h-4 w-4"></i>
+                다음 흐름
+            </div>
+            <div class="mt-4 flex flex-col gap-3">
+                <a th:each="flow : ${screenGuide.nextFlows}"
+                   th:href="${flow.href}"
+                   class="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white">
+                    <span th:text="${flow.label}">결과 목록으로</span>
+                    <i data-lucide="arrow-up-right" class="h-4 w-4 text-slate-400"></i>
+                </a>
+            </div>
+        </article>
+    </section>
+</th:block>
+
+<th:block th:fragment="mockPayloadPanel">
+    <section x-data="{ open: false }" class="rounded-[28px] border border-slate-200 bg-slate-950 p-5 text-slate-200 shadow-sm shadow-slate-950/10">
+        <button type="button"
+                @click="open = !open; $nextTick(() => lucide.createIcons())"
+                class="flex w-full items-center justify-between gap-4 text-left">
+            <div>
+                <p class="text-[11px] font-bold uppercase tracking-widest text-blue-400">Mock Payload</p>
+                <p class="mt-2 text-lg font-bold text-white" th:text="${mockPayloadName}">recommendationResultsPage</p>
+                <p class="mt-1 text-sm text-slate-400">실제 API 연결 전, 화면이 기대하는 필드 구조를 JSON 형태로 노출합니다.</p>
+            </div>
+            <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900">
+                <i x-show="!open" x-cloak data-lucide="chevron-down" class="h-5 w-5"></i>
+                <i x-show="open" x-cloak data-lucide="chevron-up" class="h-5 w-5"></i>
+            </span>
+        </button>
+        <div x-show="open" x-cloak x-transition class="mt-5 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/80">
+            <pre class="overflow-x-auto p-5 text-xs leading-6 text-cyan-100" th:text="${mockPayloadJson}">{}</pre>
+        </div>
+    </section>
+</th:block>
+
+</html>
