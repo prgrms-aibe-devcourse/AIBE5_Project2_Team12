@@ -55,10 +55,18 @@ public class ResumeService {
             CareerPayload career,
             WorkType workType,
             ResumeWritingStatus writingStatus,
-            String portfolioUrl
+            String portfolioUrl,
+            boolean publiclyVisible,
+            boolean aiMatchingEnabled
     ) {
         Resume resume = getResumeByEmail(email);
         resume.update(introduction, careerYears, career, workType, writingStatus, portfolioUrl);
+        if (resume.isPubliclyVisible() != publiclyVisible) {
+            resume.togglePubliclyVisible();
+        }
+        if (resume.isAiMatchingEnabled() != aiMatchingEnabled) {
+            resume.toggleAiMatchingEnabled();
+        }
     }
 
     // 스킬 추가
@@ -86,8 +94,10 @@ public class ResumeService {
     @Transactional(readOnly = true)
     public Resume findByEmail(String email) {
         Member member = getMemberByEmail(email);
-        return resumeRepository.findByMemberId(member.getId())
+        Resume resume = resumeRepository.findByMemberId(member.getId())
                 .orElseThrow(() -> new IllegalStateException("이력서가 존재하지 않습니다."));
+        resume.getSkills().size(); // open-in-view: false 환경에서 트랜잭션 안에 Lazy 컬렉션 강제 초기화
+        return resume;
     }
 
     // 전체 스킬 목록 조회
