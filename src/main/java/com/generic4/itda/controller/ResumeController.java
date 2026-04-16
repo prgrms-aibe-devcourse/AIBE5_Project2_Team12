@@ -54,6 +54,14 @@ public class ResumeController {
         model.addAttribute("isNew", true);
 
         return "freelancer/resumeForm";
+        } catch (IllegalStateException e) {
+            // 이력서 없음 → 작성 페이지 진행
+        }
+
+        addCommonAttributes(model);
+        model.addAttribute("resumeForm", new ResumeForm());
+        model.addAttribute("resumeSkillForm", new ResumeSkillForm());
+        return "resume/form";
     }
 
     @PostMapping("/new")
