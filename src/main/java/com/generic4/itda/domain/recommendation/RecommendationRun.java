@@ -17,11 +17,21 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.springframework.util.Assert;
 
+@Table(
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_recommendation_run_position_fingerprint_algorithm",
+                        columnNames = {"proposal_position_id", "request_fingerprint", "algorithm_version"}
+                )
+        }
+)
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -39,7 +49,7 @@ public class RecommendationRun extends BaseEntity {
     private String requestFingerprint;
 
     @Enumerated(EnumType.STRING)
-    @Column(length = 50, nullable = false)
+    @Column(name = "algorithm_version", length = 50, nullable = false)
     private RecommendationAlgorithm algorithm;
 
     @Column(name = "candidate_count")
