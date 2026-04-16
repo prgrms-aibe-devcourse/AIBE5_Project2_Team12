@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/base}">
+<head>
+    <title>추천 플로우 진입</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <main class="min-h-screen bg-slate-50 px-6 py-10 lg:px-10"
+          x-data="recommendationEntryPrototype()"
+          x-effect="$nextTick(() => window.lucide && lucide.createIcons())">
+        <div class="mx-auto flex w-full max-w-7xl flex-col gap-6">
+            <div th:replace="~{fragments/recommendation-prototype :: flowNav(${activePrototypePage})}"></div>
+            <div th:replace="~{fragments/recommendation-prototype :: screenGuide}"></div>
+
+            <section class="grid gap-6 xl:grid-cols-[1.35fr_0.85fr]">
+                <article class="overflow-hidden rounded-[32px] border border-slate-200 bg-slate-950 text-white shadow-[0_30px_80px_-30px_rgba(15,23,42,0.5)]">
+                    <div class="grid gap-10 px-7 py-8 lg:grid-cols-[1.1fr_0.9fr] lg:px-8">
+                        <div class="space-y-6">
+                            <div class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-blue-200">
+                                <i data-lucide="sparkles" class="h-3.5 w-3.5"></i>
+                                추천 실행 전 체크
+                            </div>
+
+                            <div class="space-y-4">
+                                <p class="max-w-xl text-4xl font-black leading-tight tracking-tight">
+                                    <span x-text="overview.headline"></span>
+                                </p>
+                                <p class="max-w-2xl text-sm leading-7 text-slate-300" x-text="overview.summary"></p>
+                            </div>
+
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <template x-for="metric in overview.quickMetrics" :key="metric.label">
+                                    <div class="rounded-[24px] border border-white/10 bg-white/5 p-4">
+                                        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400" x-text="metric.label"></p>
+                                        <p class="mt-3 text-2xl font-black tracking-tight text-white" x-text="metric.value"></p>
+                                        <p class="mt-2 text-sm text-slate-400" x-text="metric.helper"></p>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <div class="space-y-5 rounded-[28px] border border-white/10 bg-white/5 p-5">
+                            <div class="flex items-start justify-between gap-4">
+                                <div>
+                                    <p class="text-xs font-black uppercase tracking-widest text-slate-400">현재 제안서</p>
+                                    <h2 class="mt-2 text-2xl font-black tracking-tight text-white" th:text="${proposalSummary.proposalTitle}">AI 기반 프로젝트 매칭 플랫폼 구축</h2>
+                                </div>
+                                <span class="rounded-full border border-emerald-300/20 bg-emerald-400/15 px-3 py-1 text-xs font-bold text-emerald-200"
+                                      th:text="${proposalSummary.proposalStatusLabel}">매칭 진행</span>
+                            </div>
+
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <div class="rounded-2xl border border-white/10 bg-slate-900/50 p-4">
+                                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">선택 포지션</p>
+                                    <p class="mt-3 text-lg font-bold text-white" x-text="currentPosition().label"></p>
+                                    <p class="mt-2 text-sm text-slate-400">모집 인원 <span th:text="${proposalSummary.positions[0].headCount}">2</span>명</p>
+                                </div>
+                                <div class="rounded-2xl border border-white/10 bg-slate-900/50 p-4">
+                                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">예산 범위</p>
+                                    <p class="mt-3 text-lg font-bold text-white" th:text="${proposalSummary.budgetRange}">월 500만 - 900만 / 1인</p>
+                                    <p class="mt-2 text-sm text-slate-400" th:text="${proposalSummary.lastUpdatedAt}">2026.04.16 10:18</p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label for="positionSelect" class="text-xs font-black uppercase tracking-wider text-slate-500">포지션 컨텍스트</label>
+                                <select id="positionSelect"
+                                        x-model="selectedPosition"
+                                        class="mt-3 w-full rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3 text-sm font-semibold text-white outline-none ring-0">
+                                    <template x-for="option in positions" :key="option.value">
+                                        <option :value="option.value" x-text="option.label"></option>
+                                    </template>
+                                </select>
+                            </div>
+
+                            <div class="rounded-2xl border border-blue-400/20 bg-blue-400/10 p-4">
+                                <p class="text-[11px] font-bold uppercase tracking-widest text-blue-200">필수 스킬</p>
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                    <template x-for="skill in currentPosition().requiredSkills" :key="skill">
+                                        <span class="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-semibold text-blue-50" x-text="skill"></span>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+
+                <aside class="space-y-6">
+                    <article class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/70">
+                        <div class="flex items-center justify-between gap-4">
+                            <div>
+                                <p class="text-xs font-black uppercase tracking-widest text-slate-400">후보 풀 요약</p>
+                                <p class="mt-2 text-3xl font-black tracking-tight text-slate-950">
+                                    <span th:text="${candidatePoolSummary.totalCount}">48</span>명
+                                </p>
+                            </div>
+                            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-right">
+                                <p class="text-xs font-black uppercase tracking-wider text-emerald-600">최종 노출 가능</p>
+                                <p class="mt-1 text-2xl font-black text-emerald-700" th:text="${candidatePoolSummary.hardFilterStats.afterAiEnabledFilter}">17</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-5 space-y-3">
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <div class="flex items-center justify-between text-sm">
+                                    <span class="font-semibold text-slate-500">ACTIVE 통과</span>
+                                    <span class="font-black text-slate-900" th:text="${candidatePoolSummary.hardFilterStats.afterActiveFilter} + '명'">36명</span>
+                                </div>
+                                <div class="mt-3 h-2 rounded-full bg-slate-200">
+                                    <div class="h-2 rounded-full bg-slate-950" style="width: 75%"></div>
+                                </div>
+                            </div>
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <div class="flex items-center justify-between text-sm">
+                                    <span class="font-semibold text-slate-500">공개 여부 통과</span>
+                                    <span class="font-black text-slate-900" th:text="${candidatePoolSummary.hardFilterStats.afterVisibilityFilter} + '명'">24명</span>
+                                </div>
+                                <div class="mt-3 h-2 rounded-full bg-slate-200">
+                                    <div class="h-2 rounded-full bg-cyan-500" style="width: 52%"></div>
+                                </div>
+                            </div>
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <div class="flex items-center justify-between text-sm">
+                                    <span class="font-semibold text-slate-500">AI 추천 허용 통과</span>
+                                    <span class="font-black text-slate-900" th:text="${candidatePoolSummary.hardFilterStats.afterAiEnabledFilter} + '명'">17명</span>
+                                </div>
+                                <div class="mt-3 h-2 rounded-full bg-slate-200">
+                                    <div class="h-2 rounded-full bg-emerald-500" style="width: 35%"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-5 grid gap-3 sm:grid-cols-3">
+                            <div th:each="segment : ${candidatePoolSummary.segments}"
+                                 class="rounded-2xl border border-slate-200 bg-white p-4">
+                                <p class="text-xs font-black uppercase tracking-wider text-slate-400" th:text="${segment.label}">직접 지원자</p>
+                                <p class="mt-2 text-xl font-black text-slate-950" th:text="${segment.value}">5명</p>
+                                <p class="mt-2 text-sm text-slate-500" th:text="${segment.helper}">지원 완료 상태</p>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/70">
+                        <div class="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-400">
+                            <i data-lucide="badge-check" class="h-4 w-4"></i>
+                            실행 준비 체크리스트
+                        </div>
+                        <div class="mt-5 space-y-3">
+                            <div th:each="item : ${readinessChecklist}" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                <div class="flex items-start gap-3">
+                                    <span th:classappend="${item.checked} ? 'border-emerald-200 bg-emerald-100 text-emerald-700' : 'border-rose-200 bg-rose-100 text-rose-700'"
+                                          class="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-xl border">
+                                        <i th:attr="data-lucide=${item.checked ? 'check' : 'x'}" class="h-4 w-4"></i>
+                                    </span>
+                                    <div>
+                                        <p class="font-semibold text-slate-900" th:text="${item.label}">제안서 상태가 MATCHING 인가?</p>
+                                        <p class="mt-1 text-sm leading-6 text-slate-500" th:text="${item.helper}">WRITING 상태에서는 추천 실행을 막고 helper text만 노출</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                </aside>
+            </section>
+
+            <section class="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+                <article class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/70">
+                    <div class="flex items-center justify-between gap-4">
+                        <div>
+                            <p class="text-xs font-black uppercase tracking-widest text-slate-400">프로토타입 액션</p>
+                            <h2 class="mt-2 text-2xl font-black tracking-tight text-slate-950">추천 플로우 분기</h2>
+                        </div>
+                        <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-500">
+                            mock navigation
+                        </span>
+                    </div>
+
+                    <div class="mt-5 grid gap-4 md:grid-cols-3">
+                        <a href="/prototypes/recommendations/results"
+                           class="group rounded-[28px] border border-slate-200 bg-slate-50 p-5 transition hover:-translate-y-1 hover:border-slate-300 hover:bg-white">
+                            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+                                <i data-lucide="layers-3" class="h-6 w-6"></i>
+                            </div>
+                            <h3 class="mt-5 text-xl font-black text-slate-950">추천 결과 목록</h3>
+                            <p class="mt-2 text-sm leading-6 text-slate-500">AI 추천 Top 후보와 직접 지원자를 동시에 비교합니다.</p>
+                            <div class="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                                목록 보기
+                                <i data-lucide="arrow-right" class="h-4 w-4 transition group-hover:translate-x-1"></i>
+                            </div>
+                        </a>
+
+                        <a href="/prototypes/recommendations/empty"
+                           class="group rounded-[28px] border border-slate-200 bg-slate-50 p-5 transition hover:-translate-y-1 hover:border-slate-300 hover:bg-white">
+                            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                                <i data-lucide="search-x" class="h-6 w-6"></i>
+                            </div>
+                            <h3 class="mt-5 text-xl font-black text-slate-950">결과 없음</h3>
+                            <p class="mt-2 text-sm leading-6 text-slate-500">필터가 너무 엄격하거나 후보 풀이 부족한 경우를 보여줍니다.</p>
+                            <div class="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                                empty state 보기
+                                <i data-lucide="arrow-right" class="h-4 w-4 transition group-hover:translate-x-1"></i>
+                            </div>
+                        </a>
+
+                        <a href="/prototypes/recommendations/error"
+                           class="group rounded-[28px] border border-slate-200 bg-slate-50 p-5 transition hover:-translate-y-1 hover:border-slate-300 hover:bg-white">
+                            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-100 text-rose-700">
+                                <i data-lucide="triangle-alert" class="h-6 w-6"></i>
+                            </div>
+                            <h3 class="mt-5 text-xl font-black text-slate-950">실패 상태</h3>
+                            <p class="mt-2 text-sm leading-6 text-slate-500">추천 계산 또는 설명 생성 실패 시 어떤 정보를 보여줄지 정리합니다.</p>
+                            <div class="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                                실패 상태 보기
+                                <i data-lucide="arrow-right" class="h-4 w-4 transition group-hover:translate-x-1"></i>
+                            </div>
+                        </a>
+                    </div>
+                </article>
+
+                <div th:replace="~{fragments/recommendation-prototype :: mockPayloadPanel}"></div>
+            </section>
+        </div>
+    </main>
+
+    <script th:inline="javascript">
+        function recommendationEntryPrototype() {
+            return {
+                overview: /*[[${entryOverview}]]*/ {},
+                positions: /*[[${proposalSummary.positions}]]*/ [],
+                selectedPosition: 'backend',
+                currentPosition() {
+                    return this.positions.find(position => position.value === this.selectedPosition) || this.positions[0] || {label: '', requiredSkills: []};
+                }
+            };
+        }
+    </script>
+</div>
+</body>
+</html>
