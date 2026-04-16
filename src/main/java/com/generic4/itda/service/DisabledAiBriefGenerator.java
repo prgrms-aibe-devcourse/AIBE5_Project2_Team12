@@ -3,9 +3,11 @@ package com.generic4.itda.service;
 import com.generic4.itda.dto.proposal.AiBriefGenerateRequest;
 import com.generic4.itda.dto.proposal.AiBriefResult;
 import com.generic4.itda.exception.AiBriefGenerationException;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnMissingBean(AiBriefGenerator.class)
 public class DisabledAiBriefGenerator implements AiBriefGenerator {
 
     @Override
