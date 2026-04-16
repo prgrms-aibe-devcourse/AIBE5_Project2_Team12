@@ -14,7 +14,11 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @Controller
 @RequestMapping("/resume")
@@ -38,7 +42,8 @@ public class ResumeController {
         try {
             resumeService.findByEmail(principal.getEmail());
             return "redirect:/resume/edit";
-        } catch (IllegalStateException ignored) {}
+        } catch (IllegalStateException ignored) {
+        }
 
         ResumeForm form = new ResumeForm();
         form.setCareerYears((byte) 0);
@@ -54,14 +59,6 @@ public class ResumeController {
         model.addAttribute("isNew", true);
 
         return "freelancer/resumeForm";
-        } catch (IllegalStateException e) {
-            // 이력서 없음 → 작성 페이지 진행
-        }
-
-        addCommonAttributes(model);
-        model.addAttribute("resumeForm", new ResumeForm());
-        model.addAttribute("resumeSkillForm", new ResumeSkillForm());
-        return "resume/form";
     }
 
     @PostMapping("/new")
@@ -76,7 +73,6 @@ public class ResumeController {
             addMemberAttributes(model, principal);
             model.addAttribute("resumeSkillForm", new ResumeSkillForm());
             model.addAttribute("isNew", true);
-            model.addAttribute("editing", true);
             return "freelancer/resumeForm";
         }
 
@@ -96,7 +92,6 @@ public class ResumeController {
             addMemberAttributes(model, principal);
             model.addAttribute("resumeSkillForm", new ResumeSkillForm());
             model.addAttribute("isNew", true);
-            model.addAttribute("editing", true);
             return "freelancer/resumeForm";
         }
 
@@ -110,16 +105,12 @@ public class ResumeController {
             Model model
     ) {
         Resume resume = resumeService.findByEmail(principal.getEmail());
-
-        // DTO 변환 로직을 하단 전용 메서드로 호출
         ResumeForm form = convertToForm(resume);
 
         addCommonAttributes(model);
         addMemberAttributes(model, principal);
 
-        // mode=modify가 있으면 수정 가능(true), 없으면 조회 전용(false)
         boolean isEditable = "modify".equals(mode);
-
         model.addAttribute("resumeForm", form);
         model.addAttribute("resumeSkillForm", new ResumeSkillForm());
         model.addAttribute("resume", resume);
@@ -136,12 +127,16 @@ public class ResumeController {
             BindingResult bindingResult,
             Model model
     ) {
-        // 1. 유효성 검사 실패 시
         if (bindingResult.hasErrors()) {
+            Resume resume = resumeService.findByEmail(principal.getEmail());
+
             addCommonAttributes(model);
             addMemberAttributes(model, principal);
+            model.addAttribute("resumeSkillForm", new ResumeSkillForm());
+            model.addAttribute("resumeForm", form);
+            model.addAttribute("resume", resume);
             model.addAttribute("isNew", false);
-            model.addAttribute("editable", true); // 에러가 났으니 다시 수정할 수 있게 true 유지
+            model.addAttribute("editable", true);
             return "freelancer/resumeForm";
         }
 
@@ -161,11 +156,9 @@ public class ResumeController {
             return "redirect:/resume/new";
         }
 
-        // 2. 저장 완료 후: 파라미터 없이 리다이렉트 -> mode가 없으므로 다시 '조회 모드(readonly)'가 됨
         return "redirect:/resume/edit";
     }
 
-    // 중복 코드 방지를 위한 변환 메서드
     private ResumeForm convertToForm(Resume resume) {
         ResumeForm form = new ResumeForm();
         form.setIntroduction(resume.getIntroduction());
@@ -247,30 +240,16 @@ public class ResumeController {
         model.addAttribute("memberPhone", principal.getPhone());
     }
 
-    private String renderEditPageForSkillForm(ItDaPrincipal principal, Model model, boolean editing) {
-        Resume resume;
-        try {
-            resume = resumeService.findByEmail(principal.getEmail());
-        } catch (IllegalStateException e) {
-            return "redirect:/resume/new";
-        }
-
-        ResumeForm form = new ResumeForm();
-        form.setIntroduction(resume.getIntroduction());
-        form.setCareerYears(resume.getCareerYears());
-        form.setCareer(resume.getCareer());
-        form.setPreferredWorkType(resume.getPreferredWorkType());
-        form.setPortfolioUrl(resume.getPortfolioUrl());
-        form.setWritingStatus(resume.getWritingStatus());
-        form.setPubliclyVisible(resume.isPubliclyVisible());
-        form.setAiMatchingEnabled(resume.isAiMatchingEnabled());
+    private String renderEditPageForSkillForm(ItDaPrincipal principal, Model model, boolean editable) {
+        Resume resume = resumeService.findByEmail(principal.getEmail());
+        ResumeForm form = convertToForm(resume);
 
         addCommonAttributes(model);
         addMemberAttributes(model, principal);
         model.addAttribute("resumeForm", form);
         model.addAttribute("resume", resume);
         model.addAttribute("isNew", false);
-        model.addAttribute("editable", editing);
+        model.addAttribute("editable", editable);
         return "freelancer/resumeForm";
     }
 }
