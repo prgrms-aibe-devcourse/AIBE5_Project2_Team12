@@ -24,9 +24,12 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 @ExtendWith(MockitoExtension.class)
 class ProposalAiBriefServiceTest {
+
+    private static final String OWNER_EMAIL = "test@example.com";
 
     @Mock
     private ProposalRepository proposalRepository;
@@ -61,7 +64,7 @@ class ProposalAiBriefServiceTest {
         given(proposalRepository.findById(1L)).willReturn(Optional.of(proposal));
         given(aiBriefGenerator.generate(any(AiBriefGenerateRequest.class))).willReturn(aiBriefResult);
 
-        AiBriefResult result = proposalAiBriefService.generate(1L);
+        AiBriefResult result = proposalAiBriefService.generate(1L, OWNER_EMAIL);
 
         assertThat(result).isSameAs(aiBriefResult);
         then(aiBriefGenerator).should().generate(requestCaptor.capture());
@@ -74,7 +77,7 @@ class ProposalAiBriefServiceTest {
     void failWhenProposalDoesNotExist() {
         given(proposalRepository.findById(1L)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> proposalAiBriefService.generate(1L))
+        assertThatThrownBy(() -> proposalAiBriefService.generate(1L, OWNER_EMAIL))
                 .isInstanceOf(ProposalNotFoundException.class)
                 .hasMessage("제안서를 찾을 수 없습니다. id=1");
 
@@ -89,7 +92,7 @@ class ProposalAiBriefServiceTest {
         proposal.startMatching();
         given(proposalRepository.findById(1L)).willReturn(Optional.of(proposal));
 
-        assertThatThrownBy(() -> proposalAiBriefService.generate(1L))
+        assertThatThrownBy(() -> proposalAiBriefService.generate(1L, OWNER_EMAIL))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("작성 중인 제안서만 AI 브리프를 생성할 수 있습니다.");
 
@@ -105,7 +108,7 @@ class ProposalAiBriefServiceTest {
         given(aiBriefGenerator.generate(any(AiBriefGenerateRequest.class)))
                 .willThrow(new RuntimeException("llm failure"));
 
-        assertThatThrownBy(() -> proposalAiBriefService.generate(1L))
+        assertThatThrownBy(() -> proposalAiBriefService.generate(1L, OWNER_EMAIL))
                 .isInstanceOf(AiBriefGenerationException.class)
                 .hasMessage("AI 브리프 생성에 실패했습니다.")
                 .cause()
@@ -114,6 +117,20 @@ class ProposalAiBriefServiceTest {
 
         assertThat(proposal.getTitle()).isEqualTo("제안서 제목");
         assertThat(proposal.getDescription()).isEqualTo("제안서 본문");
+        then(aiBriefProposalMapper).should(never()).apply(any(), any());
+    }
+
+    @Test
+    @DisplayName("본인 제안서가 아니면 AI 브리프 생성을 거부한다")
+    void failWhenProposalOwnerDoesNotMatch() {
+        Proposal proposal = createProposal("권한 확인용 원본 입력");
+        given(proposalRepository.findById(1L)).willReturn(Optional.of(proposal));
+
+        assertThatThrownBy(() -> proposalAiBriefService.generate(1L, "other@example.com"))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessage("본인 제안서에 대해서만 AI 브리프를 생성할 수 있습니다.");
+
+        then(aiBriefGenerator).should(never()).generate(any());
         then(aiBriefProposalMapper).should(never()).apply(any(), any());
     }
 

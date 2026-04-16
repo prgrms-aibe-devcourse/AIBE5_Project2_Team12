@@ -1,9 +1,10 @@
 package com.generic4.itda.controller;
 
+import static com.generic4.itda.fixture.MemberFixture.createMember;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
@@ -15,6 +16,7 @@ import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.dto.proposal.AiBriefPositionResult;
 import com.generic4.itda.dto.proposal.AiBriefResult;
 import com.generic4.itda.dto.proposal.AiBriefSkillResult;
+import com.generic4.itda.dto.security.ItDaPrincipal;
 import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.service.ProposalAiBriefService;
 import java.util.List;
@@ -22,6 +24,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -40,6 +44,9 @@ class ProposalAiBriefControllerTest {
     @Test
     @DisplayName("인증된 사용자가 AI 브리프 생성을 요청하면 JSON 결과를 반환한다")
     void generateAiBrief() throws Exception {
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("user@example.com", "hashed-password", "사용자", "010-1234-5678")
+        );
         AiBriefResult result = AiBriefResult.of(
                 "AI가 만든 제목",
                 "AI가 만든 설명",
@@ -62,10 +69,14 @@ class ProposalAiBriefControllerTest {
                         )
                 )
         );
-        given(proposalAiBriefService.generate(1L)).willReturn(result);
+        given(proposalAiBriefService.generate(1L, "user@example.com")).willReturn(result);
 
         mockMvc.perform(post("/proposals/{proposalId}/ai-brief", 1L)
-                        .with(user("user@example.com").roles("USER"))
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        )))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
@@ -76,7 +87,7 @@ class ProposalAiBriefControllerTest {
                 .andExpect(jsonPath("$.positions[0].skills[0].skillName").value("Java"))
                 .andExpect(jsonPath("$.positions[0].skills[0].importance").value("ESSENTIAL"));
 
-        then(proposalAiBriefService).should().generate(1L);
+        then(proposalAiBriefService).should().generate(1L, "user@example.com");
     }
 
     @Test

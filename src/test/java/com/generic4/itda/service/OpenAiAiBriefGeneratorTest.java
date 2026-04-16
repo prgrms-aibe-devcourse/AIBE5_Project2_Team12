@@ -1,5 +1,6 @@
 package com.generic4.itda.service;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
@@ -91,6 +92,7 @@ class OpenAiAiBriefGeneratorTest {
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.model").value("gpt-4.1-mini"))
                 .andExpect(jsonPath("$.input").value("프로젝트 원본 입력"))
+                .andExpect(jsonPath("$.instructions").value(containsString("expectedPeriod는 주 단위 기준 정수로 반환한다.")))
                 .andExpect(jsonPath("$.text.format.type").value("json_schema"))
                 .andRespond(withSuccess(
                         objectMapper.writeValueAsString(Map.of("output_text", briefJson)),

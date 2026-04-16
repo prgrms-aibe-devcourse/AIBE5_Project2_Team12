@@ -38,7 +38,7 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
             - 근거가 부족한 값은 추측하지 말고 필드를 생략한다.
             - workType은 SITE, REMOTE, HYBRID 중 하나만 사용한다.
             - totalBudgetMin, totalBudgetMax, unitBudgetMin, unitBudgetMax는 원화 기준 정수로 반환한다.
-            - expectedPeriod는 개월 수 기준 정수로 반환한다.
+            - expectedPeriod는 주 단위 기준 정수로 반환한다.
             - positions는 직무명별로 나누고 같은 직무를 중복 생성하지 않는다.
             - skills.importance는 ESSENTIAL 또는 PREFERENCE만 사용한다.
             - importance를 확신할 수 없으면 PREFERENCE를 사용한다.
