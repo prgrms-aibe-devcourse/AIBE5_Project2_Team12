@@ -14,8 +14,10 @@ import com.generic4.itda.domain.recommendation.constant.RecommendationAlgorithm;
 import com.generic4.itda.domain.recommendation.constant.RecommendationRunStatus;
 import com.generic4.itda.domain.recommendation.vo.HardFilterStat;
 import jakarta.persistence.EntityManager;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -34,6 +36,7 @@ class RecommendationRunRepositoryTest {
     @Autowired
     private EntityManager em;
 
+    private Proposal proposal;
     private ProposalPosition proposalPosition;
 
     @BeforeEach
@@ -41,7 +44,7 @@ class RecommendationRunRepositoryTest {
         Member member = memberRepository.save(createMember());
         Position position = persistPosition("백엔드 개발자");
 
-        Proposal proposal = Proposal.create(
+        proposal = Proposal.create(
                 member, "AI 매칭 플랫폼 구축", "원문 내용", null,
                 null, null, ProposalWorkType.REMOTE, null, null);
         proposalPosition = proposal.addPosition(position, 2L, 500_000L, 1_000_000L);
@@ -87,6 +90,65 @@ class RecommendationRunRepositoryTest {
         RecommendationRun found = recommendationRunRepository.findById(run.getId()).orElseThrow();
         assertThat(found.getStatus()).isEqualTo(RecommendationRunStatus.FAILED);
         assertThat(found.getErrorMessage()).isEqualTo(errorMessage);
+    }
+
+    @Nested
+    @DisplayName("findByProposalPosition_IdAndRequestFingerprintAndAlgorithm")
+    class FindByCompositeKey {
+
+        private static final String FP = "fp-target";
+        private static final RecommendationAlgorithm ALG = RecommendationAlgorithm.HEURISTIC_V1;
+
+        @BeforeEach
+        void saveRun() {
+            recommendationRunRepository.saveAndFlush(
+                    RecommendationRun.create(proposalPosition, FP, ALG, 5));
+            em.clear();
+        }
+
+        @Test
+        @DisplayName("세 필드가 모두 일치하면 해당 실행 이력이 조회된다")
+        void 세_필드가_모두_일치하면_조회된다() {
+            Optional<RecommendationRun> result =
+                    recommendationRunRepository.findByProposalPosition_IdAndRequestFingerprintAndAlgorithm(
+                            proposalPosition.getId(), FP, ALG);
+
+            assertThat(result).isPresent();
+        }
+
+        @Test
+        @DisplayName("requestFingerprint가 다르면 조회되지 않는다")
+        void requestFingerprint가_다르면_조회되지_않는다() {
+            Optional<RecommendationRun> result =
+                    recommendationRunRepository.findByProposalPosition_IdAndRequestFingerprintAndAlgorithm(
+                            proposalPosition.getId(), "fp-other", ALG);
+
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("algorithm이 다르면 조회되지 않는다")
+        void algorithm이_다르면_조회되지_않는다() {
+            Optional<RecommendationRun> result =
+                    recommendationRunRepository.findByProposalPosition_IdAndRequestFingerprintAndAlgorithm(
+                            proposalPosition.getId(), FP, RecommendationAlgorithm.VECTOR_ENGINE_V1);
+
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("proposalPositionId가 다르면 조회되지 않는다")
+        void proposalPositionId가_다르면_조회되지_않는다() {
+            Position otherPosition = persistPosition("프론트엔드 개발자");
+            ProposalPosition otherPP = proposal.addPosition(otherPosition, 1L, 300_000L, 600_000L);
+            proposalRepository.saveAndFlush(proposal);
+
+            Optional<RecommendationRun> result =
+                    recommendationRunRepository.findByProposalPosition_IdAndRequestFingerprintAndAlgorithm(
+                            otherPP.getId(), FP, ALG);
+
+            assertThat(result).isEmpty();
+        }
     }
 
     private Position persistPosition(String name) {
