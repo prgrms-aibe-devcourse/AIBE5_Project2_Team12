@@ -96,7 +96,8 @@ public class ResumeService {
         Member member = getMemberByEmail(email);
         Resume resume = resumeRepository.findByMemberId(member.getId())
                 .orElseThrow(() -> new IllegalStateException("이력서가 존재하지 않습니다."));
-        resume.getSkills().size(); // open-in-view: false 환경에서 트랜잭션 안에 Lazy 컬렉션 강제 초기화
+        resume.getSkills().size();       // open-in-view: false → Lazy 컬렉션 강제 초기화
+        resume.getAttachments().size();  // open-in-view: false → Lazy 컬렉션 강제 초기화
         return resume;
     }
 
