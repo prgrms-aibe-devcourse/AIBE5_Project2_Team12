@@ -38,4 +38,8 @@ public class ResumeForm {
 
     @NotNull(message = "작성 상태는 필수값입니다.")
     private ResumeWritingStatus writingStatus;
+
+    private boolean publiclyVisible = true;
+
+    private boolean aiMatchingEnabled = true;
 }
