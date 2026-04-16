@@ -1,7 +1,8 @@
-package com.generic4.itda.domain.recommendation;
+package com.generic4.itda.domain.recommendation.converter;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.generic4.itda.domain.recommendation.vo.HardFilterStat;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Convert;
 

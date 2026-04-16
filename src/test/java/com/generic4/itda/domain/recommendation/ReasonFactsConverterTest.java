@@ -2,6 +2,8 @@ package com.generic4.itda.domain.recommendation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.generic4.itda.domain.recommendation.converter.ReasonFactsConverter;
+import com.generic4.itda.domain.recommendation.vo.ReasonFacts;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 

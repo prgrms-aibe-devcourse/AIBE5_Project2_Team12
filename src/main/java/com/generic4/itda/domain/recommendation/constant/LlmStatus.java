@@ -1,4 +1,4 @@
-package com.generic4.itda.domain.recommendation;
+package com.generic4.itda.domain.recommendation.constant;
 
 import lombok.Getter;
 

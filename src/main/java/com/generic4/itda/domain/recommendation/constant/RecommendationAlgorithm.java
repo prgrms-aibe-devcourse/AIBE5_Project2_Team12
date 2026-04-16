@@ -1,4 +1,4 @@
-package com.generic4.itda.domain.recommendation;
+package com.generic4.itda.domain.recommendation.constant;
 
 import lombok.Getter;
 
@@ -18,5 +18,16 @@ public enum RecommendationAlgorithm {
 
     RecommendationAlgorithm(String code) {
         this.code = code;
+    }
+
+    @Getter
+    public enum RecommendationRunStatus {
+        PENDING("대기중"), RUNNING("실행중"), COMPUTED("계산 완료"), FAILED("실패");
+
+        private final String description;
+
+        RecommendationRunStatus(String description) {
+            this.description = description;
+        }
     }
 }

@@ -1,5 +1,8 @@
 package com.generic4.itda.domain.recommendation;
 
+import com.generic4.itda.domain.recommendation.constant.LlmStatus;
+import com.generic4.itda.domain.recommendation.converter.ReasonFactsConverter;
+import com.generic4.itda.domain.recommendation.vo.ReasonFacts;
 import com.generic4.itda.domain.resume.Resume;
 import com.generic4.itda.domain.shared.BaseEntity;
 import jakarta.persistence.Column;
@@ -133,7 +136,7 @@ public class RecommendationResult extends BaseEntity {
 
     public void markLlmFailed() {
         Assert.state(this.llmStatus == LlmStatus.PENDING, "LLM 상태는 PENDING에서만 변경할 수 있습니다.");
-        
+
         this.llmReason = null;
         this.llmStatus = LlmStatus.FAILED;
     }

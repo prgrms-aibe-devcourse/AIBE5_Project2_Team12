@@ -1,14 +1,16 @@
 package com.generic4.itda.domain.recommendation;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+
 import com.generic4.itda.domain.proposal.ProposalPosition;
+import com.generic4.itda.domain.recommendation.constant.RecommendationAlgorithm;
+import com.generic4.itda.domain.recommendation.vo.HardFilterStat;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.mock;
 
 class RecommendationRunTest {
 
@@ -38,7 +40,7 @@ class RecommendationRunTest {
         void 생성_직후_상태는_PENDING() {
             RecommendationRun run = createPendingRun();
 
-            assertThat(run.getStatus()).isEqualTo(RecommendationRunStatus.PENDING);
+            assertThat(run.getStatus()).isEqualTo(RecommendationAlgorithm.RecommendationRunStatus.PENDING);
         }
 
         @Test
@@ -102,7 +104,7 @@ class RecommendationRunTest {
 
             run.markRunning();
 
-            assertThat(run.getStatus()).isEqualTo(RecommendationRunStatus.RUNNING);
+            assertThat(run.getStatus()).isEqualTo(RecommendationAlgorithm.RecommendationRunStatus.RUNNING);
         }
 
         @Test
@@ -113,7 +115,7 @@ class RecommendationRunTest {
 
             run.markCompleted(stat);
 
-            assertThat(run.getStatus()).isEqualTo(RecommendationRunStatus.COMPUTED);
+            assertThat(run.getStatus()).isEqualTo(RecommendationAlgorithm.RecommendationRunStatus.COMPUTED);
         }
 
         @Test
@@ -124,7 +126,7 @@ class RecommendationRunTest {
 
             run.markFailed("AI 서버 연결 실패");
 
-            assertThat(run.getStatus()).isEqualTo(RecommendationRunStatus.FAILED);
+            assertThat(run.getStatus()).isEqualTo(RecommendationAlgorithm.RecommendationRunStatus.FAILED);
         }
     }
 

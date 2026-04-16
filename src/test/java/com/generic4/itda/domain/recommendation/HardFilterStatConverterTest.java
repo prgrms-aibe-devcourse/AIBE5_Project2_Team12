@@ -2,6 +2,8 @@ package com.generic4.itda.domain.recommendation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.generic4.itda.domain.recommendation.converter.HardFilterStatConverter;
+import com.generic4.itda.domain.recommendation.vo.HardFilterStat;
 import org.junit.jupiter.api.Test;
 
 class HardFilterStatConverterTest {

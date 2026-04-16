@@ -1,17 +1,18 @@
 package com.generic4.itda.domain.recommendation;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+
+import com.generic4.itda.domain.recommendation.constant.LlmStatus;
+import com.generic4.itda.domain.recommendation.vo.ReasonFacts;
 import com.generic4.itda.domain.resume.Resume;
+import java.math.BigDecimal;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-
-import java.math.BigDecimal;
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.mock;
 
 class RecommendationResultTest {
 
@@ -98,7 +99,8 @@ class RecommendationResultTest {
         @DisplayName("recommendationRun이 null이면 예외가 발생한다")
         void recommendationRun_null이면_예외() {
             assertThatThrownBy(() ->
-                    RecommendationResult.create(null, mockResume, 1, new BigDecimal("0.5"), new BigDecimal("0.5"), reasonFacts))
+                    RecommendationResult.create(null, mockResume, 1, new BigDecimal("0.5"), new BigDecimal("0.5"),
+                            reasonFacts))
                     .isInstanceOf(IllegalArgumentException.class);
         }
 
@@ -106,7 +108,8 @@ class RecommendationResultTest {
         @DisplayName("resume이 null이면 예외가 발생한다")
         void resume_null이면_예외() {
             assertThatThrownBy(() ->
-                    RecommendationResult.create(mockRun, null, 1, new BigDecimal("0.5"), new BigDecimal("0.5"), reasonFacts))
+                    RecommendationResult.create(mockRun, null, 1, new BigDecimal("0.5"), new BigDecimal("0.5"),
+                            reasonFacts))
                     .isInstanceOf(IllegalArgumentException.class);
         }
 
@@ -114,7 +117,8 @@ class RecommendationResultTest {
         @DisplayName("rank가 0이면 예외가 발생한다")
         void rank_0이면_예외() {
             assertThatThrownBy(() ->
-                    RecommendationResult.create(mockRun, mockResume, 0, new BigDecimal("0.5"), new BigDecimal("0.5"), reasonFacts))
+                    RecommendationResult.create(mockRun, mockResume, 0, new BigDecimal("0.5"), new BigDecimal("0.5"),
+                            reasonFacts))
                     .isInstanceOf(IllegalArgumentException.class);
         }
 
@@ -122,7 +126,8 @@ class RecommendationResultTest {
         @DisplayName("rank가 음수이면 예외가 발생한다")
         void rank_음수이면_예외() {
             assertThatThrownBy(() ->
-                    RecommendationResult.create(mockRun, mockResume, -1, new BigDecimal("0.5"), new BigDecimal("0.5"), reasonFacts))
+                    RecommendationResult.create(mockRun, mockResume, -1, new BigDecimal("0.5"), new BigDecimal("0.5"),
+                            reasonFacts))
                     .isInstanceOf(IllegalArgumentException.class);
         }
 
@@ -146,7 +151,8 @@ class RecommendationResultTest {
         @DisplayName("reasonFacts가 null이면 예외가 발생한다")
         void reasonFacts_null이면_예외() {
             assertThatThrownBy(() ->
-                    RecommendationResult.create(mockRun, mockResume, 1, new BigDecimal("0.5"), new BigDecimal("0.5"), null))
+                    RecommendationResult.create(mockRun, mockResume, 1, new BigDecimal("0.5"), new BigDecimal("0.5"),
+                            null))
                     .isInstanceOf(IllegalArgumentException.class);
         }
 
@@ -154,7 +160,8 @@ class RecommendationResultTest {
         @DisplayName("finalScore가 0 미만이면 예외가 발생한다")
         void finalScore_0미만이면_예외() {
             assertThatThrownBy(() ->
-                    RecommendationResult.create(mockRun, mockResume, 1, new BigDecimal("-0.0001"), new BigDecimal("0.5"), reasonFacts))
+                    RecommendationResult.create(mockRun, mockResume, 1, new BigDecimal("-0.0001"),
+                            new BigDecimal("0.5"), reasonFacts))
                     .isInstanceOf(IllegalArgumentException.class);
         }
 
@@ -162,7 +169,8 @@ class RecommendationResultTest {
         @DisplayName("finalScore가 1 초과이면 예외가 발생한다")
         void finalScore_1초과이면_예외() {
             assertThatThrownBy(() ->
-                    RecommendationResult.create(mockRun, mockResume, 1, new BigDecimal("1.0001"), new BigDecimal("0.5"), reasonFacts))
+                    RecommendationResult.create(mockRun, mockResume, 1, new BigDecimal("1.0001"), new BigDecimal("0.5"),
+                            reasonFacts))
                     .isInstanceOf(IllegalArgumentException.class);
         }
 
@@ -170,7 +178,8 @@ class RecommendationResultTest {
         @DisplayName("embeddingScore가 0 미만이면 예외가 발생한다")
         void embeddingScore_0미만이면_예외() {
             assertThatThrownBy(() ->
-                    RecommendationResult.create(mockRun, mockResume, 1, new BigDecimal("0.5"), new BigDecimal("-0.0001"), reasonFacts))
+                    RecommendationResult.create(mockRun, mockResume, 1, new BigDecimal("0.5"),
+                            new BigDecimal("-0.0001"), reasonFacts))
                     .isInstanceOf(IllegalArgumentException.class);
         }
 
@@ -178,7 +187,8 @@ class RecommendationResultTest {
         @DisplayName("embeddingScore가 1 초과이면 예외가 발생한다")
         void embeddingScore_1초과이면_예외() {
             assertThatThrownBy(() ->
-                    RecommendationResult.create(mockRun, mockResume, 1, new BigDecimal("0.5"), new BigDecimal("1.0001"), reasonFacts))
+                    RecommendationResult.create(mockRun, mockResume, 1, new BigDecimal("0.5"), new BigDecimal("1.0001"),
+                            reasonFacts))
                     .isInstanceOf(IllegalArgumentException.class);
         }
     }
