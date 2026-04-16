@@ -3,128 +3,55 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout/base}">
 <head>
-    <title>프로필 관리 | IT-da</title>
+    <title>프로필 편집 | IT-da</title>
 </head>
 <body>
 <div layout:fragment="content">
+    <main class="min-h-screen bg-slate-50 py-10 px-6">
+        <div class="max-w-4xl mx-auto space-y-8">
 
-    <!-- Alpine.js: isNew면 처음부터 editing=true, 기존 이력서면 editing=false(읽기 전용) -->
-    <main class="min-h-screen bg-slate-50 py-10 px-6"
-          th:x-data="${' { editing: ' + isNew + ' } '}"
-          x-cloak>
-        <div class="max-w-4xl mx-auto space-y-6">
-
-            <!-- ===== 헤더 ===== -->
-            <div class="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm">
-                <div class="flex items-start justify-between gap-6">
-                    <!-- 프로필 사진 + 이름 + 뱃지 -->
-                    <div class="flex items-center gap-6">
-                        <div class="w-20 h-20 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center flex-shrink-0">
-                            <i data-lucide="camera" class="w-8 h-8 text-slate-300"></i>
-                        </div>
-                        <div class="space-y-2">
-                            <h2 class="text-2xl font-bold text-slate-900" th:text="${memberName}">이름</h2>
-                            <p class="text-sm text-slate-400" th:text="${memberEmail}">이메일</p>
-                            <!-- 상태 뱃지 (기존 이력서에서만 표시) -->
-                            <div class="flex flex-wrap items-center gap-2" th:if="${resume != null}">
-                                <span th:if="${resume.publiclyVisible}"
-                                      class="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">
-                                    <i data-lucide="eye" class="w-3 h-3"></i> 공개 중
-                                </span>
-                                <span th:unless="${resume.publiclyVisible}"
-                                      class="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full bg-slate-100 text-slate-400 border border-slate-200">
-                                    <i data-lucide="eye-off" class="w-3 h-3"></i> 비공개
-                                </span>
-                                <span th:if="${resume.aiMatchingEnabled}"
-                                      class="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-100">
-                                    <i data-lucide="zap" class="w-3 h-3"></i> AI 추천 포함
-                                </span>
-                                <span th:if="${resume?.writingStatus?.name() == 'DONE'}"
-                                      class="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full bg-violet-50 text-violet-600 border border-violet-100">
-                                    <i data-lucide="file-check" class="w-3 h-3"></i> 작성 완료
-                                </span>
-                                <span th:if="${resume?.writingStatus?.name() == 'WRITING'}"
-                                      class="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full bg-amber-50 text-amber-600 border border-amber-100">
-                                    <i data-lucide="pencil" class="w-3 h-3"></i> 작성 중
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 버튼 영역 -->
-                    <div class="flex gap-3 flex-shrink-0">
-                        <!-- 수정하기 버튼: 읽기 전용 상태에서만 표시 -->
-                        <button type="button"
-                                x-show="!editing"
-                                @click="editing = true"
-                                class="inline-flex items-center gap-2 border border-slate-300 text-slate-700 px-6 py-3 rounded-2xl font-bold text-sm hover:border-blue-400 hover:text-blue-600 transition-all">
-                            <i data-lucide="pencil" class="w-4 h-4"></i> 수정하기
-                        </button>
-                        <!-- 취소 버튼: 기존 이력서(isNew=false)일 때만 렌더링, 편집 중에만 표시 -->
-                        <button type="button"
-                                th:if="${!isNew}"
-                                x-show="editing"
-                                @click="editing = false"
-                                class="inline-flex items-center gap-2 border border-slate-200 text-slate-400 px-6 py-3 rounded-2xl font-bold text-sm hover:bg-slate-50 transition-all">
-                            취소
-                        </button>
-                        <!-- 저장하기 버튼: 편집 중일 때만 표시 -->
-                        <button type="submit" form="profileForm"
-                                x-show="editing"
-                                class="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-2xl font-bold text-sm hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-95">
-                            <i data-lucide="save" class="w-4 h-4"></i> 저장하기
-                        </button>
-                    </div>
+            <div class="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm flex items-center justify-between">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-900" th:text="${isNew ? '새 이력서 작성' : '이력서 수정'}">제목</h2>
+                    <p class="text-sm text-slate-400">정보를 입력하고 저장하기를 눌러주세요.</p>
+                </div>
+                <div class="flex gap-3">
+                    <a th:href="@{/resume}" class="px-6 py-3 text-slate-400 font-bold text-sm hover:text-slate-600 transition-all">취소</a>
+                    <button type="submit" form="profileForm"
+                            class="bg-blue-600 text-white px-8 py-3 rounded-2xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-95">
+                        <i data-lucide="save" class="w-4 h-4 inline-block mr-2"></i>저장하기
+                    </button>
                 </div>
             </div>
 
-            <!-- ===== 메인 폼 ===== -->
-            <form id="profileForm"
-                  th:with="formAction=${isNew} ? '/resume/new' : '/resume/edit'"
-                  th:action="@{${formAction}}"
-                  th:object="${resumeForm}" method="post" class="space-y-6">
+            <form id="profileForm" th:action="${isNew ? '/resume/new' : '/resume/edit'}" th:object="${resumeForm}" method="post" class="space-y-8">
 
-                <!-- 글로벌 에러 -->
-                <div th:if="${#fields.hasGlobalErrors()}"
-                     class="bg-red-50 border border-red-200 rounded-2xl px-6 py-4">
-                    <p th:each="err : ${#fields.globalErrors()}" th:text="${err}"
-                       class="text-sm text-red-600 font-medium"></p>
-                </div>
-
-                <!-- ===== 공개 및 추천 설정 ===== -->
-                <section class="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm space-y-5">
+                <section class="space-y-5">
                     <h3 class="text-base font-bold text-slate-700">공개 및 추천 설정</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-                        <!-- 프로필 공개 여부 -->
-                        <label class="flex items-center justify-between p-5 border border-slate-200 rounded-2xl transition-all"
-                               :class="editing ? 'cursor-pointer hover:border-blue-300' : 'cursor-default'">
+                        <label class="flex items-center justify-between p-6 border border-slate-200 rounded-2xl bg-white shadow-sm cursor-pointer hover:border-blue-300 transition-all">
                             <div class="space-y-1">
-                                <div class="flex items-center gap-2">
+                                <div class="flex items-center gap-3">
                                     <i data-lucide="eye" class="w-5 h-5 text-slate-400"></i>
-                                    <span class="text-sm font-bold text-slate-800">프로필 공개 여부</span>
+                                    <span class="text-sm font-bold text-slate-800">프로필 공개</span>
                                 </div>
-                                <p class="text-xs text-slate-400 ml-7">검색 결과 및 리스트에 내 프로필이 노출됩니다.</p>
+                                <p class="text-xs text-slate-400 ml-8">검색 결과에 노출됩니다.</p>
                             </div>
-                            <div class="relative flex-shrink-0 ml-4" :class="editing ? '' : 'pointer-events-none'">
+                            <div class="relative">
                                 <input type="checkbox" th:field="*{publiclyVisible}" class="sr-only peer">
                                 <div class="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:bg-blue-600 transition-colors"></div>
                                 <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5"></div>
                             </div>
                         </label>
-
-                        <!-- AI 추천 포함 여부 -->
-                        <label class="flex items-center justify-between p-5 border border-slate-200 rounded-2xl transition-all"
-                               :class="editing ? 'cursor-pointer hover:border-blue-300' : 'cursor-default'">
+                        <label class="flex items-center justify-between p-6 border border-slate-200 rounded-2xl bg-white shadow-sm cursor-pointer hover:border-blue-300 transition-all">
                             <div class="space-y-1">
-                                <div class="flex items-center gap-2">
+                                <div class="flex items-center gap-3">
                                     <i data-lucide="zap" class="w-5 h-5 text-slate-400"></i>
-                                    <span class="text-sm font-bold text-slate-800">AI 추천 포함 여부</span>
+                                    <span class="text-sm font-bold text-slate-800">AI 추천 포함</span>
                                 </div>
-                                <p class="text-xs text-slate-400 ml-7">클라이언트에게 AI 추천 후보로 제안됩니다.</p>
-                                <p class="text-xs text-slate-300 ml-7">* 직접 지원은 이 설정과 무관하게 언제나 가능합니다.</p>
+                                <p class="text-xs text-slate-400 ml-8">AI 매칭 후보로 제안됩니다.</p>
                             </div>
-                            <div class="relative flex-shrink-0 ml-4" :class="editing ? '' : 'pointer-events-none'">
+                            <div class="relative">
                                 <input type="checkbox" th:field="*{aiMatchingEnabled}" class="sr-only peer">
                                 <div class="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:bg-blue-600 transition-colors"></div>
                                 <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5"></div>
@@ -133,264 +60,36 @@
                     </div>
                 </section>
 
-                <!-- ===== 자기소개 ===== -->
-                <section class="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm space-y-4">
-                    <h3 class="text-base font-bold text-slate-700 flex items-center gap-2">
-                        <i data-lucide="message-square" class="w-5 h-5 text-blue-500"></i> 자기소개
-                    </h3>
-                    <!-- 읽기 전용 -->
-                    <p x-show="!editing"
-                       class="text-sm text-slate-600 leading-relaxed min-h-[80px] whitespace-pre-wrap"
-                       th:text="${resumeForm.introduction}"></p>
-                    <!-- 편집 모드 -->
-                    <textarea x-show="editing"
-                              th:field="*{introduction}" rows="5"
-                              class="w-full p-5 bg-slate-50 border border-slate-200 rounded-2xl text-sm text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all resize-none"
-                              placeholder="본인의 전문성을 나타낼 수 있는 소개글을 작성해주세요."></textarea>
-                    <span th:if="${#fields.hasErrors('introduction')}" th:errors="*{introduction}"
-                          class="text-red-500 text-xs"></span>
+                <section class="space-y-4">
+                    <h3 class="text-base font-bold text-slate-700">자기소개</h3>
+                    <textarea th:field="*{introduction}" rows="6"
+                              class="w-full p-6 bg-white border border-slate-200 rounded-2xl text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all resize-none"></textarea>
                 </section>
 
-                <!-- ===== 선호 근무 형태 및 연락처 ===== -->
-                <section class="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm space-y-6">
-                    <h3 class="text-base font-bold text-slate-700 flex items-center gap-2">
-                        <i data-lucide="briefcase" class="w-5 h-5 text-blue-500"></i> 선호 근무 형태 및 연락처
-                    </h3>
+                <section class="space-y-6">
+                    <h3 class="text-base font-bold text-slate-700">근무 형태 및 연락처</h3>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-                        <!-- 경력 연차 -->
-                        <div class="space-y-2">
-                            <label class="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">경력 연차</label>
-                            <!-- 읽기 -->
-                            <div x-show="!editing"
-                                 class="px-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm text-slate-700 font-medium">
-                                <span th:text="${resumeForm.careerYears != null ? resumeForm.careerYears + '년' : '-'}"></span>
-                            </div>
-                            <!-- 편집 -->
-                            <input x-show="editing" type="number" th:field="*{careerYears}" min="0" max="50"
-                                   class="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all">
-                            <span th:if="${#fields.hasErrors('careerYears')}" th:errors="*{careerYears}"
-                                  class="text-red-500 text-xs ml-1"></span>
+                        <div class="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm">
+                            <label class="text-xs font-bold text-slate-400 uppercase ml-1 mb-2 block">경력 연차</label>
+                            <input type="number" th:field="*{careerYears}" class="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm">
                         </div>
-
-                        <!-- 근무 방식 -->
-                        <div class="space-y-2">
-                            <label class="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">근무 방식</label>
-                            <!-- 읽기 -->
-                            <div x-show="!editing"
-                                 class="px-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm text-slate-700 font-medium">
-                                <span th:text="${resumeForm.preferredWorkType != null ? resumeForm.preferredWorkType.description : '-'}"></span>
-                            </div>
-                            <!-- 편집 -->
-                            <select x-show="editing" th:field="*{preferredWorkType}"
-                                    class="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all appearance-none">
+                        <div class="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm">
+                            <label class="text-xs font-bold text-slate-400 uppercase ml-1 mb-2 block">근무 방식</label>
+                            <select th:field="*{preferredWorkType}" class="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm appearance-none">
                                 <option value="">선택 안함</option>
                                 <option th:each="wt : ${workTypes}" th:value="${wt}" th:text="${wt.description}"></option>
                             </select>
                         </div>
-
-                        <!-- 작성 상태 -->
-                        <div class="space-y-2">
-                            <label class="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">작성 상태</label>
-                            <!-- 읽기 -->
-                            <div x-show="!editing"
-                                 class="px-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm text-slate-700 font-medium">
-                                <span th:text="${resumeForm.writingStatus != null ? resumeForm.writingStatus.description : '-'}"></span>
-                            </div>
-                            <!-- 편집 -->
-                            <select x-show="editing" th:field="*{writingStatus}"
-                                    class="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all appearance-none">
+                        <div class="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm">
+                            <label class="text-xs font-bold text-slate-400 uppercase ml-1 mb-2 block">작성 상태</label>
+                            <select th:field="*{writingStatus}" class="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm appearance-none">
                                 <option th:each="ws : ${writingStatuses}" th:value="${ws}" th:text="${ws.description}"></option>
                             </select>
-                            <span th:if="${#fields.hasErrors('writingStatus')}" th:errors="*{writingStatus}"
-                                  class="text-red-500 text-xs ml-1"></span>
-                        </div>
-
-                        <!-- 이메일 (항상 읽기 전용) -->
-                        <div class="space-y-2">
-                            <label class="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">이메일</label>
-                            <div class="relative">
-                                <i data-lucide="mail" class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4"></i>
-                                <input type="text" th:value="${memberEmail}" readonly
-                                       class="w-full pl-11 pr-4 py-4 bg-slate-100 border border-slate-100 rounded-2xl text-sm text-slate-400 cursor-not-allowed">
-                            </div>
-                        </div>
-
-                        <!-- 연락처 (항상 읽기 전용) -->
-                        <div class="space-y-2">
-                            <label class="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">연락처</label>
-                            <div class="relative">
-                                <i data-lucide="phone" class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4"></i>
-                                <input type="text" th:value="${memberPhone}" readonly
-                                       class="w-full pl-11 pr-4 py-4 bg-slate-100 border border-slate-100 rounded-2xl text-sm text-slate-400 cursor-not-allowed">
-                            </div>
-                        </div>
-
-                        <!-- 포트폴리오 URL -->
-                        <div class="space-y-2">
-                            <label class="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">포트폴리오 URL</label>
-                            <!-- 읽기 -->
-                            <div x-show="!editing" class="relative">
-                                <i data-lucide="link" class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4"></i>
-                                <div class="pl-11 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm text-slate-700 font-medium truncate"
-                                     th:text="${resumeForm.portfolioUrl != null ? resumeForm.portfolioUrl : '-'}"></div>
-                            </div>
-                            <!-- 편집 -->
-                            <div x-show="editing" class="relative">
-                                <i data-lucide="link" class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4"></i>
-                                <input type="text" th:field="*{portfolioUrl}" placeholder="https://..."
-                                       class="w-full pl-11 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all">
-                            </div>
                         </div>
                     </div>
                 </section>
-
-                <!-- hidden -->
                 <input type="hidden" th:if="${resumeForm.career != null}" th:field="*{career.version}">
-
             </form>
-
-            <!-- ===== 보유 스킬 ===== -->
-            <section class="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm space-y-5">
-                <h3 class="text-base font-bold text-slate-700 flex items-center gap-2">
-                    <i data-lucide="code-2" class="w-5 h-5 text-blue-500"></i> 보유 스킬
-                </h3>
-
-                <!-- 스킬 태그 목록 -->
-                <div class="flex flex-wrap gap-2">
-                    <th:block th:if="${resume != null}">
-                        <th:block th:each="rs : ${resume.skills}">
-                            <!-- 편집 모드: 삭제 버튼 있는 폼 -->
-                            <form x-show="editing"
-                                  th:action="@{/resume/skill/remove}" method="post"
-                                  class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-50 border border-blue-100 rounded-xl text-sm font-semibold text-blue-700 hover:border-red-200 hover:bg-red-50 hover:text-red-600 group transition-all">
-                                <input type="hidden" name="skillId" th:value="${rs.skill.id}">
-                                <span th:text="${rs.skill.name}"></span>
-                                <span class="text-xs opacity-60" th:text="${rs.proficiency.description}"></span>
-                                <button type="submit" class="ml-1 opacity-50 group-hover:opacity-100 transition-opacity">
-                                    <i data-lucide="x" class="w-3 h-3"></i>
-                                </button>
-                            </form>
-                            <!-- 읽기 모드: 태그만 표시 -->
-                            <span x-show="!editing"
-                                  class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-50 border border-blue-100 rounded-xl text-sm font-semibold text-blue-700">
-                                <span th:text="${rs.skill.name}"></span>
-                                <span class="text-xs opacity-60" th:text="${rs.proficiency.description}"></span>
-                            </span>
-                        </th:block>
-                    </th:block>
-                    <p th:if="${resume == null or (resume != null and #lists.isEmpty(resume.skills))}"
-                       class="text-sm text-slate-400 italic">등록된 기술 스택이 없습니다.</p>
-                </div>
-
-                <!-- 스킬 추가 폼: 편집 모드에서만 표시 -->
-                <form x-show="editing"
-                      th:action="@{/resume/skill/add}" th:object="${resumeSkillForm}" method="post"
-                      class="flex flex-wrap gap-3 pt-4 border-t border-slate-100">
-                    <div class="flex-1 min-w-[180px]">
-                        <select th:field="*{skillId}"
-                                class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm text-slate-700 focus:outline-none focus:border-blue-500 transition-all appearance-none">
-                            <option value="">스킬 선택</option>
-                            <option th:each="skill : ${skills}" th:value="${skill.id}" th:text="${skill.name}"></option>
-                        </select>
-                    </div>
-                    <div class="flex-1 min-w-[140px]">
-                        <select th:field="*{proficiency}"
-                                class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm text-slate-700 focus:outline-none focus:border-blue-500 transition-all appearance-none">
-                            <option value="">숙련도 선택</option>
-                            <option th:each="p : ${proficiencies}" th:value="${p}" th:text="${p.description}"></option>
-                        </select>
-                    </div>
-                    <button type="submit"
-                            class="inline-flex items-center gap-2 px-5 py-3 bg-blue-600 text-white rounded-2xl text-sm font-bold hover:bg-blue-700 transition-all active:scale-95 flex-shrink-0">
-                        <i data-lucide="plus" class="w-4 h-4"></i> 추가
-                    </button>
-                </form>
-            </section>
-
-            <!-- ===== 경력 사항 ===== -->
-            <section class="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm space-y-5">
-                <h3 class="text-base font-bold text-slate-700 flex items-center gap-2">
-                    <i data-lucide="building-2" class="w-5 h-5 text-blue-500"></i> 경력 사항
-                </h3>
-                <th:block th:if="${resume != null and resume.career != null and not #lists.isEmpty(resume.career.items)}">
-                    <th:block th:each="item : ${resume.career.items}">
-                        <div class="border border-slate-200 rounded-2xl p-6 space-y-2 hover:border-blue-200 transition-all">
-                            <div class="flex items-center justify-between">
-                                <span class="font-bold text-slate-800" th:text="${item.companyName}">회사명</span>
-                                <span class="text-xs text-slate-400"
-                                      th:text="${item.currentlyWorking} ? (${item.startYearMonth} + ' - 현재') : (${item.startYearMonth} + ' - ' + ${item.endYearMonth})">기간</span>
-                            </div>
-                            <p class="text-sm font-semibold text-blue-600" th:text="${item.position}">직무</p>
-                            <p class="text-sm text-slate-500" th:if="${item.summary != null}" th:text="${item.summary}">요약</p>
-                        </div>
-                    </th:block>
-                </th:block>
-                <p th:if="${resume == null or resume.career == null or #lists.isEmpty(resume.career.items)}"
-                   class="text-sm text-slate-400 italic">등록된 경력 사항이 없습니다.</p>
-            </section>
-
-            <!-- ===== 포트폴리오 / 첨부 파일 ===== -->
-            <section class="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm space-y-5">
-                <h3 class="text-base font-bold text-slate-700 flex items-center gap-2">
-                    <i data-lucide="paperclip" class="w-5 h-5 text-blue-500"></i> 포트폴리오 / 첨부 파일
-                </h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <th:block th:if="${resume != null and not #lists.isEmpty(resume.attachments)}">
-                        <th:block th:each="att : ${resume.attachments}">
-                            <div class="flex items-center justify-between p-4 border border-slate-200 rounded-2xl bg-slate-50 hover:border-blue-200 transition-all">
-                                <div class="flex items-center gap-3">
-                                    <i data-lucide="file-text" class="w-5 h-5 text-slate-400 flex-shrink-0"></i>
-                                    <p class="text-sm font-semibold text-slate-700 truncate" th:text="${att.file.originalName}">파일명</p>
-                                </div>
-                                <button x-show="editing" type="button" class="text-slate-300 hover:text-red-400 transition-colors flex-shrink-0 ml-3">
-                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
-                                </button>
-                            </div>
-                        </th:block>
-                    </th:block>
-                    <p th:if="${resume == null or #lists.isEmpty(resume.attachments)}"
-                       class="text-sm text-slate-400 italic col-span-2">등록된 첨부 파일이 없습니다.</p>
-                </div>
-            </section>
-
-            <!-- ===== DANGER ZONE ===== -->
-            <div class="border border-red-200 rounded-3xl overflow-hidden bg-white shadow-sm">
-                <div class="px-8 py-4 border-b border-red-100 bg-red-50/30">
-                    <h3 class="text-red-600 font-bold text-base tracking-tight">DANGER ZONE</h3>
-                </div>
-                <div class="divide-y divide-red-100">
-                    <div class="p-6 flex items-center justify-between">
-                        <div>
-                            <h4 class="text-slate-800 font-bold mb-1">이력서 활성화 상태 변경</h4>
-                            <div class="flex items-center gap-2 mb-1">
-                                <span class="text-sm text-slate-500">현재 상태:</span>
-                                <span th:if="${resume != null and resume?.status?.name() == 'ACTIVE'}"
-                                      class="text-sm font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">활성</span>
-                                <span th:if="${resume == null or resume?.status?.name() != 'ACTIVE'}" ...>
-                                      class="text-sm font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">비활성</span>
-                            </div>
-                            <p class="text-xs text-slate-400">비활성화 시 클라이언트 검색 결과에서 제외되며 AI 추천 대상에서 빠지게 됩니다.</p>
-                        </div>
-                        <button type="button"
-                                class="border border-red-200 text-red-500 px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-red-50 transition-all active:scale-95 whitespace-nowrap">
-                            이력서 비활성화
-                        </button>
-                    </div>
-                    <div class="p-6 flex items-center justify-between">
-                        <div>
-                            <h4 class="text-red-600 font-bold mb-1">이력서 삭제</h4>
-                            <p class="text-sm text-slate-500 mb-1">이 이력서의 모든 정보, 경력 사항, 포트폴리오 데이터가 영구적으로 삭제됩니다.</p>
-                            <p class="text-xs text-red-400 font-medium italic">이 작업은 되돌릴 수 없습니다. 신중하게 결정해 주세요.</p>
-                        </div>
-                        <button type="button"
-                                class="bg-red-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-red-700 shadow-lg shadow-red-200 transition-all active:scale-95 whitespace-nowrap">
-                            이력서 삭제하기
-                        </button>
-                    </div>
-                </div>
-            </div>
-
         </div>
     </main>
 </div>
