@@ -74,6 +74,10 @@ public class RecommendationRunService {
     private Proposal loadProposalDetail(Long proposalId) {
         Proposal proposal = proposalRepository.findWithPositionsById(proposalId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 제안서입니다."));
+
+        // Proposal -> positions, position -> skills 를 한 번에 fetch join 하면
+        // 컬렉션 중복 조회로 row 폭증과 순서 불안정 문제가 생길 수 있어
+        // skills 는 별도 조회로 영속성 컨텍스트에 적재한다.
         proposalRepository.findPositionsWithSkillsByProposalId(proposalId);
         return proposal;
     }
