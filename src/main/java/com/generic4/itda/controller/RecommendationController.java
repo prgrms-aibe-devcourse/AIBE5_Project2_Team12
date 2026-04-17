@@ -2,8 +2,10 @@ package com.generic4.itda.controller;
 
 import com.generic4.itda.dto.recommend.RecommendationEntryViewModel;
 import com.generic4.itda.dto.recommend.RecommendationRequestForm;
+import com.generic4.itda.dto.recommend.RecommendationRunStatusViewModel;
 import com.generic4.itda.dto.security.ItDaPrincipal;
 import com.generic4.itda.service.recommend.RecommendationEntryService;
+import com.generic4.itda.service.recommend.RecommendationRunQueryService;
 import com.generic4.itda.service.recommend.RecommendationRunService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,7 @@ public class RecommendationController {
 
     private final RecommendationEntryService recommendationEntryService;
     private final RecommendationRunService recommendationRunService;
+    private final RecommendationRunQueryService recommendationRunQueryService;
 
     @GetMapping("/proposals/{proposalId}/recommendations")
     public String entry(
@@ -72,6 +75,20 @@ public class RecommendationController {
             redirectAttributes.addFlashAttribute("errorMessage", toUserMessage(e));
             return "redirect:/proposals/{proposalId}/recommendations";
         }
+    }
+
+    @GetMapping("/proposals/{proposalId}/runs/{runId}")
+    public String runStatus(
+            @PathVariable Long proposalId,
+            @PathVariable Long runId,
+            @AuthenticationPrincipal ItDaPrincipal principal,
+            Model model
+    ) {
+        RecommendationRunStatusViewModel view = recommendationRunQueryService
+                .getRecommendationRunStatus(proposalId, runId, principal.getEmail());
+
+        model.addAttribute("view", view);
+        return "recommendation/status";
     }
 
     private static String toUserMessage(RuntimeException e) {
