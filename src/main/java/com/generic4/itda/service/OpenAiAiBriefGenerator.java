@@ -35,7 +35,7 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
             규칙:
             - 반드시 JSON만 반환한다.
             - title, description은 한국어로 자연스럽게 작성한다.
-            - 근거가 부족한 값은 추측하지 말고 필드를 생략한다.
+            - 근거가 부족한 값은 추측하지 말고 null로 반환한다.
             - workType은 SITE, REMOTE, HYBRID 중 하나만 사용한다.
             - totalBudgetMin, totalBudgetMax, unitBudgetMin, unitBudgetMax는 원화 기준 정수로 반환한다.
             - expectedPeriod는 주 단위 기준 정수로 반환한다.

@@ -2,6 +2,7 @@ package com.generic4.itda.service;
 
 import static com.generic4.itda.fixture.MemberFixture.createMember;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
@@ -111,6 +112,42 @@ class AiBriefProposalMapperTest {
         assertThat(proposal.getWorkType()).isEqualTo(ProposalWorkType.REMOTE);
         assertThat(proposal.getWorkPlace()).isEqualTo("강남");
         assertThat(proposal.getExpectedPeriod()).isEqualTo(8L);
+    }
+
+    @Test
+    @DisplayName("AI 응답에 값이 없으면 기존 제안서 정보와 모집 단위를 유지한다")
+    void apply_keepsExistingFieldsWhenAiReturnsNullOrEmpty() {
+        Proposal proposal = createProposal();
+        Position oldPosition = Position.create("디자이너");
+        Skill oldSkill = Skill.create("Figma", null);
+        ProposalPosition oldProposalPosition = proposal.addPosition(oldPosition, 1L, 1_000_000L, 2_000_000L);
+        oldProposalPosition.addSkill(oldSkill, ProposalPositionSkillImportance.ESSENTIAL);
+
+        AiBriefResult aiBriefResult = AiBriefResult.of(
+                " ",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of()
+        );
+
+        aiBriefProposalMapper.apply(proposal, aiBriefResult);
+
+        assertThat(proposal.getTitle()).isEqualTo("제안서 제목");
+        assertThat(proposal.getDescription()).isEqualTo("기존 설명");
+        assertThat(proposal.getTotalBudgetMin()).isEqualTo(1_000_000L);
+        assertThat(proposal.getTotalBudgetMax()).isEqualTo(2_000_000L);
+        assertThat(proposal.getWorkType()).isEqualTo(ProposalWorkType.SITE);
+        assertThat(proposal.getWorkPlace()).isEqualTo("서울");
+        assertThat(proposal.getExpectedPeriod()).isEqualTo(3L);
+        assertThat(proposal.getPositions()).hasSize(1);
+        assertThat(proposal.getPositions().get(0).getPosition().getName()).isEqualTo("디자이너");
+        assertThat(proposal.getPositions().get(0).getSkills())
+                .extracting(skill -> skill.getSkill().getName(), skill -> skill.getImportance())
+                .containsExactly(tuple("Figma", ProposalPositionSkillImportance.ESSENTIAL));
     }
 
     @Test
