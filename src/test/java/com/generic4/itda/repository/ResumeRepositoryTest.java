@@ -7,13 +7,16 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.generic4.itda.annotation.H2RepositoryTest;
 import com.generic4.itda.domain.member.Member;
+import com.generic4.itda.domain.resume.Proficiency;
 import com.generic4.itda.domain.resume.CareerEmploymentType;
 import com.generic4.itda.domain.resume.CareerItemPayload;
 import com.generic4.itda.domain.resume.CareerPayload;
 import com.generic4.itda.domain.resume.Resume;
 import com.generic4.itda.domain.resume.ResumeWritingStatus;
 import com.generic4.itda.domain.resume.WorkType;
+import com.generic4.itda.domain.skill.Skill;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceUnitUtil;
 import java.util.List;
 import java.util.Optional;
 
@@ -32,6 +35,9 @@ class ResumeRepositoryTest {
 
     @Autowired
     private EntityManager entityManager;
+
+    @Autowired
+    private SkillRepository skillRepository;
 
     @DisplayName("경력이 없는 CareerPayload도 JSON으로 정상 저장/조회된다")
     @Test
@@ -299,6 +305,57 @@ class ResumeRepositoryTest {
         assertThat(result).isEmpty();
     }
 
+    @DisplayName("findAllWithSkillsByIds는 skills와 skill 연관을 한 번에 조회하며 중복 없이 반환한다")
+    @Test
+    void findAllWithSkillsByIds_fetchesSkillsWithoutDuplicates() {
+        // given
+        Skill java = skillRepository.saveAndFlush(Skill.create("Java-fetch-join", null));
+        Skill spring = skillRepository.saveAndFlush(Skill.create("Spring-fetch-join", null));
+        Skill kotlin = skillRepository.saveAndFlush(Skill.create("Kotlin-fetch-join", null));
+
+        Resume first = createResume("fetch-1", (byte) 5);
+        first.addSkill(java, Proficiency.ADVANCED);
+        first.addSkill(spring, Proficiency.INTERMEDIATE);
+        Resume savedFirst = resumeRepository.saveAndFlush(first);
+
+        Resume second = createResume("fetch-2", (byte) 3);
+        second.addSkill(kotlin, Proficiency.BEGINNER);
+        Resume savedSecond = resumeRepository.saveAndFlush(second);
+
+        entityManager.clear();
+
+        PersistenceUnitUtil util = entityManager.getEntityManagerFactory().getPersistenceUnitUtil();
+        Resume lazyLoaded = resumeRepository.findById(savedFirst.getId()).orElseThrow();
+        assertThat(util.isLoaded(lazyLoaded, "skills")).isFalse();
+
+        entityManager.clear();
+
+        // when
+        List<Resume> found = resumeRepository.findAllWithSkillsByIds(List.of(savedFirst.getId(), savedSecond.getId()));
+
+        // then
+        assertThat(found).hasSize(2);
+        assertThat(found).extracting(Resume::getId)
+                .containsExactlyInAnyOrder(savedFirst.getId(), savedSecond.getId());
+
+        Resume fetchedFirst = found.stream()
+                .filter(resume -> resume.getId().equals(savedFirst.getId()))
+                .findFirst()
+                .orElseThrow();
+        Resume fetchedSecond = found.stream()
+                .filter(resume -> resume.getId().equals(savedSecond.getId()))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(util.isLoaded(fetchedFirst, "skills")).isTrue();
+        assertThat(util.isLoaded(fetchedSecond, "skills")).isTrue();
+        assertThat(fetchedFirst.getSkills()).hasSize(2);
+        assertThat(fetchedSecond.getSkills()).hasSize(1);
+        assertThat(util.isLoaded(fetchedFirst.getSkills().first(), "skill")).isTrue();
+        assertThat(fetchedFirst.getSkills()).extracting(resumeSkill -> resumeSkill.getSkill().getName())
+                .containsExactly("Java-fetch-join", "Spring-fetch-join");
+    }
+
 
     private static CareerPayload createCareerPayload() {
         CareerItemPayload item = new CareerItemPayload();
@@ -314,5 +371,26 @@ class ResumeRepositoryTest {
         CareerPayload payload = new CareerPayload();
         payload.getItems().add(item);
         return payload;
+    }
+
+    private Resume createResume(String suffix, byte careerYears) {
+        String phone = "010-0000-" + String.format("%04d", Math.abs(suffix.hashCode() % 10_000));
+        Member member = memberRepository.save(createMember(
+                "resume-" + suffix + "@example.com",
+                "hashed-password",
+                "name-" + suffix,
+                "nickname-" + suffix,
+                phone
+        ));
+
+        return Resume.create(
+                member,
+                "자기소개-" + suffix,
+                careerYears,
+                createCareerPayload(),
+                WorkType.REMOTE,
+                ResumeWritingStatus.DONE,
+                null
+        );
     }
 }
