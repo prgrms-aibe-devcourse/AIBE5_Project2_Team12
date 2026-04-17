@@ -7,6 +7,7 @@ import com.generic4.itda.domain.resume.Resume;
 import com.generic4.itda.domain.resume.ResumeWritingStatus;
 import com.generic4.itda.domain.resume.WorkType;
 import com.generic4.itda.domain.skill.Skill;
+import com.generic4.itda.dto.resume.ResumeForm;
 import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.ResumeRepository;
 import com.generic4.itda.repository.SkillRepository;
@@ -26,45 +27,51 @@ public class ResumeService {
     private final SkillRepository skillRepository;
 
     // 이력서 생성
-    public Resume create(
-            String email,
-            String introduction,
-            Byte careerYears,
-            CareerPayload career,
-            WorkType preferredWorkType,
-            ResumeWritingStatus writingStatus,
-            String portfolioUrl
-    ) {
-        Member member = getMemberByEmail(email);
-
-        if (resumeRepository.findByMemberId(member.getId()).isPresent()) {
+    @Transactional
+    public Resume create(String email, ResumeForm form) {
+        // 1. 존재 여부 확인 (리뷰어 제안 적용)
+        if (resumeRepository.existsByMemberEmail(email)) {
             throw new IllegalStateException("이미 이력서가 존재합니다.");
         }
 
-        Resume resume = Resume.create(member, introduction, careerYears, career,
-                preferredWorkType, writingStatus, portfolioUrl);
+        // 2. 회원 정보 조회
+        Member member = getMemberByEmail(email);
+
+        // 3. 엔티티 생성 시 form에서 데이터를 하나씩 꺼내서 전달
+        // ※ 여기서 에러가 났을 겁니다. Resume.create가 요구하는 인자 개수를 맞춰주세요.
+        Resume resume = Resume.create(
+                member,
+                form.getIntroduction(),
+                form.getCareerYears(),
+                form.getCareer(),
+                form.getPreferredWorkType(),
+                form.getWritingStatus(),
+                form.getPortfolioUrl()
+        );
 
         return resumeRepository.save(resume);
     }
 
     // 이력서 수정
-    public void update(
-            String email,
-            String introduction,
-            Byte careerYears,
-            CareerPayload career,
-            WorkType workType,
-            ResumeWritingStatus writingStatus,
-            String portfolioUrl,
-            boolean publiclyVisible,
-            boolean aiMatchingEnabled
-    ) {
+    public void update(String email, ResumeForm form) {
+        // 1. 이메일로 이력서 조회
         Resume resume = getResumeByEmail(email);
-        resume.update(introduction, careerYears, career, workType, writingStatus, portfolioUrl);
-        if (resume.isPubliclyVisible() != publiclyVisible) {
+
+        // 2. form에서 데이터를 꺼내서 엔티티 업데이트
+        resume.update(
+                form.getIntroduction(),
+                form.getCareerYears(),
+                form.getCareer(),
+                form.getPreferredWorkType(), // 서비스에서는 preferredWorkType, 엔티티는 workType일 수 있으니 이름 확인!
+                form.getWritingStatus(),
+                form.getPortfolioUrl()
+        );
+
+        // 3. 토글 로직도 form의 값으로 처리
+        if (resume.isPubliclyVisible() != form.isPubliclyVisible()) {
             resume.togglePubliclyVisible();
         }
-        if (resume.isAiMatchingEnabled() != aiMatchingEnabled) {
+        if (resume.isAiMatchingEnabled() != form.isAiMatchingEnabled()) {
             resume.toggleAiMatchingEnabled();
         }
     }
