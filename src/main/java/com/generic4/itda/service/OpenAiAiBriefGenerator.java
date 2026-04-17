@@ -110,17 +110,24 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
     private Map<String, Object> buildSchema() {
         Map<String, Object> schema = objectSchema();
 
+        schema.put("required", List.of(
+                "title",
+                "description",
+                "totalBudgetMin",
+                "totalBudgetMax",
+                "workType",
+                "workPlace",
+                "expectedPeriod",
+                "positions"
+        ));
         schema.put("properties", Map.of(
-                "title", Map.of("type", "string"),
-                "description", Map.of("type", "string"),
-                "totalBudgetMin", Map.of("type", "integer"),
-                "totalBudgetMax", Map.of("type", "integer"),
-                "workType", Map.of(
-                        "type", "string",
-                        "enum", List.of("SITE", "REMOTE", "HYBRID")
-                ),
-                "workPlace", Map.of("type", "string"),
-                "expectedPeriod", Map.of("type", "integer"),
+                "title", nullableStringSchema(),
+                "description", nullableStringSchema(),
+                "totalBudgetMin", nullableIntegerSchema(),
+                "totalBudgetMax", nullableIntegerSchema(),
+                "workType", nullableEnumSchema("SITE", "REMOTE", "HYBRID"),
+                "workPlace", nullableStringSchema(),
+                "expectedPeriod", nullableIntegerSchema(),
                 "positions", Map.of(
                         "type", "array",
                         "items", buildPositionSchema()
@@ -132,12 +139,12 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
 
     private Map<String, Object> buildPositionSchema() {
         Map<String, Object> schema = objectSchema();
-        schema.put("required", List.of("positionName", "skills"));
+        schema.put("required", List.of("positionName", "headCount", "unitBudgetMin", "unitBudgetMax", "skills"));
         schema.put("properties", Map.of(
                 "positionName", Map.of("type", "string"),
-                "headCount", Map.of("type", "integer"),
-                "unitBudgetMin", Map.of("type", "integer"),
-                "unitBudgetMax", Map.of("type", "integer"),
+                "headCount", nullableIntegerSchema(),
+                "unitBudgetMin", nullableIntegerSchema(),
+                "unitBudgetMax", nullableIntegerSchema(),
                 "skills", Map.of(
                         "type", "array",
                         "items", buildSkillSchema()
@@ -148,13 +155,10 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
 
     private Map<String, Object> buildSkillSchema() {
         Map<String, Object> schema = objectSchema();
-        schema.put("required", List.of("skillName"));
+        schema.put("required", List.of("skillName", "importance"));
         schema.put("properties", Map.of(
                 "skillName", Map.of("type", "string"),
-                "importance", Map.of(
-                        "type", "string",
-                        "enum", List.of("ESSENTIAL", "PREFERENCE")
-                )
+                "importance", nullableEnumSchema("ESSENTIAL", "PREFERENCE")
         ));
         return schema;
     }
@@ -164,6 +168,23 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
         schema.put("type", "object");
         schema.put("additionalProperties", false);
         return schema;
+    }
+
+    private Map<String, Object> nullableStringSchema() {
+        return Map.of("type", List.of("string", "null"));
+    }
+
+    private Map<String, Object> nullableIntegerSchema() {
+        return Map.of("type", List.of("integer", "null"));
+    }
+
+    private Map<String, Object> nullableEnumSchema(String... values) {
+        List<Object> enumValues = new ArrayList<>(List.of(values));
+        enumValues.add(null);
+        return Map.of(
+                "type", List.of("string", "null"),
+                "enum", enumValues
+        );
     }
 
     private String extractResponseText(JsonNode responseBody) {
