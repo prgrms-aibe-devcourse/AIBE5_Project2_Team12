@@ -15,7 +15,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.OrderBy;
@@ -45,13 +44,11 @@ public class Resume extends BaseEntity {
     @JoinColumn(name = "member_id", nullable = false, unique = true, updatable = false, referencedColumnName = "id")
     private Member member; // 회원 id
 
-    @Lob
     @Column(columnDefinition = "TEXT")
     private String introduction; // 자기소개
 
     private Byte careerYears; // 경력 연차
 
-    @Lob
     @Column(columnDefinition = "TEXT")
     @Convert(converter = CareerPayloadJsonConverter.class)
     private CareerPayload career; // 경력 상세 JSON

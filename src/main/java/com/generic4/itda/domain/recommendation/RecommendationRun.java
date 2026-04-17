@@ -15,7 +15,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
@@ -59,7 +58,6 @@ public class RecommendationRun extends BaseEntity {
     private int topK;
 
     @Convert(converter = HardFilterStatConverter.class)
-    @Lob
     @Column(name = "hard_filter_stats", columnDefinition = "TEXT")
     private HardFilterStat hardFilterStats;
 
@@ -67,7 +65,6 @@ public class RecommendationRun extends BaseEntity {
     @Column(nullable = false)
     private RecommendationAlgorithm.RecommendationRunStatus status;
 
-    @Lob
     @Column(columnDefinition = "TEXT")
     private String errorMessage;
 
