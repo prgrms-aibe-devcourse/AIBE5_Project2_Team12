@@ -9,6 +9,8 @@ import org.springframework.data.jpa.repository.Query;
 
 public interface ProposalRepository extends JpaRepository<Proposal, Long> {
 
+    Optional<Proposal> findByMemberIdAndTitle(Long memberId, String title);
+
     @Query("""
             select distinct p
             from Proposal p
