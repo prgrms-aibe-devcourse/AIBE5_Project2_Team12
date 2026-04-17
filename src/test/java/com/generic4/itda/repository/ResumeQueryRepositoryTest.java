@@ -90,6 +90,40 @@ class ResumeQueryRepositoryTest {
                 .containsExactly(13, 8, 8, 8, 9);
     }
 
+    @DisplayName("findCandidatePool은 정렬된 후보 중 limit 개수만 반환한다")
+    @Test
+    void findCandidatePool_appliesLimitAfterOrdering() {
+        // given
+        Skill java = skillRepository.saveAndFlush(Skill.create("Java-query-pool-limit", null));
+        Skill spring = skillRepository.saveAndFlush(Skill.create("Spring-query-pool-limit", null));
+
+        Resume strongest = saveResume("pool-limit-1", (byte) 5, true, true, true,
+                skill(java, Proficiency.ADVANCED),
+                skill(spring, Proficiency.INTERMEDIATE));
+        Resume higherCareer = saveResume("pool-limit-2", (byte) 10, true, true, true,
+                skill(java, Proficiency.INTERMEDIATE),
+                skill(spring, Proficiency.INTERMEDIATE));
+        saveResume("pool-limit-3", (byte) 7, true, true, true,
+                skill(java, Proficiency.INTERMEDIATE),
+                skill(spring, Proficiency.INTERMEDIATE));
+        saveResume("pool-limit-4", (byte) 20, true, true, true,
+                skill(java, Proficiency.ADVANCED));
+
+        // when
+        List<CandidatePoolRow> result = resumeQueryRepository.findCandidatePool(
+                List.of(java.getId(), spring.getId()),
+                2
+        );
+
+        // then
+        assertThat(result).hasSize(2);
+        assertThat(result).extracting(CandidatePoolRow::resumeId)
+                .containsExactly(
+                        strongest.getId(),
+                        higherCareer.getId()
+                );
+    }
+
     @DisplayName("findRecommendableResumeIds는 추천 가능 이력서만 경력과 id 순으로 조회한다")
     @Test
     void findRecommendableResumeIds_filtersAndOrdersResumes() {
@@ -110,6 +144,26 @@ class ResumeQueryRepositoryTest {
                 highestCareer.getId(),
                 mediumCareerLowId.getId(),
                 mediumCareerHighId.getId()
+        );
+    }
+
+    @DisplayName("findRecommendableResumeIds는 정렬된 이력서 중 limit 개수만 반환한다")
+    @Test
+    void findRecommendableResumeIds_appliesLimitAfterOrdering() {
+        // given
+        Resume highestCareer = saveResume("recommend-limit-1", (byte) 9, true, true, true);
+        Resume mediumCareerLowId = saveResume("recommend-limit-2", (byte) 5, true, true, true);
+        saveResume("recommend-limit-3", (byte) 5, true, true, true);
+        saveResume("recommend-limit-4", (byte) 1, true, true, true);
+
+        // when
+        List<Long> result = resumeQueryRepository.findRecommendableResumeIds(2);
+
+        // then
+        assertThat(result).hasSize(2);
+        assertThat(result).containsExactly(
+                highestCareer.getId(),
+                mediumCareerLowId.getId()
         );
     }
 
