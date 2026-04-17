@@ -293,31 +293,36 @@
                                   class="flex flex-wrap gap-3 items-end">
 
                                 <div class="flex-1 min-w-[160px]">
-                                    <label class="text-xs font-bold text-slate-400 block mb-1.5">스킬 선택</label>
+                                    <div class="flex justify-between items-end mb-1.5">
+                                        <label class="text-xs font-bold text-slate-400 block">스킬 선택</label>
+                                        <span th:if="${#fields.hasErrors('skillId')}"
+                                              class="text-[10px] text-red-500 font-bold animate-pulse"
+                                              th:errors="*{skillId}">필수값입니다.</span>
+                                    </div>
                                     <select th:field="*{skillId}"
+                                            th:classappend="${#fields.hasErrors('skillId')} ? 'border-red-400 ring-1 ring-red-400/10' : ''"
                                             class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm appearance-none focus:border-blue-400 focus:outline-none">
                                         <option value="">스킬 선택</option>
-                                        <option th:each="skill : ${skills}"
-                                                th:value="${skill.id}"
-                                                th:text="${skill.name}"></option>
+                                        <option th:each="skill : ${skills}" th:value="${skill.id}" th:text="${skill.name}"></option>
                                     </select>
-                                    <p th:if="${#fields.hasErrors('skillId')}"
-                                       class="text-xs text-red-500 mt-1"
-                                       th:errors="*{skillId}"></p>
                                 </div>
 
                                 <div class="flex-1 min-w-[120px]">
-                                    <label class="text-xs font-bold text-slate-400 block mb-1.5">숙련도</label>
+                                    <div class="flex justify-between items-end mb-1.5">
+                                        <label class="text-xs font-bold text-slate-400 block">숙련도</label>
+                                        <span th:if="${#fields.hasErrors('proficiency')}"
+                                              class="text-[10px] text-red-500 font-bold animate-pulse"
+                                              th:errors="*{proficiency}">필수값입니다.</span>
+                                    </div>
+
                                     <select th:field="*{proficiency}"
-                                            class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm appearance-none focus:border-blue-400 focus:outline-none">
+                                            th:classappend="${#fields.hasErrors('proficiency')} ? 'border-red-400 ring-1 ring-red-400/10' : ''"
+                                            class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm appearance-none focus:border-blue-400 focus:outline-none transition-all">
                                         <option value="">선택</option>
                                         <option th:each="p : ${proficiencies}"
                                                 th:value="${p}"
                                                 th:text="${p.description}"></option>
                                     </select>
-                                    <p th:if="${#fields.hasErrors('proficiency')}"
-                                       class="text-xs text-red-500 mt-1"
-                                       th:errors="*{proficiency}"></p>
                                 </div>
 
                                 <button type="submit"
