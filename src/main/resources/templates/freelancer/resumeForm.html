@@ -258,8 +258,15 @@
 
                                     <!-- 읽기 전용: 숙련도 텍스트 -->
                                     <span th:if="${!isEditing}"
-                                          class="text-xs text-slate-400 bg-white rounded-lg px-2 py-0.5 border border-slate-200"
-                                          th:text="${rs.proficiency.description}">중급</span>
+                                          class="text-xs font-bold px-2 py-0.5 rounded-lg border transition-colors"
+                                          th:text="${rs.proficiency.description}"
+                                          th:classappend="${
+                                              rs.proficiency.name() == 'BEGINNER' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                                              rs.proficiency.name() == 'INTERMEDIATE' ? 'bg-blue-50 text-blue-600 border-blue-200' :
+                                              rs.proficiency.name() == 'ADVANCED' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                                              'bg-slate-50 text-slate-400 border-slate-200'
+                                          }">중급
+                                    </span>
 
                                     <!-- 편집 모드: 삭제 버튼 (AJAX) -->
                                     <th:block th:if="${isEditing}">
