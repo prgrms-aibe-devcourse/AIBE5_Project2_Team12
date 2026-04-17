@@ -15,12 +15,14 @@ import com.generic4.itda.domain.recommendation.constant.RecommendationRunStatus;
 import com.generic4.itda.domain.recommendation.vo.HardFilterStat;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceUnitUtil;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 
 @RepositoryTest
 class RecommendationRunRepositoryTest {
@@ -212,9 +214,144 @@ class RecommendationRunRepositoryTest {
         }
     }
 
+    @Nested
+    @DisplayName("findPendingRunIds")
+    class FindPendingRunIds {
+
+        @Test
+        @DisplayName("PENDING 상태인 run id만 반환된다")
+        void PENDING_상태인_run_id만_반환된다() {
+            RecommendationRun pending = saveRunWithStatus(RecommendationRunStatus.PENDING);
+            saveRunWithStatus(RecommendationRunStatus.RUNNING);
+            saveRunWithStatus(RecommendationRunStatus.COMPUTED);
+            saveRunWithStatus(RecommendationRunStatus.FAILED);
+            em.clear();
+
+            List<Long> ids = recommendationRunRepository.findPendingRunIds(PageRequest.of(0, 100));
+
+            assertThat(ids).containsExactly(pending.getId());
+        }
+
+        @Test
+        @DisplayName("id asc 순으로 정렬되어 반환된다")
+        void id_asc_순으로_정렬되어_반환된다() {
+            RecommendationRun first = saveRunWithStatus(RecommendationRunStatus.PENDING);
+            RecommendationRun second = recommendationRunRepository.saveAndFlush(
+                    RecommendationRun.create(proposalPosition, "fp-second", RecommendationAlgorithm.VECTOR_ENGINE_V1,
+                            5));
+            em.clear();
+
+            List<Long> ids = recommendationRunRepository.findPendingRunIds(PageRequest.of(0, 100));
+
+            assertThat(ids).containsExactly(first.getId(), second.getId());
+        }
+
+        @Test
+        @DisplayName("PageRequest size 1 적용 시 1건만 반환된다")
+        void PageRequest_size_1_적용_시_1건만_반환된다() {
+            saveRunWithStatus(RecommendationRunStatus.PENDING);
+            recommendationRunRepository.saveAndFlush(
+                    RecommendationRun.create(proposalPosition, "fp-second", RecommendationAlgorithm.VECTOR_ENGINE_V1,
+                            5));
+            em.clear();
+
+            List<Long> ids = recommendationRunRepository.findPendingRunIds(PageRequest.of(0, 1));
+
+            assertThat(ids).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("PENDING run이 없으면 빈 리스트를 반환한다")
+        void PENDING_run이_없으면_빈_리스트를_반환한다() {
+            saveRunWithStatus(RecommendationRunStatus.RUNNING);
+            em.clear();
+
+            List<Long> ids = recommendationRunRepository.findPendingRunIds(PageRequest.of(0, 100));
+
+            assertThat(ids).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("claimAsRunning")
+    class ClaimAsRunning {
+
+        @Test
+        @DisplayName("PENDING 상태 run 점유 시 update count가 1이다")
+        void PENDING_상태_run_점유_시_update_count가_1이다() {
+            RecommendationRun run = saveRunWithStatus(RecommendationRunStatus.PENDING);
+
+            int count = recommendationRunRepository.claimAsRunning(run.getId());
+
+            assertThat(count).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("claimAsRunning 후 DB에서 다시 조회하면 RUNNING 상태이고 errorMessage가 null이다")
+        void claimAsRunning_후_상태가_RUNNING이고_errorMessage가_null이다() {
+            RecommendationRun run = saveRunWithStatus(RecommendationRunStatus.PENDING);
+
+            recommendationRunRepository.claimAsRunning(run.getId());
+            em.clear();
+
+            RecommendationRun found = recommendationRunRepository.findById(run.getId()).orElseThrow();
+            assertThat(found.getStatus()).isEqualTo(RecommendationRunStatus.RUNNING);
+            assertThat(found.getErrorMessage()).isNull();
+        }
+
+        @Test
+        @DisplayName("같은 run을 두 번 호출하면 첫 번째만 1, 두 번째는 0이다")
+        void 같은_run을_두_번_호출하면_첫_번째만_성공한다() {
+            RecommendationRun run = saveRunWithStatus(RecommendationRunStatus.PENDING);
+
+            int first = recommendationRunRepository.claimAsRunning(run.getId());
+            int second = recommendationRunRepository.claimAsRunning(run.getId());
+
+            assertThat(first).isEqualTo(1);
+            assertThat(second).isEqualTo(0);
+        }
+
+        @Test
+        @DisplayName("RUNNING 상태 run은 점유되지 않는다")
+        void RUNNING_상태_run은_점유되지_않는다() {
+            RecommendationRun run = saveRunWithStatus(RecommendationRunStatus.RUNNING);
+
+            int count = recommendationRunRepository.claimAsRunning(run.getId());
+
+            assertThat(count).isEqualTo(0);
+        }
+
+        @Test
+        @DisplayName("COMPUTED 또는 FAILED 상태 run은 점유되지 않는다")
+        void COMPUTED_또는_FAILED_상태_run은_점유되지_않는다() {
+            RecommendationRun computed = saveRunWithStatus(RecommendationRunStatus.COMPUTED);
+            RecommendationRun failed = saveRunWithStatus(RecommendationRunStatus.FAILED);
+
+            assertThat(recommendationRunRepository.claimAsRunning(computed.getId())).isEqualTo(0);
+            assertThat(recommendationRunRepository.claimAsRunning(failed.getId())).isEqualTo(0);
+        }
+    }
+
     private Position persistPosition(String name) {
         Position position = Position.create(name);
         em.persist(position);
         return position;
+    }
+
+    private RecommendationRun saveRunWithStatus(RecommendationRunStatus targetStatus) {
+        RecommendationRun run = recommendationRunRepository.saveAndFlush(
+                RecommendationRun.create(proposalPosition, "fp-" + targetStatus.name().toLowerCase(),
+                        RecommendationAlgorithm.HEURISTIC_V1, 5));
+        if (targetStatus == RecommendationRunStatus.RUNNING
+                || targetStatus == RecommendationRunStatus.COMPUTED
+                || targetStatus == RecommendationRunStatus.FAILED) {
+            run.markRunning();
+        }
+        if (targetStatus == RecommendationRunStatus.COMPUTED) {
+            run.markCompleted(new HardFilterStat(10, 8, 6, 3));
+        } else if (targetStatus == RecommendationRunStatus.FAILED) {
+            run.markFailed("의도된 실패");
+        }
+        return recommendationRunRepository.saveAndFlush(run);
     }
 }
