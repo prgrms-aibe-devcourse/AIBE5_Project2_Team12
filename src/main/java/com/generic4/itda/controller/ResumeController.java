@@ -85,15 +85,7 @@ public class ResumeController {
         }
 
         try {
-            resumeService.create(
-                    principal.getEmail(),
-                    form.getIntroduction(),
-                    form.getCareerYears(),
-                    form.getCareer(),
-                    form.getPreferredWorkType(),
-                    form.getWritingStatus(),
-                    form.getPortfolioUrl()
-            );
+            resumeService.create(principal.getEmail(), form);
         } catch (IllegalStateException e) {
             bindingResult.reject("resumeExists", e.getMessage());
             addCommonAttributes(model);
@@ -144,17 +136,7 @@ public class ResumeController {
         }
 
         try {
-            resumeService.update(
-                    principal.getEmail(),
-                    form.getIntroduction(),
-                    form.getCareerYears(),
-                    form.getCareer(),
-                    form.getPreferredWorkType(),
-                    form.getWritingStatus(),
-                    form.getPortfolioUrl(),
-                    form.isPubliclyVisible(),
-                    form.isAiMatchingEnabled()
-            );
+            resumeService.update(principal.getEmail(), form);
         } catch (IllegalStateException e) {
             return "redirect:/resumes/new";
         }

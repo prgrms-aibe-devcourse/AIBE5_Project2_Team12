@@ -7,4 +7,6 @@ import java.util.Optional;
 
 public interface ResumeRepository extends JpaRepository<Resume, Long> {
     Optional<Resume> findByMemberId(Long memberId);
+
+    boolean existsByMemberEmail(String email);
 }
