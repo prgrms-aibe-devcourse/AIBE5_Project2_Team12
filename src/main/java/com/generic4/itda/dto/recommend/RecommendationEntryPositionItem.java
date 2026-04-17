@@ -7,8 +7,7 @@ public record RecommendationEntryPositionItem(
         String positionName,
         Long headCount,
         String budgetText,
-        List<RecommendationEntrySkillItem> skills,
-        boolean selected
+        List<RecommendationEntrySkillItem> skills
 ) {
 
 }
