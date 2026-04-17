@@ -47,7 +47,7 @@
 
                             <!-- [기존 이력서 - 읽기 전용] 수정하기 -->
                             <th:block th:if="${isNew eq false and isEditing eq false}">
-                                <a th:href="@{/resume/edit(mode='modify')}"
+                                <a th:href="@{/resumes/edit}"
                                    class="bg-white border border-slate-300 text-slate-700 px-8 py-3 rounded-2xl font-bold text-sm hover:border-blue-400 hover:text-blue-600 transition-all inline-flex items-center gap-2">
                                     <i data-lucide="pencil" class="w-4 h-4"></i>수정하기
                                 </a>
@@ -55,7 +55,7 @@
 
                             <!-- [기존 이력서 - 편집 모드] 취소 + 저장하기 -->
                             <th:block th:if="${isNew eq false and isEditing eq true}">
-                                <a th:href="@{/resume/edit}"
+                                <a th:href="@{/resumes/me}"
                                    class="px-6 py-3 text-slate-500 font-bold text-sm hover:text-slate-700 transition-all">취소</a>
                                 <button type="submit" form="profileForm"
                                         class="bg-blue-600 text-white px-8 py-3 rounded-2xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center gap-2">
@@ -69,7 +69,7 @@
 
                 <!-- ===== 메인 폼 ===== -->
                 <form id="profileForm"
-                      th:action="${isNew eq true ? '/resume/new' : '/resume/edit'}"
+                      th:action="${isNew eq true ? '/resumes/new' : '/resumes/edit'}"
                       th:object="${resumeForm}"
                       method="post"
                       class="space-y-6">
@@ -224,8 +224,8 @@
 
                 </form>
 
-                <!-- ===== 기술 스택 (폼 외부 — 별도 POST) ===== -->
-                <div class="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm space-y-5">
+                <!-- ===== 기술 스택 (AJAX — 별도 POST, #skillSection 전체 교체) ===== -->
+                <div id="skillSection" class="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm space-y-5">
                     <h3 class="text-base font-bold text-slate-700">기술 스택</h3>
 
                     <!-- 신규: 이력서 저장 전 안내 -->
@@ -239,13 +239,31 @@
                         <div th:if="${!resume.skills.isEmpty()}" class="flex flex-wrap gap-3">
                             <th:block th:each="rs : ${resume.skills}">
                                 <div class="flex items-center gap-2 bg-slate-100 rounded-xl px-4 py-2.5">
-                                    <span class="text-sm font-semibold text-slate-700"
-                                          th:text="${rs.skill.name}">스킬명</span>
-                                    <span class="text-xs text-slate-400 bg-white rounded-lg px-2 py-0.5 border border-slate-200"
-                                          th:text="${rs.proficiency.description}">중급</span>
-                                    <!-- 삭제 버튼: 편집 모드에서만 -->
+                                    <span class="text-sm font-semibold text-slate-700" th:text="${rs.skill.name}">스킬명</span>
+
+                                    <!-- 편집 모드: 숙련도 선택 (변경 즉시 AJAX) -->
                                     <th:block th:if="${isEditing}">
-                                        <form th:action="@{/resume/skill/remove}" method="post" class="inline">
+                                        <form th:action="@{/resumes/skill/update}" method="post" class="inline skill-update-form">
+                                            <input type="hidden" name="skillId" th:value="${rs.skill.id}">
+                                            <select name="proficiency"
+                                                    onchange="this.form.requestSubmit()"
+                                                    class="text-xs text-slate-600 bg-white rounded-lg px-2 py-0.5 border border-slate-200 focus:outline-none cursor-pointer">
+                                                <option th:each="p : ${proficiencies}"
+                                                        th:value="${p}"
+                                                        th:text="${p.description}"
+                                                        th:selected="${rs.proficiency == p}"></option>
+                                            </select>
+                                        </form>
+                                    </th:block>
+
+                                    <!-- 읽기 전용: 숙련도 텍스트 -->
+                                    <span th:if="${!isEditing}"
+                                          class="text-xs text-slate-400 bg-white rounded-lg px-2 py-0.5 border border-slate-200"
+                                          th:text="${rs.proficiency.description}">중급</span>
+
+                                    <!-- 편집 모드: 삭제 버튼 (AJAX) -->
+                                    <th:block th:if="${isEditing}">
+                                        <form th:action="@{/resumes/skill/remove}" method="post" class="inline skill-delete-form">
                                             <input type="hidden" name="skillId" th:value="${rs.skill.id}">
                                             <button type="submit"
                                                     class="text-slate-300 hover:text-red-400 transition-colors ml-1 flex items-center">
@@ -257,12 +275,12 @@
                             </th:block>
                         </div>
 
-                        <p th:if="${resume.skills.isEmpty()}"
-                           class="text-sm text-slate-400">등록된 스킬이 없습니다.</p>
+                        <p th:if="${resume.skills.isEmpty()}" class="text-sm text-slate-400">등록된 스킬이 없습니다.</p>
 
-                        <!-- 스킬 추가 폼: 편집 모드에서만 -->
+                        <!-- 스킬 추가 폼: 편집 모드에서만 (AJAX) -->
                         <div th:if="${isEditing}" class="border-t border-slate-100 pt-5">
-                            <form th:action="@{/resume/skill/add}"
+                            <form id="skillAddForm"
+                                  th:action="@{/resumes/skill/add}"
                                   th:object="${resumeSkillForm}"
                                   method="post"
                                   class="flex flex-wrap gap-3 items-end">
@@ -310,5 +328,42 @@
         </main>
     </div>
 </div>
+
+<th:block layout:fragment="scripts">
+<script>
+    /**
+     * 스킬 AJAX 처리
+     *   #skillAddForm      — 스킬 추가
+     *   .skill-delete-form — 스킬 삭제 (X 버튼)
+     *   .skill-update-form — 숙련도 변경 (select onchange → requestSubmit)
+     *
+     * 서버는 "freelancer/resumeForm :: #skillSection" fragment 반환
+     * → outerHTML 교체로 DOM 업데이트
+     */
+    document.addEventListener('submit', async function (e) {
+        const form = e.target;
+        if (!form.matches('#skillAddForm, .skill-delete-form, .skill-update-form')) return;
+
+        e.preventDefault();
+
+        try {
+            const response = await fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form)
+            });
+            if (!response.ok) return;
+
+            const html = await response.text();
+            const section = document.getElementById('skillSection');
+            if (section) {
+                section.outerHTML = html;
+                if (window.lucide) lucide.createIcons();
+            }
+        } catch (err) {
+            console.error('스킬 처리 중 오류:', err);
+        }
+    });
+</script>
+</th:block>
 </body>
 </html>
