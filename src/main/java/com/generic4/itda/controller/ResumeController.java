@@ -10,18 +10,15 @@ import com.generic4.itda.dto.security.ItDaPrincipal;
 import com.generic4.itda.service.ResumeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
 
 @Controller
-@RequestMapping("/resume")
+@RequestMapping("/resumes")
 @RequiredArgsConstructor
 public class ResumeController {
 
@@ -31,17 +28,33 @@ public class ResumeController {
     public String index(@AuthenticationPrincipal ItDaPrincipal principal) {
         try {
             resumeService.findByEmail(principal.getEmail());
-            return "redirect:/resume/edit";
+            return "redirect:/resumes/me";
         } catch (IllegalStateException ignored) {
-            return "redirect:/resume/new";
+            return "redirect:/resumes/new";
         }
+    }
+
+    @GetMapping("/me")
+    public String viewFrom (@AuthenticationPrincipal ItDaPrincipal principal, Model model){
+        Resume resume = resumeService.findByEmail(principal.getEmail());
+        ResumeForm form = convertToForm(resume);
+
+        addCommonAttributes(model);
+        addMemberAttributes(model, principal);
+
+        model.addAttribute("resumeForm", form);
+        model.addAttribute("resume", resume);
+        model.addAttribute("isNew", false);
+        model.addAttribute("editable", false);
+
+        return "freelancer/resumeForm";
     }
 
     @GetMapping("/new")
     public String newForm(@AuthenticationPrincipal ItDaPrincipal principal, Model model) {
         try {
             resumeService.findByEmail(principal.getEmail());
-            return "redirect:/resume/edit";
+            return "redirect:/resumes/edit";
         } catch (IllegalStateException ignored) {
         }
 
@@ -95,27 +108,22 @@ public class ResumeController {
             return "freelancer/resumeForm";
         }
 
-        return "redirect:/resume/edit";
+        return "redirect:/resumes/edit";
     }
 
     @GetMapping("/edit")
-    public String editForm(
-            @AuthenticationPrincipal ItDaPrincipal principal,
-            @RequestParam(value = "mode", required = false) String mode,
-            Model model
-    ) {
+    public String editForm(@AuthenticationPrincipal ItDaPrincipal principal, Model model) {
         Resume resume = resumeService.findByEmail(principal.getEmail());
         ResumeForm form = convertToForm(resume);
 
         addCommonAttributes(model);
         addMemberAttributes(model, principal);
 
-        boolean isEditable = "modify".equals(mode);
         model.addAttribute("resumeForm", form);
         model.addAttribute("resumeSkillForm", new ResumeSkillForm());
         model.addAttribute("resume", resume);
         model.addAttribute("isNew", false);
-        model.addAttribute("editable", isEditable);
+        model.addAttribute("editable", true);
 
         return "freelancer/resumeForm";
     }
@@ -153,10 +161,10 @@ public class ResumeController {
                     form.isAiMatchingEnabled()
             );
         } catch (IllegalStateException e) {
-            return "redirect:/resume/new";
+            return "redirect:/resumes/new";
         }
 
-        return "redirect:/resume/edit";
+        return "redirect:/resumes/me";
     }
 
     private ResumeForm convertToForm(Resume resume) {
@@ -179,52 +187,64 @@ public class ResumeController {
             BindingResult bindingResult,
             Model model
     ) {
-        if (bindingResult.hasErrors()) {
-            return renderEditPageForSkillForm(principal, model, true);
+        // 1. 검증 오류가 없을 때만 저장 로직 실행
+        if (!bindingResult.hasErrors()) {
+            try {
+                resumeService.addSkill(principal.getEmail(), form.getSkillId(), form.getProficiency());
+            } catch (IllegalStateException e) {
+                // 중복 스킬 등 비즈니스 예외 처리
+                bindingResult.rejectValue("skillId", "duplicate", e.getMessage());
+            }
         }
 
-        try {
-            resumeService.addSkill(principal.getEmail(), form.getSkillId(), form.getProficiency());
-        } catch (IllegalStateException e) {
-            bindingResult.reject("skillAddFailed", e.getMessage());
-            return renderEditPageForSkillForm(principal, model, true);
-        }
+        // 2. 조각을 다시 그리기 위한 데이터 준비 (핵심)
+        Resume resume = resumeService.findByEmail(principal.getEmail());
+        addCommonAttributes(model); // skills, proficiencies 목록 담기
+        model.addAttribute("resume", resume);
+        model.addAttribute("isEditing", true);
+        // 에러가 있다면 입력하던 폼을 그대로, 없다면 빈 폼을 전달
+        model.addAttribute("resumeSkillForm", bindingResult.hasErrors() ? form : new ResumeSkillForm());
 
-        return "redirect:/resume/edit?mode=modify";
-    }
-
-    @PostMapping("/skill/update")
-    public String updateSkill(
-            @AuthenticationPrincipal ItDaPrincipal principal,
-            @Valid @ModelAttribute("resumeSkillForm") ResumeSkillForm form,
-            BindingResult bindingResult,
-            Model model
-    ) {
-        if (bindingResult.hasErrors()) {
-            return renderEditPageForSkillForm(principal, model, true);
-        }
-
-        try {
-            resumeService.updateSkill(principal.getEmail(), form.getSkillId(), form.getProficiency());
-        } catch (IllegalStateException e) {
-            bindingResult.reject("skillUpdateFailed", e.getMessage());
-            return renderEditPageForSkillForm(principal, model, true);
-        }
-
-        return "redirect:/resume/edit?mode=modify";
+        // 3. 파일명 :: #ID 반환 (이 부분을 본인의 파일명에 맞게 수정하세요)
+        return "freelancer/resumeForm :: #skillSection";
     }
 
     @PostMapping("/skill/remove")
     public String removeSkill(
             @AuthenticationPrincipal ItDaPrincipal principal,
-            @ModelAttribute("resumeSkillForm") ResumeSkillForm form
+            @ModelAttribute("resumeSkillForm") ResumeSkillForm form,
+            Model model
     ) {
-        if (form.getSkillId() == null) {
-            return "redirect:/resume/edit";
+        if (form.getSkillId() != null) {
+            resumeService.removeSkill(principal.getEmail(), form.getSkillId());
         }
 
-        resumeService.removeSkill(principal.getEmail(), form.getSkillId());
-        return "redirect:/resume/edit?mode=modify";
+        // 삭제 후에도 목록을 갱신해서 조각 반환
+        Resume resume = resumeService.findByEmail(principal.getEmail());
+        addCommonAttributes(model);
+        model.addAttribute("resume", resume);
+        model.addAttribute("isEditing", true);
+        model.addAttribute("resumeSkillForm", new ResumeSkillForm());
+
+        return "freelancer/resumeForm :: #skillSection";
+    }
+    @PostMapping("/skill/update")
+    public String updateSkill(
+            @AuthenticationPrincipal ItDaPrincipal principal,
+            @ModelAttribute("resumeSkillForm") ResumeSkillForm form,
+            Model model
+    ) {
+        // 특정 스킬의 숙련도 업데이트
+        resumeService.updateSkill(principal.getEmail(), form.getSkillId(), form.getProficiency());
+
+        // 갱신된 데이터로 조각 반환
+        Resume resume = resumeService.findByEmail(principal.getEmail());
+        addCommonAttributes(model);
+        model.addAttribute("resume", resume);
+        model.addAttribute("isEditing", true);
+        model.addAttribute("resumeSkillForm", new ResumeSkillForm());
+
+        return "freelancer/resumeForm :: #skillSection";
     }
 
     private void addCommonAttributes(Model model) {
