@@ -48,7 +48,7 @@
                         </a>
                     </th:block>
                     <th:block sec:authorize="isAuthenticated()">
-                        <a th:href="@{/freelancer/projects}"
+                        <a th:href="@{/freelancers}"
                            @mouseenter="hoverRole = 'freelancer'" @mouseleave="hoverRole = null"
                            class="group relative block p-10 bg-slate-50 border-2 border-transparent rounded-[40px] transition-all hover:border-blue-600 hover:bg-white hover:shadow-2xl hover:shadow-blue-100 text-left overflow-hidden">
                             <div th:replace="~{::freelancerCardContent}"></div>
