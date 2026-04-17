@@ -17,7 +17,7 @@ public class AiBriefProperties {
 
     private String apiKey;
 
-    private String model = "gpt-4.1-mini";
+    private String model = "gpt-5-mini";
 
     private Integer maxOutputTokens = 2_000;
 }

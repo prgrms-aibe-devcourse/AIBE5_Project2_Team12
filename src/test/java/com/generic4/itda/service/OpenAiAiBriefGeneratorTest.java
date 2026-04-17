@@ -49,7 +49,7 @@ class OpenAiAiBriefGeneratorTest {
         properties.setEnabled(true);
         properties.setApiUrl(API_URL);
         properties.setApiKey(API_KEY);
-        properties.setModel("gpt-4.1-mini");
+        properties.setModel("gpt-5-mini");
         properties.setMaxOutputTokens(2000);
 
         RestClient.Builder builder = RestClient.builder();
@@ -91,7 +91,7 @@ class OpenAiAiBriefGeneratorTest {
                 .andExpect(method(POST))
                 .andExpect(header(AUTHORIZATION, "Bearer " + API_KEY))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.model").value("gpt-4.1-mini"))
+                .andExpect(jsonPath("$.model").value("gpt-5-mini"))
                 .andExpect(jsonPath("$.input").value("프로젝트 원본 입력"))
                 .andExpect(jsonPath("$.instructions").value(containsString("expectedPeriod는 주 단위 기준 정수로 반환한다.")))
                 .andExpect(jsonPath("$.text.format.type").value("json_schema"))
