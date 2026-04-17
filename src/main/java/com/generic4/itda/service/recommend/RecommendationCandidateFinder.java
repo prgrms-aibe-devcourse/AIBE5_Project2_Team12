@@ -1,0 +1,79 @@
+package com.generic4.itda.service.recommend;
+
+import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
+import com.generic4.itda.domain.recommendation.RecommendationRun;
+import com.generic4.itda.domain.resume.Resume;
+import com.generic4.itda.repository.ResumeQueryRepository;
+import com.generic4.itda.repository.ResumeRepository;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+@Component
+@Transactional(readOnly = true)
+@RequiredArgsConstructor
+public class RecommendationCandidateFinder {
+
+    private static final int MINIMUM_CANDIDATE_POOL_SIZE = 100;
+
+    private final ResumeQueryRepository resumeQueryRepository;
+    private final ResumeRepository resumeRepository;
+
+    public List<RecommendationCandidate> findCandidates(RecommendationRun run) {
+        List<Long> requiredSkillIds = extractRequiredSkillIds(run);
+        int candidatePoolSize = resolveCandidatePoolSize(run.getTopK());
+
+        List<Long> candidateResumeIds;
+        if (requiredSkillIds.isEmpty()) {
+            candidateResumeIds = resumeQueryRepository.findRecommendableResumeIds(candidatePoolSize);
+        } else {
+            candidateResumeIds = resumeQueryRepository.findCandidatePool(requiredSkillIds, candidatePoolSize).stream()
+                    .map(CandidatePoolRow::resumeId)
+                    .toList();
+        }
+
+        if (candidateResumeIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<Resume> resumes = resumeRepository.findAllWithSkillsByIds(candidateResumeIds);
+        Map<Long, Resume> resumeMap = resumes.stream()
+                .collect(Collectors.toMap(Resume::getId, Function.identity()));
+
+        return candidateResumeIds.stream()
+                .map(resumeMap::get)
+                .filter(Objects::nonNull)
+                .map(this::toCandidate)
+                .toList();
+    }
+
+    private List<Long> extractRequiredSkillIds(RecommendationRun run) {
+        return run.getProposalPosition().getSkills().stream()
+                .filter(pps -> pps.getImportance() == ProposalPositionSkillImportance.ESSENTIAL)
+                .map(pps -> pps.getSkill().getId())
+                .toList();
+    }
+
+    private int resolveCandidatePoolSize(int topK) {
+        return Math.max(MINIMUM_CANDIDATE_POOL_SIZE, topK * 20);
+    }
+
+    private RecommendationCandidate toCandidate(Resume resume) {
+        return new RecommendationCandidate(
+                resume.getId(),
+                resume.getStatus(),
+                resume.isPubliclyVisible(),
+                resume.isAiMatchingEnabled(),
+                resume.getCareerYears(),
+                resume.getSkills().stream()
+                        .map(RecommendationCandidate.CandidateSkill::of)
+                        .toList()
+        );
+    }
+
+}
