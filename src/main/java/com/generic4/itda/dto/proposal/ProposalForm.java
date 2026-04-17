@@ -1,0 +1,66 @@
+package com.generic4.itda.dto.proposal;
+
+import com.generic4.itda.domain.proposal.Proposal;
+import com.generic4.itda.domain.proposal.ProposalStatus;
+import com.generic4.itda.domain.proposal.ProposalWorkType;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Getter
+@Setter
+@NoArgsConstructor
+public class ProposalForm {
+
+    @NotBlank(message = "제안서 제목은 필수값입니다.")
+    @Size(max = 200, message = "제안서 제목은 200자를 초과할 수 없습니다.")
+    private String title;
+
+    @NotBlank(message = "제안서 원본 입력은 필수값입니다.")
+    @Size(max = 10000, message = "제안서 원본 입력은 10000자를 초과할 수 없습니다.")
+    private String rawInputText;
+
+    @Size(max = 10000, message = "설명은 10000자를 초과할 수 없습니다.")
+    private String description;
+
+    @Min(value = 0, message = "최소 예산은 0 이상이어야 합니다.")
+    private Long totalBudgetMin;
+
+    @Min(value = 0, message = "최대 예산은 0 이상이어야 합니다.")
+    private Long totalBudgetMax;
+
+    private ProposalWorkType workType;
+
+    @Size(max = 255, message = "근무 장소는 255자를 초과할 수 없습니다.")
+    private String workPlace;
+
+    @Min(value = 1, message = "예상 기간은 1 이상이어야 합니다.")
+    private Long expectedPeriod;
+
+    private ProposalStatus status;
+
+    public static ProposalForm from(Proposal proposal) {
+        ProposalForm form = new ProposalForm();
+        form.setTitle(proposal.getTitle());
+        form.setRawInputText(proposal.getRawInputText());
+        form.setDescription(proposal.getDescription());
+        form.setTotalBudgetMin(proposal.getTotalBudgetMin());
+        form.setTotalBudgetMax(proposal.getTotalBudgetMax());
+        form.setWorkType(proposal.getWorkType());
+        form.setWorkPlace(proposal.getWorkPlace());
+        form.setExpectedPeriod(proposal.getExpectedPeriod());
+        form.setStatus(proposal.getStatus());
+        return form;
+    }
+
+    public static ProposalForm createDefault() {
+        ProposalForm form = new ProposalForm();
+        form.setStatus(ProposalStatus.WRITING);
+        form.setTitle("");
+        form.setRawInputText("");
+        return form;
+    }
+}
