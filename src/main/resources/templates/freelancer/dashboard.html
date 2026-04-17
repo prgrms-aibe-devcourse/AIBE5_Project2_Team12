@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/base}">
+<head>
+    <title>프로젝트 대시보드 | IT-da</title>
+</head>
+<body>
+
+<div layout:fragment="content">
+<main class="min-h-screen bg-slate-50 py-10 px-6">
+<div class="max-w-6xl mx-auto space-y-8">
+
+    <!-- 헤더 -->
+    <div class="flex items-start justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900">프로젝트 대시보드</h1>
+            <p class="text-sm text-slate-400 mt-1">AI가 매칭한 프로젝트 제안을 확인하고 관리하세요.</p>
+        </div>
+        <a th:href="@{/resumes/me}"
+           class="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:border-slate-300 hover:shadow-sm transition-all shrink-0">
+            <i data-lucide="file-text" class="w-4 h-4"></i>이력서 관리
+        </a>
+    </div>
+
+    <!-- 통계 카드 -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div data-stat-card data-status=""
+             th:class="${statusFilter == null} ? 'rounded-3xl p-6 flex flex-col gap-3 border-2 border-blue-500 bg-white shadow-md cursor-pointer transition-all' : 'rounded-3xl p-6 flex flex-col gap-3 border border-slate-200 bg-white shadow-sm hover:border-slate-300 cursor-pointer transition-all'">
+            <div class="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center">
+                <i data-lucide="inbox" class="w-5 h-5 text-blue-500"></i>
+            </div>
+            <div><p class="text-xs text-slate-400 font-medium">받은 제안</p>
+            <p class="text-3xl font-bold text-slate-900 mt-0.5" th:text="${totalCount} + '건'">0건</p></div>
+            <p class="text-xs text-slate-400">클라이언트로부터 도착한 모든 제안</p>
+        </div>
+        <div data-stat-card data-status="NEW"
+             th:class="${statusFilter == 'NEW'} ? 'rounded-3xl p-6 flex flex-col gap-3 border-2 border-blue-500 bg-white shadow-md cursor-pointer transition-all' : 'rounded-3xl p-6 flex flex-col gap-3 border border-slate-200 bg-white shadow-sm hover:border-slate-300 cursor-pointer transition-all'">
+            <div class="w-10 h-10 rounded-2xl bg-yellow-50 flex items-center justify-center">
+                <i data-lucide="bell" class="w-5 h-5 text-yellow-500"></i>
+            </div>
+            <div><p class="text-xs text-slate-400 font-medium">새로운 제안</p>
+            <p class="text-3xl font-bold text-slate-900 mt-0.5" th:text="${newCount} + '건'">0건</p></div>
+            <p class="text-xs text-slate-400">아직 확인하지 않은 신규 제안</p>
+        </div>
+        <div data-stat-card data-status="IN_PROGRESS"
+             th:class="${statusFilter == 'IN_PROGRESS'} ? 'rounded-3xl p-6 flex flex-col gap-3 border-2 border-blue-500 bg-white shadow-md cursor-pointer transition-all' : 'rounded-3xl p-6 flex flex-col gap-3 border border-slate-200 bg-white shadow-sm hover:border-slate-300 cursor-pointer transition-all'">
+            <div class="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center">
+                <i data-lucide="loader" class="w-5 h-5 text-emerald-500"></i>
+            </div>
+            <div><p class="text-xs text-slate-400 font-medium">진행 중 매칭</p>
+            <p class="text-3xl font-bold text-slate-900 mt-0.5" th:text="${inProgressCount} + '건'">0건</p></div>
+            <p class="text-xs text-slate-400">클라이언트와 협의 중인 프로젝트</p>
+        </div>
+        <div data-stat-card data-status="MATCHED"
+             th:class="${statusFilter == 'MATCHED'} ? 'rounded-3xl p-6 flex flex-col gap-3 border-2 border-blue-500 bg-white shadow-md cursor-pointer transition-all' : 'rounded-3xl p-6 flex flex-col gap-3 border border-slate-200 bg-white shadow-sm hover:border-slate-300 cursor-pointer transition-all'">
+            <div class="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center">
+                <i data-lucide="check-circle" class="w-5 h-5 text-slate-500"></i>
+            </div>
+            <div><p class="text-xs text-slate-400 font-medium">매칭 완료</p>
+            <p class="text-3xl font-bold text-slate-900 mt-0.5" th:text="${matchedCount} + '건'">0건</p></div>
+            <p class="text-xs text-slate-400">성공적으로 종료된 프로젝트</p>
+        </div>
+    </div>
+
+    <!-- 목록 카드 -->
+    <div class="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
+
+        <!-- 검색바 -->
+        <div class="flex items-center justify-between gap-4 px-6 py-5 border-b border-slate-100">
+            <h2 class="text-base font-bold text-slate-700 shrink-0">제안 목록</h2>
+            <form id="searchForm" class="flex items-center gap-2 flex-1 max-w-md" onsubmit="return false;">
+                <div class="relative flex-1">
+                    <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"></i>
+                    <input id="searchInput" type="text" th:value="${query}" placeholder="기업명 또는 프로젝트명 검색"
+                           class="w-full pl-9 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-blue-400 transition-colors">
+                </div>
+                <button type="submit" class="px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors shrink-0">검색</button>
+            </form>
+        </div>
+
+        <!-- AJAX 교체 영역 -->
+        <div id="listSection">
+            <div class="hidden md:grid grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_80px] gap-4 px-6 py-3 border-b border-slate-100 text-xs font-bold text-slate-400 uppercase tracking-wide">
+                <span>프로젝트 / 기업</span><span>상태</span><span>예상 비용</span><span>수신일</span><span></span>
+            </div>
+
+            <div th:if="${items.isEmpty()}" class="flex flex-col items-center justify-center py-24">
+                <i data-lucide="inbox" class="w-14 h-14 mb-4 text-slate-300"></i>
+                <p class="text-base font-semibold text-slate-500">받은 제안이 없습니다</p>
+                <p class="text-sm mt-1 text-slate-400">이력서를 잘 관리하면 알맞는 프로젝트 제안이 올거에요.</p>
+                <a th:href="@{/resumes/edit}" class="mt-6 px-6 py-2.5 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition-all">이력서 관리하기</a>
+            </div>
+
+            <div th:if="${not items.isEmpty()}" class="divide-y divide-slate-100">
+                <div th:each="item : ${items}" class="grid grid-cols-1 md:grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_80px] gap-4 items-center px-6 py-5 hover:bg-slate-50 transition-colors">
+                    <div class="space-y-1">
+                        <p class="text-sm font-bold text-slate-900" th:text="${item.proposalTitle()}">프로젝트명</p>
+                        <div class="flex items-center gap-1.5 text-xs text-slate-500">
+                            <i data-lucide="building-2" class="w-3.5 h-3.5 text-slate-400 shrink-0"></i>
+                            <span th:text="${item.companyName()}">기업명</span>
+                            <span class="text-slate-300">·</span>
+                            <span th:text="${item.positionName()}">포지션</span>
+                        </div>
+                        <div class="flex flex-wrap gap-1 pt-0.5">
+                            <span th:each="skill : ${item.skillNames()}" th:text="${skill}"
+                                  class="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-medium rounded-lg">스킬</span>
+                        </div>
+                    </div>
+                    <div>
+                        <span th:text="${item.status().label}"
+                              th:class="'inline-block px-3 py-1.5 rounded-xl text-xs font-bold ' + ${item.status().cssClass}">상태</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <i data-lucide="wallet" class="w-3.5 h-3.5 text-slate-400 hidden md:block"></i>
+                        <span class="text-sm font-semibold text-slate-700" th:text="${item.formattedBudget()}">협의</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-sm text-slate-500">
+                        <i data-lucide="calendar" class="w-3.5 h-3.5 text-slate-400 hidden md:block"></i>
+                        <span th:text="${#temporals.format(item.receivedAt(), 'yyyy.MM.dd')}">날짜</span>
+                    </div>
+                    <div class="flex justify-end">
+                        <a th:href="@{/proposals/{id}(id=${item.proposalId()})}"
+                           class="flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-700 whitespace-nowrap">
+                            보기<i data-lucide="chevron-right" class="w-4 h-4"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+</main>
+</div>
+
+<th:block layout:fragment="scripts">
+<script th:inline="javascript">
+(function () {
+    var cur_status = /*[[${statusFilter ?: ''}]]*/ '';
+    var cur_query  = /*[[${query ?: ''}]]*/ '';
+    var ACT = ['border-2','border-blue-500','shadow-md'];
+    var INA = ['border','border-slate-200','shadow-sm'];
+
+    document.querySelectorAll('[data-stat-card]').forEach(function(c) {
+        c.addEventListener('click', function() {
+            cur_status = c.dataset.status;
+            ACT.concat(INA).forEach(function(cl){ document.querySelectorAll('[data-stat-card]').forEach(function(x){ x.classList.remove(cl); }); });
+            INA.forEach(function(cl){ document.querySelectorAll('[data-stat-card]').forEach(function(x){ x.classList.add(cl); }); });
+            INA.forEach(function(cl){ c.classList.remove(cl); });
+            ACT.forEach(function(cl){ c.classList.add(cl); });
+            loadList(cur_status, cur_query);
+        });
+    });
+
+    var form = document.getElementById('searchForm');
+    var inp  = document.getElementById('searchInput');
+    if (form) form.addEventListener('submit', function() { cur_query = inp ? inp.value.trim() : ''; loadList(cur_status, cur_query); });
+
+    function loadList(status, q) {
+        var p = new URLSearchParams();
+        if (status) p.set('status', status);
+        if (q) p.set('q', q);
+        var el = document.getElementById('listSection');
+        if (el) { el.style.opacity = '0.4'; el.style.pointerEvents = 'none'; }
+        fetch('/freelancers/dashboard/items?' + p.toString())
+            .then(function(r){ if (!r.ok) throw r; return r.text(); })
+            .then(function(html){
+                var tmp = document.createElement('div'); tmp.innerHTML = html;
+                var next = tmp.querySelector('#listSection') || tmp.firstElementChild;
+                var old  = document.getElementById('listSection');
+                if (next && old) { old.replaceWith(next); if (window.lucide) lucide.createIcons(); }
+            })
+            .catch(function(e){ console.error('목록 오류', e); var s = document.getElementById('listSection'); if(s){s.style.opacity='1';s.style.pointerEvents='';} });
+    }
+})();
+</script>
+</th:block>
+
+</body>
+</html>
