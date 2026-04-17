@@ -15,6 +15,7 @@ import com.generic4.itda.domain.recommendation.constant.RecommendationRunStatus;
 import com.generic4.itda.domain.recommendation.vo.HardFilterStat;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceUnitUtil;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -329,6 +330,22 @@ class RecommendationRunRepositoryTest {
 
             assertThat(recommendationRunRepository.claimAsRunning(computed.getId())).isEqualTo(0);
             assertThat(recommendationRunRepository.claimAsRunning(failed.getId())).isEqualTo(0);
+        }
+
+        @Test
+        @DisplayName("claimAsRunning 시 modifiedAt이 전달한 시각으로 갱신된다")
+        void claimAsRunning_시_modifiedAt이_전달한_시각으로_갱신된다() {
+            RecommendationRun run = saveRunWithStatus(RecommendationRunStatus.PENDING);
+            LocalDateTime startedAt = LocalDateTime.of(2026, 4, 17, 15, 30, 0);
+
+            recommendationRunRepository.claimAsRunning(run.getId(), startedAt);
+            em.flush();
+            em.clear();
+
+            RecommendationRun found = recommendationRunRepository.findById(run.getId()).orElseThrow();
+
+            assertThat(found.getStatus()).isEqualTo(RecommendationRunStatus.RUNNING);
+            assertThat(found.getModifiedAt()).isEqualTo(startedAt);
         }
     }
 

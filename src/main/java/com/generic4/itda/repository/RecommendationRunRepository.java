@@ -2,6 +2,7 @@ package com.generic4.itda.repository;
 
 import com.generic4.itda.domain.recommendation.RecommendationRun;
 import com.generic4.itda.domain.recommendation.constant.RecommendationAlgorithm;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
@@ -39,9 +40,14 @@ public interface RecommendationRunRepository extends JpaRepository<Recommendatio
     @Query("""
             update RecommendationRun rr
             set rr.status = com.generic4.itda.domain.recommendation.constant.RecommendationRunStatus.RUNNING,
-                rr.errorMessage = null
+                rr.errorMessage = null,
+                rr.modifiedAt = :startedAt
             where rr.id = :runId
             and rr.status = com.generic4.itda.domain.recommendation.constant.RecommendationRunStatus.PENDING
             """)
-    int claimAsRunning(Long runId);
+    int claimAsRunning(Long runId, LocalDateTime startedAt);
+
+    default int claimAsRunning(Long runId) {
+        return claimAsRunning(runId, LocalDateTime.now());
+    }
 }
