@@ -100,12 +100,10 @@ public class ResumeService {
     // 이력서 조회
     @Transactional(readOnly = true)
     public Resume findByEmail(String email) {
-        Member member = getMemberByEmail(email);
-        Resume resume = resumeRepository.findByMemberId(member.getId())
+        // 이제 여기서 Fetch Join으로 한 번에 다 가져옵니다.
+        // .size() 같은 강제 초기화 코드가 더 이상 필요 없습니다!
+        return resumeRepository.findByMemberEmailWithDetails(email)
                 .orElseThrow(() -> new IllegalStateException("이력서가 존재하지 않습니다."));
-        resume.getSkills().size();       // open-in-view: false → Lazy 컬렉션 강제 초기화
-        resume.getAttachments().size();  // open-in-view: false → Lazy 컬렉션 강제 초기화
-        return resume;
     }
 
     // 전체 스킬 목록 조회
