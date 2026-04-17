@@ -19,7 +19,7 @@ public interface ProposalRepository extends JpaRepository<Proposal, Long> {
     Optional<Proposal> findWithPositionsById(Long proposalId);
 
     @Query("""
-            select pp
+            select distinct pp
             from ProposalPosition pp
             left join fetch pp.skills pps
             left join fetch pps.skill s
