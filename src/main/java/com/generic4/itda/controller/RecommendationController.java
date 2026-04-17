@@ -2,8 +2,10 @@ package com.generic4.itda.controller;
 
 import com.generic4.itda.dto.recommend.RecommendationEntryViewModel;
 import com.generic4.itda.dto.recommend.RecommendationRequestForm;
+import com.generic4.itda.dto.recommend.RecommendationRunStatusViewModel;
 import com.generic4.itda.dto.security.ItDaPrincipal;
 import com.generic4.itda.service.recommend.RecommendationEntryService;
+import com.generic4.itda.service.recommend.RecommendationRunQueryService;
 import com.generic4.itda.service.recommend.RecommendationRunService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,7 @@ public class RecommendationController {
 
     private final RecommendationEntryService recommendationEntryService;
     private final RecommendationRunService recommendationRunService;
+    private final RecommendationRunQueryService recommendationRunQueryService;
 
     @GetMapping("/proposals/{proposalId}/recommendations")
     public String entry(
@@ -64,13 +67,38 @@ public class RecommendationController {
 
             redirectAttributes.addAttribute("runId", runId);
             redirectAttributes.addAttribute("proposalId", proposalId);
-            return "redirect:/proposals/{proposalId}/recommendations/runs/{runId}";
+            return "redirect:/proposals/{proposalId}/runs/{runId}";
         } catch (IllegalArgumentException | IllegalStateException e) {
             log.warn("추천 실행 요청 실패. proposalId={}, proposalPositionId={}, email={}",
                     proposalId, form.proposalPositionId(), principal.getEmail(), e);
 
             redirectAttributes.addFlashAttribute("errorMessage", toUserMessage(e));
             return "redirect:/proposals/{proposalId}/recommendations";
+        }
+    }
+
+    @GetMapping("/proposals/{proposalId}/runs/{runId}")
+    public String runStatus(
+            @PathVariable Long proposalId,
+            @PathVariable Long runId,
+            @AuthenticationPrincipal ItDaPrincipal principal,
+            Model model
+    ) {
+        try {
+            RecommendationRunStatusViewModel view = recommendationRunQueryService
+                    .getRecommendationRunStatus(proposalId, runId, principal.getEmail());
+
+            model.addAttribute("view", view);
+            return "recommendation/status";
+        } catch (IllegalArgumentException e) {
+            log.warn("추천 실행 상태 조회 실패. proposalId={}, runId={}, email={}",
+                    proposalId, runId, principal.getEmail(), e);
+
+            model.addAttribute("title", "추천 실행 정보를 확인할 수 없습니다.");
+            model.addAttribute("message", toRunStatusUserMessage(e));
+            model.addAttribute("backUrl", "/proposals/" + proposalId + "/recommendations");
+
+            return "recommendation/error";
         }
     }
 
@@ -82,5 +110,14 @@ public class RecommendationController {
             return "현재 상태에는 추천을 실행할 수 없습니다.";
         }
         return "추천 요청 처리 중 문제가 발생했습니다. 다시 시도해주세요.";
+    }
+
+    private static String toRunStatusUserMessage(IllegalArgumentException e) {
+        return switch (e.getMessage()) {
+            case "추천 실행 정보를 찾을 수 없습니다." -> "존재하지 않거나 만료된 추천 실행입니다.";
+            case "잘못된 추천 실행 접근입니다." -> "요청한 추천 실행 정보가 올바르지 않습니다.";
+            case "접근 권한이 없습니다." -> "해당 추천 실행 정보에 접근할 수 없습니다.";
+            default -> "추천 실행 정보를 불러오는 중 문제가 발생했습니다.";
+        };
     }
 }

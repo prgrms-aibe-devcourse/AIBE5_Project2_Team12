@@ -14,6 +14,7 @@ import com.generic4.itda.domain.recommendation.constant.RecommendationAlgorithm;
 import com.generic4.itda.domain.recommendation.constant.RecommendationRunStatus;
 import com.generic4.itda.domain.recommendation.vo.HardFilterStat;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceUnitUtil;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -147,6 +148,66 @@ class RecommendationRunRepositoryTest {
                     recommendationRunRepository.findByProposalPosition_IdAndRequestFingerprintAndAlgorithm(
                             otherPP.getId(), FP, ALG);
 
+            assertThat(result).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("findDetailById")
+    class FindDetailById {
+
+        private RecommendationRun run;
+
+        @BeforeEach
+        void saveRun() {
+            run = recommendationRunRepository.saveAndFlush(
+                    RecommendationRun.create(proposalPosition, "fp-detail", RecommendationAlgorithm.HEURISTIC_V1, 5));
+            em.clear();
+        }
+
+        @Test
+        @DisplayName("run, proposalPosition, proposal, member를 한 번에 조회한다")
+        void run과_연결된_상위_그래프를_함께_조회한다() {
+            // when
+            Optional<RecommendationRun> result = recommendationRunRepository.findDetailById(run.getId());
+
+            // then
+            assertThat(result).isPresent();
+
+            RecommendationRun found = result.orElseThrow();
+            PersistenceUnitUtil util = em.getEntityManagerFactory().getPersistenceUnitUtil();
+
+            assertThat(util.isLoaded(found, "proposalPosition")).isTrue();
+            assertThat(found.getProposalPosition().getId()).isEqualTo(proposalPosition.getId());
+
+            assertThat(util.isLoaded(found.getProposalPosition(), "proposal")).isTrue();
+            assertThat(found.getProposalPosition().getProposal().getId()).isEqualTo(proposal.getId());
+
+            assertThat(util.isLoaded(found.getProposalPosition().getProposal(), "member")).isTrue();
+            assertThat(found.getProposalPosition().getProposal().getMember().getId())
+                    .isEqualTo(proposal.getMember().getId());
+        }
+
+        @Test
+        @DisplayName("쿼리에 포함되지 않은 연관은 LAZY 상태로 남는다")
+        void 쿼리에_포함되지_않은_연관은_LAZY_상태로_남는다() {
+            // when
+            RecommendationRun found = recommendationRunRepository.findDetailById(run.getId()).orElseThrow();
+
+            // then
+            PersistenceUnitUtil util = em.getEntityManagerFactory().getPersistenceUnitUtil();
+
+            assertThat(util.isLoaded(found.getProposalPosition(), "position")).isFalse();
+            assertThat(util.isLoaded(found.getProposalPosition().getProposal(), "positions")).isFalse();
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 id면 빈 Optional을 반환한다")
+        void 존재하지_않는_id면_빈_Optional을_반환한다() {
+            // when
+            Optional<RecommendationRun> result = recommendationRunRepository.findDetailById(Long.MAX_VALUE);
+
+            // then
             assertThat(result).isEmpty();
         }
     }

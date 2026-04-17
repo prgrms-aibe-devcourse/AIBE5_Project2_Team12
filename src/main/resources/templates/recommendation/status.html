@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>추천 결과</title>
+  <meta http-equiv="refresh" content="5" th:if="${view.autoRefresh}">
+</head>
+<body>
+<main>
+  <h1 th:text="${view.title}">추천 상태 제목</h1>
+  <p th:text="${view.proposalTitle}">제안서 제목</p>
+  <p th:text="${view.message}">상태 메시지</p>
+
+  <a th:if="${view.nextActionUrl != null}"
+     th:href="${view.nextActionUrl}"
+     th:text="${view.nextActionLabel}">
+    다음 액션
+  </a>
+</main>
+</body>
+</html>
