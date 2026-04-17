@@ -1,5 +1,6 @@
 package com.generic4.itda.service;
 
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -48,7 +49,7 @@ class OpenAiAiBriefGeneratorTest {
         properties.setEnabled(true);
         properties.setApiUrl(API_URL);
         properties.setApiKey(API_KEY);
-        properties.setModel("gpt-4.1-mini");
+        properties.setModel("gpt-5-mini");
         properties.setMaxOutputTokens(2000);
 
         RestClient.Builder builder = RestClient.builder();
@@ -90,10 +91,27 @@ class OpenAiAiBriefGeneratorTest {
                 .andExpect(method(POST))
                 .andExpect(header(AUTHORIZATION, "Bearer " + API_KEY))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.model").value("gpt-4.1-mini"))
+                .andExpect(jsonPath("$.model").value("gpt-5-mini"))
                 .andExpect(jsonPath("$.input").value("프로젝트 원본 입력"))
+                .andExpect(jsonPath("$.instructions").value(containsString("근거가 부족한 값은 추측하지 말고 null로 반환한다.")))
                 .andExpect(jsonPath("$.instructions").value(containsString("expectedPeriod는 주 단위 기준 정수로 반환한다.")))
                 .andExpect(jsonPath("$.text.format.type").value("json_schema"))
+                .andExpect(jsonPath("$.text.format.schema.required[*]").value(containsInAnyOrder(
+                        "title",
+                        "description",
+                        "totalBudgetMin",
+                        "totalBudgetMax",
+                        "workType",
+                        "workPlace",
+                        "expectedPeriod",
+                        "positions"
+                )))
+                .andExpect(jsonPath("$.text.format.schema.properties.title.type[*]").value(containsInAnyOrder(
+                        "string",
+                        "null"
+                )))
+                .andExpect(jsonPath("$.text.format.schema.properties.positions.items.properties.skills.items.required[*]")
+                        .value(containsInAnyOrder("skillName", "importance")))
                 .andRespond(withSuccess(
                         objectMapper.writeValueAsString(Map.of("output_text", briefJson)),
                         MediaType.APPLICATION_JSON

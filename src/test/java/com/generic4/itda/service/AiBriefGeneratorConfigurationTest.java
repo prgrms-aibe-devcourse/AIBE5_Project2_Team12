@@ -42,7 +42,7 @@ class AiBriefGeneratorConfigurationTest {
                 .withPropertyValues(
                         "ai.brief.enabled=true",
                         "ai.brief.api-key=test-api-key",
-                        "ai.brief.model=gpt-4.1-mini"
+                        "ai.brief.model=gpt-5-mini"
                 )
                 .run(context -> {
                     assertThat(context).hasSingleBean(AiBriefGenerator.class);

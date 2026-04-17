@@ -3,6 +3,7 @@ package com.generic4.itda.service;
 import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
+import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.domain.skill.Skill;
 import com.generic4.itda.dto.proposal.AiBriefPositionResult;
 import com.generic4.itda.dto.proposal.AiBriefResult;
@@ -30,18 +31,22 @@ public class AiBriefProposalMapper {
         proposal.update(
                 resolveTitle(proposal, aiBriefResult),
                 proposal.getRawInputText(),
-                aiBriefResult.getDescription(),
-                aiBriefResult.getTotalBudgetMin(),
-                aiBriefResult.getTotalBudgetMax(),
-                aiBriefResult.getWorkType(),
-                aiBriefResult.getWorkPlace(),
-                aiBriefResult.getExpectedPeriod()
+                resolveDescription(proposal, aiBriefResult),
+                resolveTotalBudgetMin(proposal, aiBriefResult),
+                resolveTotalBudgetMax(proposal, aiBriefResult),
+                resolveWorkType(proposal, aiBriefResult),
+                resolveWorkPlace(proposal, aiBriefResult),
+                resolveExpectedPeriod(proposal, aiBriefResult)
         );
 
         replacePositions(proposal, aiBriefResult.getPositions());
     }
 
     private void replacePositions(Proposal proposal, List<AiBriefPositionResult> positions) {
+        if (positions == null || positions.isEmpty()) {
+            return;
+        }
+
         List<ProposalPosition> existingPositions = new ArrayList<>(proposal.getPositions());
         for (ProposalPosition existingPosition : existingPositions) {
             proposal.removePosition(existingPosition);
@@ -81,5 +86,47 @@ public class AiBriefProposalMapper {
             return aiBriefResult.getTitle();
         }
         return proposal.getTitle();
+    }
+
+    private String resolveDescription(Proposal proposal, AiBriefResult aiBriefResult) {
+        if (StringUtils.hasText(aiBriefResult.getDescription())) {
+            return aiBriefResult.getDescription();
+        }
+        return proposal.getDescription();
+    }
+
+    private Long resolveTotalBudgetMin(Proposal proposal, AiBriefResult aiBriefResult) {
+        if (aiBriefResult.getTotalBudgetMin() != null) {
+            return aiBriefResult.getTotalBudgetMin();
+        }
+        return proposal.getTotalBudgetMin();
+    }
+
+    private Long resolveTotalBudgetMax(Proposal proposal, AiBriefResult aiBriefResult) {
+        if (aiBriefResult.getTotalBudgetMax() != null) {
+            return aiBriefResult.getTotalBudgetMax();
+        }
+        return proposal.getTotalBudgetMax();
+    }
+
+    private ProposalWorkType resolveWorkType(Proposal proposal, AiBriefResult aiBriefResult) {
+        if (aiBriefResult.getWorkType() != null) {
+            return aiBriefResult.getWorkType();
+        }
+        return proposal.getWorkType();
+    }
+
+    private String resolveWorkPlace(Proposal proposal, AiBriefResult aiBriefResult) {
+        if (StringUtils.hasText(aiBriefResult.getWorkPlace())) {
+            return aiBriefResult.getWorkPlace();
+        }
+        return proposal.getWorkPlace();
+    }
+
+    private Long resolveExpectedPeriod(Proposal proposal, AiBriefResult aiBriefResult) {
+        if (aiBriefResult.getExpectedPeriod() != null) {
+            return aiBriefResult.getExpectedPeriod();
+        }
+        return proposal.getExpectedPeriod();
     }
 }
