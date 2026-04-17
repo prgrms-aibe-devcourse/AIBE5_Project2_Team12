@@ -37,7 +37,7 @@ public class ResumeController {
     @GetMapping("/me")
     public String viewFrom (@AuthenticationPrincipal ItDaPrincipal principal, Model model){
         Resume resume = resumeService.findByEmail(principal.getEmail());
-        ResumeForm form = convertToForm(resume);
+        ResumeForm form = ResumeForm.from(resume);
 
         addCommonAttributes(model);
         addMemberAttributes(model, principal);
@@ -58,12 +58,7 @@ public class ResumeController {
         } catch (IllegalStateException ignored) {
         }
 
-        ResumeForm form = new ResumeForm();
-        form.setCareerYears((byte) 0);
-        form.setWritingStatus(ResumeWritingStatus.WRITING);
-        form.setIntroduction("");
-        form.setPubliclyVisible(true);
-        form.setAiMatchingEnabled(true);
+        ResumeForm form = ResumeForm.createDefault();
 
         addCommonAttributes(model);
         addMemberAttributes(model, principal);
@@ -114,7 +109,7 @@ public class ResumeController {
     @GetMapping("/edit")
     public String editForm(@AuthenticationPrincipal ItDaPrincipal principal, Model model) {
         Resume resume = resumeService.findByEmail(principal.getEmail());
-        ResumeForm form = convertToForm(resume);
+        ResumeForm form = ResumeForm.from(resume);
 
         addCommonAttributes(model);
         addMemberAttributes(model, principal);
@@ -165,19 +160,6 @@ public class ResumeController {
         }
 
         return "redirect:/resumes/me";
-    }
-
-    private ResumeForm convertToForm(Resume resume) {
-        ResumeForm form = new ResumeForm();
-        form.setIntroduction(resume.getIntroduction());
-        form.setCareerYears(resume.getCareerYears());
-        form.setCareer(resume.getCareer());
-        form.setPreferredWorkType(resume.getPreferredWorkType());
-        form.setPortfolioUrl(resume.getPortfolioUrl());
-        form.setWritingStatus(resume.getWritingStatus());
-        form.setPubliclyVisible(resume.isPubliclyVisible());
-        form.setAiMatchingEnabled(resume.isAiMatchingEnabled());
-        return form;
     }
 
     @PostMapping("/skill/add")
@@ -262,7 +244,7 @@ public class ResumeController {
 
     private String renderEditPageForSkillForm(ItDaPrincipal principal, Model model, boolean editable) {
         Resume resume = resumeService.findByEmail(principal.getEmail());
-        ResumeForm form = convertToForm(resume);
+        ResumeForm form = ResumeForm.from(resume);
 
         addCommonAttributes(model);
         addMemberAttributes(model, principal);

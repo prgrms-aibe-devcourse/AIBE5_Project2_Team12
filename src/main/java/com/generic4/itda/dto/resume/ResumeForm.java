@@ -1,9 +1,6 @@
 package com.generic4.itda.dto.resume;
 
-import com.generic4.itda.domain.resume.CareerPayload;
-import com.generic4.itda.domain.resume.Proficiency;
-import com.generic4.itda.domain.resume.ResumeWritingStatus;
-import com.generic4.itda.domain.resume.WorkType;
+import com.generic4.itda.domain.resume.*;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -42,4 +39,27 @@ public class ResumeForm {
     private boolean publiclyVisible = true;
 
     private boolean aiMatchingEnabled = true;
+
+    public static ResumeForm from(Resume resume) {
+        ResumeForm form = new ResumeForm();
+        form.setIntroduction(resume.getIntroduction());
+        form.setCareerYears(resume.getCareerYears());
+        form.setCareer(resume.getCareer());
+        form.setPreferredWorkType(resume.getPreferredWorkType());
+        form.setPortfolioUrl(resume.getPortfolioUrl());
+        form.setWritingStatus(resume.getWritingStatus());
+        form.setPubliclyVisible(resume.isPubliclyVisible());
+        form.setAiMatchingEnabled(resume.isAiMatchingEnabled());
+        return form;
+    }
+
+    public static ResumeForm createDefault() {
+        ResumeForm form = new ResumeForm();
+        form.setCareerYears((byte) 0);
+        form.setWritingStatus(ResumeWritingStatus.WRITING);
+        form.setIntroduction("");
+        form.setPubliclyVisible(true);
+        form.setAiMatchingEnabled(true);
+        return form;
+    }
 }
