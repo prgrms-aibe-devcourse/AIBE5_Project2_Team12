@@ -64,7 +64,7 @@ public class RecommendationController {
 
             redirectAttributes.addAttribute("runId", runId);
             redirectAttributes.addAttribute("proposalId", proposalId);
-            return "redirect:/proposals/{proposalId}/recommendations/runs/{runId}";
+            return "redirect:/proposals/{proposalId}/runs/{runId}";
         } catch (IllegalArgumentException | IllegalStateException e) {
             log.warn("추천 실행 요청 실패. proposalId={}, proposalPositionId={}, email={}",
                     proposalId, form.proposalPositionId(), principal.getEmail(), e);
