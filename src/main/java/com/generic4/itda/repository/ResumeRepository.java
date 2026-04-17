@@ -15,6 +15,6 @@ public interface ResumeRepository extends JpaRepository<Resume, Long> {
     @Query("select r from Resume r " +
             "left join fetch r.skills " +
             "left join fetch r.attachments " +
-            "where r.member.email = :email")
+            "where r.member.email.value = :email")
     Optional<Resume> findByMemberEmailWithDetails(@Param("email") String email);
 }
