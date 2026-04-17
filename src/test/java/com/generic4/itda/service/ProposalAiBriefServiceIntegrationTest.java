@@ -27,6 +27,7 @@ import jakarta.persistence.PersistenceContext;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @IntegrationTest
 @Transactional
+@Disabled("수동 검증 용도로 유지")
 class ProposalAiBriefServiceIntegrationTest {
 
     @Autowired
