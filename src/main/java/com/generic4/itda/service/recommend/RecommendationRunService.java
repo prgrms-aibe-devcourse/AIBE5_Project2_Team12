@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class RecommendationRunService {
 
     private static final RecommendationAlgorithm DEFAULT_ALGORITHM = RecommendationAlgorithm.HEURISTIC_V1;
-    private static final int DEFAULT_TOK_K = 3;
+    private static final int DEFAULT_TOP_K = 3;
 
     private final ProposalRepository proposalRepository;
     private final MemberRepository memberRepository;
@@ -48,7 +48,7 @@ public class RecommendationRunService {
                 proposal,
                 proposalPosition,
                 DEFAULT_ALGORITHM,
-                DEFAULT_TOK_K
+                DEFAULT_TOP_K
         );
 
         return recommendationRunRepository
@@ -66,7 +66,7 @@ public class RecommendationRunService {
                 proposalPosition,
                 fingerprint,
                 DEFAULT_ALGORITHM,
-                DEFAULT_TOK_K
+                DEFAULT_TOP_K
         );
         return recommendationRunRepository.save(recommendationRun);
     }

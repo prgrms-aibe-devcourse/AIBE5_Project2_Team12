@@ -41,7 +41,7 @@ public class RecommendationFingerprintGenerator {
                 "proposalPosition.positionId=" + proposalPosition.getPosition().getId(),
                 "proposalPosition.positionName=" + proposalPosition.getPosition().getName(),
                 "proposalPosition.headCount=" + proposalPosition.getHeadCount(),
-                "proposalPosition.status=" + proposalPosition.getStatus(),
+                "proposalPosition.status=" + proposalPosition.getStatus().name(),
                 "proposalPosition.unitBudgetMin=" + proposalPosition.getUnitBudgetMin(),
                 "proposalPosition.unitBudgetMax=" + proposalPosition.getUnitBudgetMax(),
 
@@ -78,7 +78,7 @@ public class RecommendationFingerprintGenerator {
             }
             return sb.toString();
         } catch (NoSuchAlgorithmException e) {
-            throw new IllegalArgumentException("request fingerprint 생성에 실패했습니다.", e);
+            throw new IllegalStateException("request fingerprint 생성에 실패했습니다.", e);
         }
     }
 }
