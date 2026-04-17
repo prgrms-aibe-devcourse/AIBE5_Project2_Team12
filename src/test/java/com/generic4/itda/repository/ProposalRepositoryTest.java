@@ -13,6 +13,7 @@ import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
 import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.domain.skill.Skill;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceUnitUtil;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -159,9 +160,126 @@ class ProposalRepositoryTest {
                 .hasMessage("같은 제안서에는 동일한 직무를 중복 등록할 수 없습니다.");
     }
 
+    // ──────────────────────────────────────────────────────────────────────────
+    // 두 단계 조회(findWithPositionsById -> findPositionsWithSkillsByProposalId) + 1차 캐시 합성 계약 검증
+    // ──────────────────────────────────────────────────────────────────────────
+
+    @DisplayName("findWithPositionsById 단독 호출 시 ProposalPosition.skills는 LAZY 미초기화 상태다")
+    @Test
+    void findWithPositionsById_단독_호출_시_skills는_LAZY_미초기화_상태다() {
+        Member member = memberRepository.save(createMember());
+        Position backend = persist(Position.create("백엔드 개발자"));
+        Skill java = persist(Skill.create("Java", "백엔드 언어"));
+
+        Proposal proposal = Proposal.create(
+                member, "AI 매칭 플랫폼", "원문", null,
+                null, null, ProposalWorkType.REMOTE, null, null);
+        proposal.addPosition(backend, 1L, 500_000L, 1_000_000L).addSkill(java, ProposalPositionSkillImportance.ESSENTIAL);
+        proposalRepository.saveAndFlush(proposal);
+        entityManager.clear();
+
+        Proposal found = proposalRepository.findWithPositionsById(proposal.getId()).orElseThrow();
+        ProposalPosition pp = found.getPositions().get(0);
+
+        PersistenceUnitUtil util = entityManager.getEntityManagerFactory().getPersistenceUnitUtil();
+        assertThat(util.isLoaded(pp, "skills")).isFalse();
+    }
+
+    @DisplayName("두 단계 조회 호출 시 ProposalPosition.skills는 추가 쿼리 없이 초기화된 상태다")
+    @Test
+    void 두_단계_조회_호출_시_skills는_추가_쿼리_없이_초기화된_상태다() {
+        Member member = memberRepository.save(createMember());
+        Position backend = persist(Position.create("백엔드 개발자"));
+        Skill java = persist(Skill.create("Java", "백엔드 언어"));
+        Skill spring = persist(Skill.create("Spring Boot", "웹 프레임워크"));
+
+        Proposal proposal = Proposal.create(
+                member, "AI 매칭 플랫폼", "원문", null,
+                null, null, ProposalWorkType.REMOTE, null, null);
+        ProposalPosition pp = proposal.addPosition(backend, 1L, 500_000L, 1_000_000L);
+        pp.addSkill(java, ProposalPositionSkillImportance.ESSENTIAL);
+        pp.addSkill(spring, ProposalPositionSkillImportance.PREFERENCE);
+        proposalRepository.saveAndFlush(proposal);
+        entityManager.clear();
+
+        Proposal found = loadProposalDetail(proposal.getId());
+        ProposalPosition foundPP = found.getPositions().get(0);
+
+        PersistenceUnitUtil util = entityManager.getEntityManagerFactory().getPersistenceUnitUtil();
+        assertThat(util.isLoaded(foundPP, "skills")).isTrue();
+        assertThat(foundPP.getSkills())
+                .extracting(pps -> pps.getSkill().getName())
+                .containsExactlyInAnyOrder("Java", "Spring Boot");
+    }
+
+    @DisplayName("두 단계 조회로 aggregate가 완성된다 — positions와 skills가 1차 캐시 합성으로 함께 반환된다")
+    @Test
+    void 두_단계_조회로_aggregate가_완성된다() {
+        Member member = memberRepository.save(createMember());
+        Position backend = persist(Position.create("백엔드 개발자"));
+        Skill java = persist(Skill.create("Java", "백엔드 언어"));
+        Skill spring = persist(Skill.create("Spring Boot", "웹 프레임워크"));
+
+        Proposal proposal = Proposal.create(
+                member, "AI 매칭 플랫폼", "원문", null,
+                null, null, ProposalWorkType.REMOTE, null, null);
+        ProposalPosition pp = proposal.addPosition(backend, 1L, 500_000L, 1_000_000L);
+        pp.addSkill(java, ProposalPositionSkillImportance.ESSENTIAL);
+        pp.addSkill(spring, ProposalPositionSkillImportance.PREFERENCE);
+        proposalRepository.saveAndFlush(proposal);
+        entityManager.clear();
+
+        Proposal found = loadProposalDetail(proposal.getId());
+
+        assertThat(found.getPositions()).hasSize(1);
+        ProposalPosition foundPP = found.getPositions().get(0);
+        assertThat(foundPP.getPosition().getName()).isEqualTo("백엔드 개발자");
+        assertThat(foundPP.getSkills())
+                .extracting(pps -> pps.getSkill().getName())
+                .containsExactlyInAnyOrder("Java", "Spring Boot");
+    }
+
+    @DisplayName("두 단계 조회로 aggregate가 완성된다 — 복수 positions × skills 구조에서 positions 컬렉션에 중복이 없다 (DISTINCT 계약)")
+    @Test
+    void 두_단계_조회_복수_positions_x_skills_구조에서_positions_컬렉션에_중복이_없다() {
+        Member member = memberRepository.save(createMember());
+        Position backend = persist(Position.create("백엔드 개발자"));
+        Position frontend = persist(Position.create("프론트엔드 개발자"));
+        Skill java = persist(Skill.create("Java", null));
+        Skill spring = persist(Skill.create("Spring Boot", null));
+        Skill react = persist(Skill.create("React", null));
+        Skill ts = persist(Skill.create("TypeScript", null));
+
+        Proposal proposal = Proposal.create(
+                member, "풀스택 프로젝트", "원문", null,
+                null, null, ProposalWorkType.HYBRID, null, null);
+        ProposalPosition pp1 = proposal.addPosition(backend, 1L, 500_000L, 1_000_000L);
+        pp1.addSkill(java, ProposalPositionSkillImportance.ESSENTIAL);
+        pp1.addSkill(spring, ProposalPositionSkillImportance.PREFERENCE);
+        ProposalPosition pp2 = proposal.addPosition(frontend, 1L, 400_000L, 800_000L);
+        pp2.addSkill(react, ProposalPositionSkillImportance.ESSENTIAL);
+        pp2.addSkill(ts, ProposalPositionSkillImportance.PREFERENCE);
+        proposalRepository.saveAndFlush(proposal);
+        entityManager.clear();
+
+        Proposal found = loadProposalDetail(proposal.getId());
+
+        PersistenceUnitUtil util = entityManager.getEntityManagerFactory().getPersistenceUnitUtil();
+        assertThat(found.getPositions()).hasSize(2);
+        found.getPositions().forEach(p ->
+                assertThat(util.isLoaded(p, "skills")).isTrue()
+        );
+    }
+
     private <T> T persist(T entity) {
         entityManager.persist(entity);
         return entity;
+    }
+
+    private Proposal loadProposalDetail(Long proposalId) {
+        Proposal proposal = proposalRepository.findWithPositionsById(proposalId).orElseThrow();
+        proposalRepository.findPositionsWithSkillsByProposalId(proposalId);
+        return proposal;
     }
 
     private long countRows(String entityName) {

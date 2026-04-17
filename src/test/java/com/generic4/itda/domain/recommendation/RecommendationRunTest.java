@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 
 import com.generic4.itda.domain.proposal.ProposalPosition;
 import com.generic4.itda.domain.recommendation.constant.RecommendationAlgorithm;
+import com.generic4.itda.domain.recommendation.constant.RecommendationRunStatus;
 import com.generic4.itda.domain.recommendation.vo.HardFilterStat;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -40,7 +41,7 @@ class RecommendationRunTest {
         void 생성_직후_상태는_PENDING() {
             RecommendationRun run = createPendingRun();
 
-            assertThat(run.getStatus()).isEqualTo(RecommendationAlgorithm.RecommendationRunStatus.PENDING);
+            assertThat(run.getStatus()).isEqualTo(RecommendationRunStatus.PENDING);
         }
 
         @Test
@@ -104,7 +105,7 @@ class RecommendationRunTest {
 
             run.markRunning();
 
-            assertThat(run.getStatus()).isEqualTo(RecommendationAlgorithm.RecommendationRunStatus.RUNNING);
+            assertThat(run.getStatus()).isEqualTo(RecommendationRunStatus.RUNNING);
         }
 
         @Test
@@ -115,7 +116,7 @@ class RecommendationRunTest {
 
             run.markCompleted(stat);
 
-            assertThat(run.getStatus()).isEqualTo(RecommendationAlgorithm.RecommendationRunStatus.COMPUTED);
+            assertThat(run.getStatus()).isEqualTo(RecommendationRunStatus.COMPUTED);
         }
 
         @Test
@@ -126,7 +127,7 @@ class RecommendationRunTest {
 
             run.markFailed("AI 서버 연결 실패");
 
-            assertThat(run.getStatus()).isEqualTo(RecommendationAlgorithm.RecommendationRunStatus.FAILED);
+            assertThat(run.getStatus()).isEqualTo(RecommendationRunStatus.FAILED);
         }
     }
 
