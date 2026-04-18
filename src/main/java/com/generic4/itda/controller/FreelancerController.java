@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class FreelancerController {
 
     private final ResumeService resumeService;
-    private final FreelancerDashboardService freelancerProjectService;
+    private final FreelancerDashboardService freelancerDashboardService;
 
     @GetMapping("")
     public String index(@AuthenticationPrincipal ItDaPrincipal principal) {
@@ -57,37 +57,20 @@ public class FreelancerController {
 
     // ─────────────────────────────────────────────────────────
     private void populateModel(String email, String status, String q, Model model) {
-        List<FreelancerDashboardItem> allItems =
-                freelancerProjectService.getDashboardItems(email);
+        // 1. 통계용 데이터 (필터링 전 전체 리스트)
+        List<FreelancerDashboardItem> allItems = freelancerDashboardService.getDashboardItems(email, null, null);
 
-        // 통계 카드는 전체 기준
-        long totalCount      = allItems.size();
-        long newCount        = allItems.stream().filter(i -> i.status() == DashboardProposalStatus.NEW).count();
-        long inProgressCount = allItems.stream().filter(i -> i.status() == DashboardProposalStatus.IN_PROGRESS).count();
-        long matchedCount    = allItems.stream().filter(i -> i.status() == DashboardProposalStatus.MATCHED).count();
+        // 2. 화면 목록용 데이터 (검색어와 상태가 반영된 리스트 - DB에서 처리)
+        List<FreelancerDashboardItem> filteredItems = freelancerDashboardService.getDashboardItems(email, status, q);
 
-        // 검색어 필터
-        List<FreelancerDashboardItem> items = allItems;
-        if (q != null && !q.isBlank()) {
-            String kw = q.trim().toLowerCase();
-            items = items.stream()
-                    .filter(i -> i.proposalTitle().toLowerCase().contains(kw)
-                              || i.companyName().toLowerCase().contains(kw))
-                    .toList();
-        }
-        // 상태 필터
-        if (status != null && !status.isBlank()) {
-            try {
-                DashboardProposalStatus fs = DashboardProposalStatus.valueOf(status);
-                items = items.stream().filter(i -> i.status() == fs).toList();
-            } catch (IllegalArgumentException ignored) { }
-        }
+        // 통계 계산은 전체 데이터 기준
+        model.addAttribute("totalCount",      allItems.size());
+        model.addAttribute("newCount",        allItems.stream().filter(i -> i.getStatus() == DashboardProposalStatus.NEW).count());
+        model.addAttribute("inProgressCount", allItems.stream().filter(i -> i.getStatus() == DashboardProposalStatus.IN_PROGRESS).count());
+        model.addAttribute("matchedCount",    allItems.stream().filter(i -> i.getStatus() == DashboardProposalStatus.COMPLETED).count());
 
-        model.addAttribute("items",           items);
-        model.addAttribute("totalCount",      totalCount);
-        model.addAttribute("newCount",        newCount);
-        model.addAttribute("inProgressCount", inProgressCount);
-        model.addAttribute("matchedCount",    matchedCount);
+        // 화면 출력은 필터링된 데이터
+        model.addAttribute("items",           filteredItems);
         model.addAttribute("statusFilter",    status);
         model.addAttribute("query",           q);
     }
