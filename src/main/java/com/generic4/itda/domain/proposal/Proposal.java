@@ -54,12 +54,6 @@ public class Proposal extends BaseEntity {
 
     private Long totalBudgetMax;
 
-    @Enumerated(EnumType.STRING)
-    private ProposalWorkType workType;
-
-    @Column(length = 255)
-    private String workPlace;
-
     private Long expectedPeriod;
 
     @Enumerated(EnumType.STRING)
@@ -72,8 +66,7 @@ public class Proposal extends BaseEntity {
 
     @Builder(access = AccessLevel.PRIVATE)
     private Proposal(Member member, String title, String rawInputText, String description,
-            Long totalBudgetMin, Long totalBudgetMax, ProposalWorkType workType, String workPlace,
-            Long expectedPeriod, ProposalStatus status) {
+            Long totalBudgetMin, Long totalBudgetMax, Long expectedPeriod, ProposalStatus status) {
         validateMember(member);
         validateBudgetRange(totalBudgetMin, totalBudgetMax, "전체");
         validateExpectedPeriod(expectedPeriod);
@@ -84,15 +77,12 @@ public class Proposal extends BaseEntity {
         this.description = normalizeOptionalText(description);
         this.totalBudgetMin = totalBudgetMin;
         this.totalBudgetMax = totalBudgetMax;
-        this.workType = workType;
-        this.workPlace = normalizeOptionalShortText(workPlace);
         this.expectedPeriod = expectedPeriod;
         this.status = status == null ? ProposalStatus.WRITING : status;
     }
 
     public static Proposal create(Member member, String title, String rawInputText, String description,
-            Long totalBudgetMin, Long totalBudgetMax, ProposalWorkType workType, String workPlace,
-            Long expectedPeriod) {
+            Long totalBudgetMin, Long totalBudgetMax, Long expectedPeriod) {
         return Proposal.builder()
                 .member(member)
                 .title(title)
@@ -100,15 +90,19 @@ public class Proposal extends BaseEntity {
                 .description(description)
                 .totalBudgetMin(totalBudgetMin)
                 .totalBudgetMax(totalBudgetMax)
-                .workType(workType)
-                .workPlace(workPlace)
                 .expectedPeriod(expectedPeriod)
                 .status(ProposalStatus.WRITING)
                 .build();
     }
 
+    public static Proposal create(Member member, String title, String rawInputText, String description,
+            Long totalBudgetMin, Long totalBudgetMax, ProposalWorkType workType, String workPlace,
+            Long expectedPeriod) {
+        return create(member, title, rawInputText, description, totalBudgetMin, totalBudgetMax, expectedPeriod);
+    }
+
     public void update(String title, String rawInputText, String description, Long totalBudgetMin,
-            Long totalBudgetMax, ProposalWorkType workType, String workPlace, Long expectedPeriod) {
+            Long totalBudgetMax, Long expectedPeriod) {
         validateBudgetRange(totalBudgetMin, totalBudgetMax, "전체");
         validateExpectedPeriod(expectedPeriod);
 
@@ -117,9 +111,12 @@ public class Proposal extends BaseEntity {
         this.description = normalizeOptionalText(description);
         this.totalBudgetMin = totalBudgetMin;
         this.totalBudgetMax = totalBudgetMax;
-        this.workType = workType;
-        this.workPlace = normalizeOptionalShortText(workPlace);
         this.expectedPeriod = expectedPeriod;
+    }
+
+    public void update(String title, String rawInputText, String description, Long totalBudgetMin,
+            Long totalBudgetMax, ProposalWorkType workType, String workPlace, Long expectedPeriod) {
+        update(title, rawInputText, description, totalBudgetMin, totalBudgetMax, expectedPeriod);
     }
 
     public void startMatching() {
@@ -132,19 +129,45 @@ public class Proposal extends BaseEntity {
         this.status = ProposalStatus.COMPLETE;
     }
 
-    public ProposalPosition addPosition(Position position, Long headCount, Long unitBudgetMin, Long unitBudgetMax) {
-        ProposalPosition proposalPosition = ProposalPosition.create(this, position, headCount, unitBudgetMin,
-                unitBudgetMax);
+    public ProposalPosition addPosition(Position position, String title, ProposalWorkType workType, Long headCount,
+            Long unitBudgetMin, Long unitBudgetMax, Long expectedPeriod, Integer careerMinYears,
+            Integer careerMaxYears, String workPlace) {
+        ProposalPosition proposalPosition = ProposalPosition.create(
+                this,
+                position,
+                title,
+                workType,
+                headCount,
+                unitBudgetMin,
+                unitBudgetMax,
+                expectedPeriod,
+                careerMinYears,
+                careerMaxYears,
+                workPlace
+        );
         validatePositionChange(proposalPosition, proposalPosition.getPosition());
         this.positions.add(proposalPosition);
         return proposalPosition;
     }
 
+    public ProposalPosition addPosition(Position position, Long headCount, Long unitBudgetMin, Long unitBudgetMax) {
+        return addPosition(
+                position,
+                position.getName(),
+                null,
+                headCount,
+                unitBudgetMin,
+                unitBudgetMax,
+                null,
+                null,
+                null,
+                null
+        );
+    }
+
     void validatePositionChange(ProposalPosition proposalPosition, Position position) {
         Assert.notNull(proposalPosition, "모집 단위는 필수값입니다.");
         Assert.notNull(position, "직무는 필수값입니다.");
-        Assert.state(isPositionNotDuplicated(proposalPosition, position),
-                "같은 제안서에는 동일한 직무를 중복 등록할 수 없습니다.");
     }
 
     public void removePosition(ProposalPosition proposalPosition) {
@@ -159,23 +182,6 @@ public class Proposal extends BaseEntity {
     private static void validateMember(Member member) {
         Assert.notNull(member, "클라이언트 회원은 필수값입니다.");
         Assert.isTrue(member.getStatus() == UserStatus.ACTIVE, "활성 회원만 제안서를 작성할 수 있습니다.");
-    }
-
-    private boolean isPositionNotDuplicated(ProposalPosition source, Position target) {
-        return this.positions.stream()
-                .filter(existing -> existing != source)
-                .map(ProposalPosition::getPosition)
-                .noneMatch(existing -> hasSamePosition(existing, target));
-    }
-
-    private boolean hasSamePosition(Position source, Position target) {
-        if (source == target) {
-            return true;
-        }
-        if (source.getId() != null && target.getId() != null) {
-            return source.getId().equals(target.getId());
-        }
-        return source.getName().equals(target.getName());
     }
 
     private static void validateBudgetRange(Long budgetMin, Long budgetMax, String label) {
@@ -204,10 +210,6 @@ public class Proposal extends BaseEntity {
     private static String normalizeRequiredRawInputText(String rawInputText) {
         Assert.hasText(rawInputText, "제안서 원본 입력은 필수값입니다.");
         return rawInputText;
-    }
-
-    private static String normalizeOptionalShortText(String value) {
-        return StringUtils.hasText(value) ? value.trim() : null;
     }
 
     private static String normalizeOptionalText(String value) {
