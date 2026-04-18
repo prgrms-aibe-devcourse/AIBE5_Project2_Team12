@@ -10,7 +10,7 @@ import java.util.Optional;
 public interface ResumeRepository extends JpaRepository<Resume, Long> {
     Optional<Resume> findByMemberId(Long memberId);
 
-    boolean existsByMemberEmail(String email);
+    boolean existsByMemberEmailValue(String email);
 
     @Query("select r from Resume r " +
             "left join fetch r.skills " +

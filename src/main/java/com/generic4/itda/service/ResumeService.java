@@ -1,11 +1,8 @@
 package com.generic4.itda.service;
 
 import com.generic4.itda.domain.member.Member;
-import com.generic4.itda.domain.resume.CareerPayload;
 import com.generic4.itda.domain.resume.Proficiency;
 import com.generic4.itda.domain.resume.Resume;
-import com.generic4.itda.domain.resume.ResumeWritingStatus;
-import com.generic4.itda.domain.resume.WorkType;
 import com.generic4.itda.domain.skill.Skill;
 import com.generic4.itda.dto.resume.ResumeForm;
 import com.generic4.itda.repository.MemberRepository;
@@ -30,7 +27,7 @@ public class ResumeService {
     @Transactional
     public Resume create(String email, ResumeForm form) {
         // 1. 존재 여부 확인 (리뷰어 제안 적용)
-        if (resumeRepository.existsByMemberEmail(email)) {
+        if (resumeRepository.existsByMemberEmailValue(email)) {
             throw new IllegalStateException("이미 이력서가 존재합니다.");
         }
 
