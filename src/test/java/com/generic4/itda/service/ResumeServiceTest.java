@@ -56,7 +56,7 @@ class ResumeServiceTest {
     @DisplayName("이력서 생성 성공 - 존재 확인 후 회원 조회 순서 보장")
     void create_Success() {
         // given
-        when(resumeRepository.existsByMemberEmail(EMAIL)).thenReturn(false);
+        when(resumeRepository.existsByMemberEmailValue(EMAIL)).thenReturn(false);
         when(memberRepository.findByEmail_Value(EMAIL)).thenReturn(member);
 
         // when
@@ -71,7 +71,7 @@ class ResumeServiceTest {
     @DisplayName("이력서 생성 실패 - 이미 존재하면 회원 조회를 하지 않음")
     void create_Fail_AlreadyExists() {
         // given
-        when(resumeRepository.existsByMemberEmail(EMAIL)).thenReturn(true);
+        when(resumeRepository.existsByMemberEmailValue(EMAIL)).thenReturn(true);
 
         // when & then
         assertThatThrownBy(() -> resumeService.create(EMAIL, form))
