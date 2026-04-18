@@ -14,23 +14,59 @@
           isNew=false + editable=false/null → 기본, 읽기 전용
     -->
     <div th:with="isEditing=${isNew eq true or editable eq true}">
+        <input type="hidden" id="isEditingFlag" th:value="${isEditing}">
         <main class="min-h-screen bg-slate-50 py-10 px-6">
             <div class="max-w-4xl mx-auto space-y-6">
+
+                <div id="exitModal" class="fixed inset-0 z-[9999] hidden">
+                    <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"></div>
+
+                    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm px-4">
+                        <div class="bg-white rounded-3xl p-8 shadow-2xl border border-slate-100">
+                            <div class="text-center space-y-4">
+                                <div class="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto">
+                                    <i data-lucide="alert-triangle" class="w-8 h-8 text-red-500"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-bold text-slate-900">정말 나갈까요?</h3>
+                                    <p class="text-sm text-slate-500 mt-2">작성 중인 내용은 저장되지 않으며<br>모든 변경사항이 삭제됩니다.</p>
+                                </div>
+                                <div class="flex gap-3 pt-2">
+                                    <button onclick="closeModal()"
+                                            class="flex-1 px-5 py-3 rounded-2xl bg-slate-100 text-slate-600 font-bold text-sm hover:bg-slate-200 transition-all">
+                                        계속 작성
+                                    </button>
+                                    <button onclick="confirmExit()"
+                                            class="flex-1 px-5 py-3 rounded-2xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 shadow-lg shadow-red-200 transition-all">
+                                        나가기
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- ===== 프로필 헤더 카드 ===== -->
                 <div class="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm">
                     <div class="flex items-center justify-between flex-wrap gap-4">
 
-                        <!-- 프로필 정보 -->
-                        <div class="flex items-center gap-5">
-                            <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
-                                <span class="text-white text-2xl font-bold"
-                                      th:text="${(memberName != null and !#strings.isEmpty(memberName)) ? #strings.substring(memberName,0,1) : '?'}">이</span>
-                            </div>
-                            <div>
-                                <h2 class="text-xl font-bold text-slate-900" th:text="${memberName}">이름</h2>
-                                <p class="text-sm text-slate-400" th:text="${memberEmail}">email@example.com</p>
-                                <p class="text-sm text-slate-400" th:text="${memberPhone}">010-0000-0000</p>
+                        <!-- 뒤로가기 + 구분선 + 프로필 정보 -->
+                        <div class="flex items-center gap-4">
+                            <button type="button" onclick="handleBackAction()"
+                                    class="flex items-center justify-center w-9 h-9 text-slate-400 rounded-xl hover:bg-slate-100 hover:text-slate-600 transition-all active:scale-95 shrink-0">
+                                <i data-lucide="arrow-left" class="w-5 h-5"></i>
+                            </button>
+                            <div class="w-px h-10 bg-slate-200 shrink-0"></div>
+                            <div class="flex items-center gap-5">
+                                <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
+                                    <span class="text-white text-2xl font-bold"
+                                          th:text="${(memberName != null and !#strings.isEmpty(memberName)) ? #strings.substring(memberName,0,1) : '?'}">이</span>
+                                </div>
+                                <div>
+                                    <h2 class="text-xl font-bold text-slate-900" th:text="${memberName}">이름</h2>
+                                    <p class="text-sm text-slate-400" th:text="${memberEmail}">email@example.com</p>
+                                    <p class="text-sm text-slate-400" th:text="${memberPhone}">010-0000-0000</p>
+                                </div>
                             </div>
                         </div>
 
@@ -55,8 +91,8 @@
 
                             <!-- [기존 이력서 - 편집 모드] 취소 + 저장하기 -->
                             <th:block th:if="${isNew eq false and isEditing eq true}">
-                                <a th:href="@{/resumes/me}"
-                                   class="px-6 py-3 text-slate-500 font-bold text-sm hover:text-slate-700 transition-all">취소</a>
+                                <button type="button" onclick="handleBackAction()"
+                                        class="px-6 py-3 text-slate-500 font-bold text-sm hover:text-slate-700 transition-all">취소</button>
                                 <button type="submit" form="profileForm"
                                         class="bg-blue-600 text-white px-8 py-3 rounded-2xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center gap-2">
                                     <i data-lucide="save" class="w-4 h-4"></i>저장하기
@@ -375,6 +411,66 @@
             console.error('스킬 처리 중 오류:', err);
         }
     });
+
+    let isDirty = document.getElementById('isEditingFlag')?.value === 'true';
+
+    (function () {
+        const modal = document.getElementById('exitModal');
+        const profileForm = document.getElementById('profileForm');
+
+        console.log('[DEBUG] 모달 요소:', modal);
+
+        if (profileForm) {
+            // 모든 입력 요소 감지
+            profileForm.querySelectorAll('input, textarea, select').forEach(el => {
+                el.addEventListener('input', () => {
+                    isDirty = true;
+                    console.log('[DEBUG] 폼 변경됨');
+                });
+                el.addEventListener('change', () => {
+                    isDirty = true;
+                    console.log('[DEBUG] 폼 변경됨');
+                });
+            });
+
+            // 저장 버튼 클릭 시 경고창 미출력 처리
+            profileForm.addEventListener('submit', () => {
+                isDirty = false;
+            });
+        }
+
+        // 브라우저 뒤로가기 감지 (History API)
+        if (isDirty) history.pushState(null, '', location.href);
+        window.addEventListener('popstate', () => {
+            if (isDirty) {
+                history.pushState(null, '', location.href);
+                if (modal) modal.classList.remove('hidden');
+            }
+        });
+
+        // 전역 함수로 등록
+        window.handleBackAction = function() {
+            console.log('[DEBUG] 뒤로가기 클릭됨, 현재 isDirty:', isDirty);
+
+            // 이제 isDirty가 정의되어 있으므로 에러가 나지 않습니다.
+            if (isDirty) {
+                if (modal) {
+                    modal.classList.remove('hidden');
+                }
+            } else {
+                location.href = "/freelancers/dashboard";
+            }
+        };
+
+        window.closeModal = function() {
+            if (modal) modal.classList.add('hidden');
+        };
+
+        window.confirmExit = function() {
+            isDirty = false;
+            location.href = "/freelancers/dashboard";
+        };
+    })();
 </script>
 </th:block>
 </body>
