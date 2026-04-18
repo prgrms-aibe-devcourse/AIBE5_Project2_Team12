@@ -48,7 +48,7 @@
             <div class="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center">
                 <i data-lucide="loader" class="w-5 h-5 text-emerald-500"></i>
             </div>
-            <div><p class="text-xs text-slate-400 font-medium">진행 중 매칭</p>
+            <div><p class="text-xs text-slate-400 font-medium">진행 중인 건</p>
             <p class="text-3xl font-bold text-slate-900 mt-0.5" th:text="${inProgressCount} + '건'">0건</p></div>
             <p class="text-xs text-slate-400">클라이언트와 협의 중인 프로젝트</p>
         </div>
@@ -57,7 +57,7 @@
             <div class="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center">
                 <i data-lucide="check-circle" class="w-5 h-5 text-slate-500"></i>
             </div>
-            <div><p class="text-xs text-slate-400 font-medium">매칭 완료</p>
+            <div><p class="text-xs text-slate-400 font-medium">완료 된 건</p>
             <p class="text-3xl font-bold text-slate-900 mt-0.5" th:text="${matchedCount} + '건'">0건</p></div>
             <p class="text-xs text-slate-400">성공적으로 종료된 프로젝트</p>
         </div>
