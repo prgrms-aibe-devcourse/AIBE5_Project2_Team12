@@ -147,6 +147,45 @@ class ResumeQueryRepositoryTest {
         );
     }
 
+    @DisplayName("findCandidatePool은 작성중인 이력서를 후보 풀에서 제외한다")
+    @Test
+    void findCandidatePool_excludesWritingResumes() {
+        // given
+        Skill java = skillRepository.saveAndFlush(Skill.create("Java-query-pool-writing", null));
+        Skill spring = skillRepository.saveAndFlush(Skill.create("Spring-query-pool-writing", null));
+
+        Resume doneResume = saveResume(
+                "pool-done",
+                (byte) 8,
+                true,
+                true,
+                true,
+                ResumeWritingStatus.DONE,
+                skill(java, Proficiency.ADVANCED),
+                skill(spring, Proficiency.INTERMEDIATE)
+        );
+        saveResume(
+                "pool-writing",
+                (byte) 20,
+                true,
+                true,
+                true,
+                ResumeWritingStatus.WRITING,
+                skill(java, Proficiency.ADVANCED),
+                skill(spring, Proficiency.ADVANCED)
+        );
+
+        // when
+        List<CandidatePoolRow> result = resumeQueryRepository.findCandidatePool(
+                List.of(java.getId(), spring.getId()),
+                10
+        );
+
+        // then
+        assertThat(result).extracting(CandidatePoolRow::resumeId)
+                .containsExactly(doneResume.getId());
+    }
+
     @DisplayName("findRecommendableResumeIds는 정렬된 이력서 중 limit 개수만 반환한다")
     @Test
     void findRecommendableResumeIds_appliesLimitAfterOrdering() {
@@ -167,12 +206,60 @@ class ResumeQueryRepositoryTest {
         );
     }
 
+    @DisplayName("findRecommendableResumeIds는 작성중인 이력서를 제외한다")
+    @Test
+    void findRecommendableResumeIds_excludesWritingResumes() {
+        // given
+        Resume doneResume = saveResume(
+                "recommend-done",
+                (byte) 7,
+                true,
+                true,
+                true,
+                ResumeWritingStatus.DONE
+        );
+        saveResume(
+                "recommend-writing",
+                (byte) 30,
+                true,
+                true,
+                true,
+                ResumeWritingStatus.WRITING
+        );
+
+        // when
+        List<Long> result = resumeQueryRepository.findRecommendableResumeIds(10);
+
+        // then
+        assertThat(result).containsExactly(doneResume.getId());
+    }
+
     private Resume saveResume(
             String suffix,
             byte careerYears,
             boolean publiclyVisible,
             boolean aiMatchingEnabled,
             boolean active,
+            SkillAssignment... skills
+    ) {
+        return saveResume(
+                suffix,
+                careerYears,
+                publiclyVisible,
+                aiMatchingEnabled,
+                active,
+                ResumeWritingStatus.DONE,
+                skills
+        );
+    }
+
+    private Resume saveResume(
+            String suffix,
+            byte careerYears,
+            boolean publiclyVisible,
+            boolean aiMatchingEnabled,
+            boolean active,
+            ResumeWritingStatus writingStatus,
             SkillAssignment... skills
     ) {
         String phone = "010-1111-" + String.format("%04d", Math.abs(suffix.hashCode() % 10_000));
@@ -190,7 +277,7 @@ class ResumeQueryRepositoryTest {
                 careerYears,
                 new CareerPayload(),
                 WorkType.REMOTE,
-                ResumeWritingStatus.DONE,
+                writingStatus,
                 null
         );
 
@@ -215,5 +302,6 @@ class ResumeQueryRepositoryTest {
     }
 
     private record SkillAssignment(Skill skill, Proficiency proficiency) {
+
     }
 }
