@@ -22,7 +22,6 @@ public class ProposalForm {
     @Size(max = 200, message = "제안서 제목은 200자를 초과할 수 없습니다.")
     private String title;
 
-    @NotBlank(message = "제안서 원본 입력은 필수값입니다.")
     @Size(max = 10000, message = "제안서 원본 입력은 10000자를 초과할 수 없습니다.")
     private String rawInputText;
 

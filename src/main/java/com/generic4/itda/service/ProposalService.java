@@ -5,6 +5,7 @@ import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
 import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
+import com.generic4.itda.domain.proposal.ProposalStatus;
 import com.generic4.itda.domain.skill.Skill;
 import com.generic4.itda.dto.proposal.ProposalForm;
 import com.generic4.itda.dto.proposal.ProposalPositionForm;
@@ -33,7 +34,7 @@ public class ProposalService {
     private final PositionRepository positionRepository;
     private final SkillRepository skillRepository;
 
-    public Proposal create(String memberEmail, ProposalForm form) {
+    public Proposal saveDraft(String memberEmail, ProposalForm form) {
         Member member = getMemberByEmail(memberEmail);
         List<ProposalPositionForm> positionForms = getPositionForms(form);
 
@@ -51,8 +52,16 @@ public class ProposalService {
         return proposalRepository.save(proposal);
     }
 
-    public Proposal update(Long proposalId, String memberEmail, ProposalForm form) {
+    public Proposal register(String memberEmail, ProposalForm form) {
+        Proposal proposal = saveDraft(memberEmail, form);
+        proposal.startMatching();
+        return proposal;
+    }
+
+    public Proposal saveDraft(Long proposalId, String memberEmail, ProposalForm form) {
         Proposal proposal = getOwnedProposal(proposalId, memberEmail);
+        validateEditable(proposal);
+        proposal.revertToWriting();
         List<ProposalPositionForm> positionForms = getPositionForms(form);
 
         proposal.update(
@@ -68,9 +77,38 @@ public class ProposalService {
         return proposal;
     }
 
+    public Proposal register(Long proposalId, String memberEmail, ProposalForm form) {
+        Proposal proposal = getOwnedProposal(proposalId, memberEmail);
+        validateEditable(proposal);
+        List<ProposalPositionForm> positionForms = getPositionForms(form);
+
+        proposal.update(
+                form.getTitle(),
+                form.getRawInputText(),
+                form.getDescription(),
+                calculateTotalBudgetMin(positionForms),
+                calculateTotalBudgetMax(positionForms),
+                form.getExpectedPeriod()
+        );
+
+        replacePositions(proposal, positionForms);
+        if (proposal.getStatus() == ProposalStatus.WRITING) {
+            proposal.startMatching();
+        }
+        return proposal;
+    }
+
     @Transactional(readOnly = true)
     public Proposal findOwnedProposal(Long proposalId, String memberEmail) {
         return getOwnedProposal(proposalId, memberEmail);
+    }
+
+    public Long calculateTotalBudgetMin(ProposalForm form) {
+        return calculateTotalBudgetMin(getPositionForms(form));
+    }
+
+    public Long calculateTotalBudgetMax(ProposalForm form) {
+        return calculateTotalBudgetMax(getPositionForms(form));
     }
 
     private void replacePositions(Proposal proposal, List<ProposalPositionForm> positionForms) {
@@ -160,6 +198,12 @@ public class ProposalService {
             throw new IllegalArgumentException("존재하지 않는 회원입니다.");
         }
         return member;
+    }
+
+    private void validateEditable(Proposal proposal) {
+        if (proposal.getStatus() == ProposalStatus.COMPLETE) {
+            throw new IllegalStateException("종료된 제안서는 수정할 수 없습니다.");
+        }
     }
 
     private Position getPosition(Long positionId) {

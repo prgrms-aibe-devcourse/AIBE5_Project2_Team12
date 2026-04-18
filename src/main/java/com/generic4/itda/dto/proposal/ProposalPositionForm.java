@@ -28,8 +28,10 @@ public class ProposalPositionForm {
     @Size(max = 200, message = "포지션 제목은 200자를 초과할 수 없습니다.")
     private String title;
 
+    @NotNull(message = "근무 형태는 필수값입니다.")
     private ProposalWorkType workType;
 
+    @NotNull(message = "모집 인원은 필수값입니다.")
     @Min(value = 1, message = "모집 인원은 1 이상이어야 합니다.")
     private Long headCount;
 

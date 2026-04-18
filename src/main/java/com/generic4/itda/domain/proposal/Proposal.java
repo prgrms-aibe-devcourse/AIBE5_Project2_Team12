@@ -73,7 +73,7 @@ public class Proposal extends BaseEntity {
 
         this.member = member;
         this.title = normalizeRequiredTitle(title);
-        this.rawInputText = normalizeRequiredRawInputText(rawInputText);
+        this.rawInputText = normalizeRawInputText(rawInputText);
         this.description = normalizeOptionalText(description);
         this.totalBudgetMin = totalBudgetMin;
         this.totalBudgetMax = totalBudgetMax;
@@ -107,7 +107,7 @@ public class Proposal extends BaseEntity {
         validateExpectedPeriod(expectedPeriod);
 
         this.title = normalizeRequiredTitle(title);
-        this.rawInputText = normalizeRequiredRawInputText(rawInputText);
+        this.rawInputText = normalizeRawInputText(rawInputText);
         this.description = normalizeOptionalText(description);
         this.totalBudgetMin = totalBudgetMin;
         this.totalBudgetMax = totalBudgetMax;
@@ -127,6 +127,11 @@ public class Proposal extends BaseEntity {
     public void complete() {
         Assert.state(this.status == ProposalStatus.MATCHING, "매칭 중인 제안서만 종료할 수 있습니다.");
         this.status = ProposalStatus.COMPLETE;
+    }
+
+    public void revertToWriting() {
+        Assert.state(this.status != ProposalStatus.COMPLETE, "종료된 제안서는 다시 작성 상태로 되돌릴 수 없습니다.");
+        this.status = ProposalStatus.WRITING;
     }
 
     public ProposalPosition addPosition(Position position, String title, ProposalWorkType workType, Long headCount,
@@ -153,7 +158,7 @@ public class Proposal extends BaseEntity {
     public ProposalPosition addPosition(Position position, Long headCount, Long unitBudgetMin, Long unitBudgetMax) {
         return addPosition(
                 position,
-                position.getName(),
+                position == null ? null : position.getName(),
                 null,
                 headCount,
                 unitBudgetMin,
@@ -207,9 +212,8 @@ public class Proposal extends BaseEntity {
         return title.trim();
     }
 
-    private static String normalizeRequiredRawInputText(String rawInputText) {
-        Assert.hasText(rawInputText, "제안서 원본 입력은 필수값입니다.");
-        return rawInputText;
+    private static String normalizeRawInputText(String rawInputText) {
+        return rawInputText == null ? "" : rawInputText;
     }
 
     private static String normalizeOptionalText(String value) {
