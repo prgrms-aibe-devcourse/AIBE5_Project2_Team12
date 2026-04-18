@@ -1,36 +1,55 @@
 package com.generic4.itda.dto.freelancer;
 
-import java.time.LocalDate;
-import java.util.List;
+import com.generic4.itda.domain.matching.constant.MatchingStatus;
+import lombok.Getter;
+
+import java.time.LocalDateTime;
 
 public record FreelancerDashboardItem(
         Long proposalId,
         String proposalTitle,
         String companyName,
         String positionName,
-        DashboardProposalStatus status,
+        MatchingStatus matchingStatus,
         Long budgetMin,
         Long budgetMax,
-        LocalDate receivedAt,
-        List<String> skillNames
+        LocalDateTime receivedAt
 ) {
+
+    public DashboardProposalStatus getStatus() {
+        if (this.matchingStatus == null) return DashboardProposalStatus.NEW;
+
+        return switch (this.matchingStatus) {
+            // 1. 새로운 제안
+            case PROPOSED -> DashboardProposalStatus.NEW;
+
+            // 2. 수락 후 프로젝트 수행 중인 단계
+            case ACCEPTED, IN_PROGRESS -> DashboardProposalStatus.IN_PROGRESS;
+
+            // 3. 프로젝트가 끝났거나(COMPLETED), 성사되지 않고 종료된 경우
+            case COMPLETED, REJECTED, CANCELED -> DashboardProposalStatus.COMPLETED;
+
+            default -> DashboardProposalStatus.NEW;
+        };
+    }
 
     public enum DashboardProposalStatus {
         NEW("신규 제안", "bg-blue-100 text-blue-700"),
         IN_PROGRESS("진행 중", "bg-emerald-100 text-emerald-700"),
-        MATCHED("매칭 완료", "bg-slate-900 text-white");
+        COMPLETED("완료", "bg-slate-900 text-white"); // 프로젝트 수행 완료와 취소된 건은 완료로 통칭
 
         private final String label;
         private final String cssClass;
 
         DashboardProposalStatus(String label, String cssClass) {
-            this.label    = label;
+            this.label = label;
             this.cssClass = cssClass;
         }
 
-        public String getLabel()    { return label; }
+        public String getLabel() { return label; }
         public String getCssClass() { return cssClass; }
     }
+
 
     public String formattedBudget() {
         if (budgetMin == null && budgetMax == null) return "협의";
