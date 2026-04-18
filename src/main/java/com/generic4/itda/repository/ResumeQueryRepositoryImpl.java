@@ -4,6 +4,7 @@ import com.generic4.itda.domain.resume.Proficiency;
 import com.generic4.itda.domain.resume.QResume;
 import com.generic4.itda.domain.resume.QResumeSkill;
 import com.generic4.itda.domain.resume.ResumeStatus;
+import com.generic4.itda.domain.resume.ResumeWritingStatus;
 import com.generic4.itda.service.recommend.CandidatePoolRow;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.CaseBuilder;
@@ -47,6 +48,7 @@ public class ResumeQueryRepositoryImpl implements ResumeQueryRepository {
                         resume.status.eq(ResumeStatus.ACTIVE),
                         resume.publiclyVisible.isTrue(),
                         resume.aiMatchingEnabled.isTrue(),
+                        resume.writingStatus.eq(ResumeWritingStatus.DONE),
                         resumeSkill.skill.id.in(requiredSkillIds)
                 )
                 .groupBy(resume.id, resume.careerYears)
@@ -68,6 +70,7 @@ public class ResumeQueryRepositoryImpl implements ResumeQueryRepository {
                 .where(
                         resume.status.eq(ResumeStatus.ACTIVE),
                         resume.publiclyVisible.isTrue(),
+                        resume.writingStatus.eq(ResumeWritingStatus.DONE),
                         resume.aiMatchingEnabled.isTrue()
                 )
                 .orderBy(
