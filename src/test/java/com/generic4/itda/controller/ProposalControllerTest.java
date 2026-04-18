@@ -169,4 +169,47 @@ class ProposalControllerTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrlPattern("**/login"));
     }
+
+    @Test
+    @DisplayName("거절/취소 이력만 있는 MATCHING 제안서는 새 초안으로 복제한 뒤 편집 화면으로 이동한다")
+    void redirectToClonedDraftWhenEditRequiresCopy() throws Exception {
+        Proposal copied = org.mockito.Mockito.mock(Proposal.class);
+        given(copied.getId()).willReturn(7L);
+        given(positionRepository.findAll(any(Sort.class)))
+                .willReturn(List.of(Position.create("백엔드 개발자")));
+        given(proposalService.prepareForEdit(1L, "client@example.com")).willReturn(copied);
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(get("/proposals/1/edit")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/proposals/7/edit"));
+    }
+
+    @Test
+    @DisplayName("진행 중 또는 완료된 매칭 이력이 있으면 수정 화면 대신 대시보드로 이동한다")
+    void redirectDashboardWhenEditBlocked() throws Exception {
+        given(proposalService.prepareForEdit(1L, "client@example.com"))
+                .willThrow(new IllegalStateException("진행 중이거나 완료된 매칭이 있는 제안서는 수정할 수 없습니다."));
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(get("/proposals/1/edit")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/client/dashboard"));
+    }
 }

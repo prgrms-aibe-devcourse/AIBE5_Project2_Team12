@@ -1,6 +1,7 @@
 package com.generic4.itda.service;
 
 import com.generic4.itda.domain.member.Member;
+import com.generic4.itda.domain.matching.constant.MatchingStatus;
 import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
@@ -10,10 +11,14 @@ import com.generic4.itda.domain.skill.Skill;
 import com.generic4.itda.dto.proposal.ProposalForm;
 import com.generic4.itda.dto.proposal.ProposalPositionForm;
 import com.generic4.itda.exception.ProposalNotFoundException;
+import com.generic4.itda.repository.MatchingRepository;
 import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.PositionRepository;
 import com.generic4.itda.repository.ProposalRepository;
+import com.generic4.itda.repository.RecommendationResultRepository;
+import com.generic4.itda.repository.RecommendationRunRepository;
 import com.generic4.itda.repository.SkillRepository;
+import java.util.EnumSet;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -29,10 +34,20 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class ProposalService {
 
+    private static final EnumSet<MatchingStatus> BLOCKING_MATCHING_STATUSES = EnumSet.of(
+            MatchingStatus.PROPOSED,
+            MatchingStatus.ACCEPTED,
+            MatchingStatus.IN_PROGRESS,
+            MatchingStatus.COMPLETED
+    );
+
     private final ProposalRepository proposalRepository;
     private final MemberRepository memberRepository;
     private final PositionRepository positionRepository;
     private final SkillRepository skillRepository;
+    private final MatchingRepository matchingRepository;
+    private final RecommendationRunRepository recommendationRunRepository;
+    private final RecommendationResultRepository recommendationResultRepository;
 
     public Proposal saveDraft(String memberEmail, ProposalForm form) {
         Member member = getMemberByEmail(memberEmail);
@@ -58,10 +73,13 @@ public class ProposalService {
         return proposal;
     }
 
-    public Proposal saveDraft(Long proposalId, String memberEmail, ProposalForm form) {
+    public Proposal prepareForEdit(Long proposalId, String memberEmail) {
         Proposal proposal = getOwnedProposal(proposalId, memberEmail);
-        validateEditable(proposal);
-        proposal.revertToWriting();
+        return resolveEditableProposal(proposal);
+    }
+
+    public Proposal saveDraft(Long proposalId, String memberEmail, ProposalForm form) {
+        Proposal proposal = resolveEditableProposal(getOwnedProposal(proposalId, memberEmail));
         List<ProposalPositionForm> positionForms = getPositionForms(form);
 
         proposal.update(
@@ -78,8 +96,7 @@ public class ProposalService {
     }
 
     public Proposal register(Long proposalId, String memberEmail, ProposalForm form) {
-        Proposal proposal = getOwnedProposal(proposalId, memberEmail);
-        validateEditable(proposal);
+        Proposal proposal = resolveEditableProposal(getOwnedProposal(proposalId, memberEmail));
         List<ProposalPositionForm> positionForms = getPositionForms(form);
 
         proposal.update(
@@ -109,6 +126,27 @@ public class ProposalService {
 
     public Long calculateTotalBudgetMax(ProposalForm form) {
         return calculateTotalBudgetMax(getPositionForms(form));
+    }
+
+    private Proposal resolveEditableProposal(Proposal proposal) {
+        validateEditable(proposal);
+
+        if (proposal.getStatus() != ProposalStatus.MATCHING) {
+            return proposal;
+        }
+
+        Long proposalId = proposal.getId();
+        if (!matchingRepository.existsByProposalPosition_Proposal_Id(proposalId)) {
+            clearRecommendationHistory(proposalId);
+            proposal.revertToWriting();
+            return proposal;
+        }
+
+        if (matchingRepository.existsByProposalPosition_Proposal_IdAndStatusIn(proposalId, BLOCKING_MATCHING_STATUSES)) {
+            throw new IllegalStateException("진행 중이거나 완료된 매칭이 있는 제안서는 수정할 수 없습니다.");
+        }
+
+        return cloneAsDraft(proposalId, proposal.getMember());
     }
 
     private void replacePositions(Proposal proposal, List<ProposalPositionForm> positionForms) {
@@ -186,6 +224,52 @@ public class ProposalService {
             sum = Math.addExact(sum, Math.multiplyExact(headCount, budget));
         }
         return sum;
+    }
+
+    private void clearRecommendationHistory(Long proposalId) {
+        if (!recommendationRunRepository.existsByProposalPosition_Proposal_Id(proposalId)) {
+            return;
+        }
+
+        recommendationResultRepository.deleteAllByRecommendationRun_ProposalPosition_Proposal_Id(proposalId);
+        recommendationRunRepository.deleteAllByProposalPosition_Proposal_Id(proposalId);
+    }
+
+    private Proposal cloneAsDraft(Long proposalId, Member member) {
+        Proposal source = proposalRepository.findWithPositionsById(proposalId)
+                .orElseThrow(() -> new ProposalNotFoundException("제안서를 찾을 수 없습니다. id=" + proposalId));
+        proposalRepository.findPositionsWithSkillsByProposalId(proposalId);
+
+        Proposal draftCopy = Proposal.create(
+                member,
+                source.getTitle(),
+                source.getRawInputText(),
+                source.getDescription(),
+                source.getTotalBudgetMin(),
+                source.getTotalBudgetMax(),
+                source.getExpectedPeriod()
+        );
+
+        for (ProposalPosition sourcePosition : source.getPositions()) {
+            ProposalPosition copiedPosition = draftCopy.addPosition(
+                    sourcePosition.getPosition(),
+                    sourcePosition.getTitle(),
+                    sourcePosition.getWorkType(),
+                    sourcePosition.getHeadCount(),
+                    sourcePosition.getUnitBudgetMin(),
+                    sourcePosition.getUnitBudgetMax(),
+                    sourcePosition.getExpectedPeriod(),
+                    sourcePosition.getCareerMinYears(),
+                    sourcePosition.getCareerMaxYears(),
+                    sourcePosition.getWorkPlace()
+            );
+
+            sourcePosition.getSkills().forEach(skill ->
+                    copiedPosition.addSkill(skill.getSkill(), skill.getImportance())
+            );
+        }
+
+        return proposalRepository.save(draftCopy);
     }
 
     private List<ProposalPositionForm> getPositionForms(ProposalForm form) {

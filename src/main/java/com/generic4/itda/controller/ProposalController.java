@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
 @RequestMapping("/proposals")
@@ -91,9 +92,22 @@ public class ProposalController {
     public String editForm(
             @PathVariable Long proposalId,
             @AuthenticationPrincipal ItDaPrincipal principal,
-            Model model
+            Model model,
+            RedirectAttributes redirectAttributes
     ) {
-        Proposal proposal = proposalService.findOwnedProposal(proposalId, principal.getEmail());
+        Proposal proposal;
+        try {
+            proposal = proposalService.prepareForEdit(proposalId, principal.getEmail());
+        } catch (IllegalStateException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
+            return "redirect:/client/dashboard";
+        }
+
+        if (!proposal.getId().equals(proposalId)) {
+            redirectAttributes.addFlashAttribute("noticeMessage", "기존 매칭 이력을 보존하기 위해 새 초안으로 이동했습니다.");
+            return "redirect:/proposals/" + proposal.getId() + "/edit";
+        }
+
         ProposalForm form = ProposalForm.from(proposal);
 
         addCommonAttributes(model);
@@ -112,7 +126,8 @@ public class ProposalController {
             @Valid @ModelAttribute("proposalForm") ProposalForm form,
             BindingResult bindingResult,
             @RequestParam(name = "submitAction", defaultValue = SAVE_ACTION) String submitAction,
-            Model model
+            Model model,
+            RedirectAttributes redirectAttributes
     ) {
         boolean registerAction = isRegisterAction(submitAction);
         sanitizeForSubmit(form);
@@ -131,9 +146,13 @@ public class ProposalController {
                     ? proposalService.register(proposalId, principal.getEmail(), form)
                     : proposalService.saveDraft(proposalId, principal.getEmail(), form);
 
+            if (!proposal.getId().equals(proposalId)) {
+                redirectAttributes.addFlashAttribute("noticeMessage", "기존 매칭 이력을 보존하기 위해 새 초안으로 저장했습니다.");
+            }
+
             return registerAction
                     ? "redirect:/proposals/" + proposal.getId() + "/recommendations"
-                    : "redirect:/proposals/" + proposalId + "/edit";
+                    : "redirect:/proposals/" + proposal.getId() + "/edit";
         } catch (IllegalArgumentException | IllegalStateException e) {
             rejectGlobal(bindingResult, e.getMessage());
             addCommonAttributes(model);
