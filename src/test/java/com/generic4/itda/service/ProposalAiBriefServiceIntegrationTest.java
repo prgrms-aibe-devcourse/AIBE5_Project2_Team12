@@ -134,8 +134,6 @@ class ProposalAiBriefServiceIntegrationTest {
                 .isEqualTo("웹 서비스 개발 외주입니다. 백엔드 개발자 1명과 프론트엔드 개발자 1명을 12주 동안 채용합니다.");
         assertThat(persistedProposal.getTotalBudgetMin()).isEqualTo(8_000_000L);
         assertThat(persistedProposal.getTotalBudgetMax()).isEqualTo(8_000_000L);
-        assertThat(persistedProposal.getWorkType()).isEqualTo(ProposalWorkType.HYBRID);
-        assertThat(persistedProposal.getWorkPlace()).isEqualTo("판교");
         assertThat(persistedProposal.getExpectedPeriod()).isEqualTo(12L);
         assertThat(persistedProposal.getPositions()).hasSize(2);
         assertThat(positionsByName).doesNotContainKey("디자이너");

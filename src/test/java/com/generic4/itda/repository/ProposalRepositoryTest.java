@@ -2,7 +2,6 @@ package com.generic4.itda.repository;
 
 import static com.generic4.itda.fixture.MemberFixture.createMember;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.generic4.itda.annotation.H2RepositoryTest;
 import com.generic4.itda.domain.member.Member;
@@ -136,9 +135,9 @@ class ProposalRepositoryTest {
         assertThat(countRows("ProposalPositionSkill")).isEqualTo(1L);
     }
 
-    @DisplayName("같은 직무 마스터를 같은 제안서 안에 중복 저장할 수 없다")
+    @DisplayName("같은 직무 마스터를 같은 제안서 안에 중복 저장할 수 있다")
     @Test
-    void failWhenPositionMasterIsDuplicatedWithinProposal() {
+    void allowWhenPositionMasterIsDuplicatedWithinProposal() {
         Member member = memberRepository.save(createMember());
         Position backend = persist(Position.create("백엔드 개발자"));
 
@@ -154,10 +153,13 @@ class ProposalRepositoryTest {
                 12L
         );
         proposal.addPosition(backend, 1L, 3_000_000L, 4_000_000L);
+        proposal.addPosition(backend, 2L, 5_000_000L, 6_000_000L);
 
-        assertThatThrownBy(() -> proposal.addPosition(backend, 2L, 5_000_000L, 6_000_000L))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("같은 제안서에는 동일한 직무를 중복 등록할 수 없습니다.");
+        proposalRepository.saveAndFlush(proposal);
+        entityManager.clear();
+
+        Proposal persistedProposal = proposalRepository.findById(proposal.getId()).orElseThrow();
+        assertThat(persistedProposal.getPositions()).hasSize(2);
     }
 
     // ──────────────────────────────────────────────────────────────────────────

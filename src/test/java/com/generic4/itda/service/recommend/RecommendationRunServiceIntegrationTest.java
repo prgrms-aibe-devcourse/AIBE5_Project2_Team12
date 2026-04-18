@@ -149,8 +149,6 @@ class RecommendationRunServiceIntegrationTest {
                 editableProposal.getDescription(),
                 editableProposal.getTotalBudgetMin(),
                 editableProposal.getTotalBudgetMax(),
-                editableProposal.getWorkType(),
-                editableProposal.getWorkPlace(),
                 editableProposal.getExpectedPeriod()
         );
         proposalRepository.saveAndFlush(editableProposal);

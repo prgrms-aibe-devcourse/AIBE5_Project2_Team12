@@ -28,8 +28,6 @@ class ProposalTest {
                 "  최종 제안서 본문  ",
                 1_000_000L,
                 3_000_000L,
-                ProposalWorkType.HYBRID,
-                "  서울 강남구  ",
                 12L
         );
 
@@ -39,8 +37,6 @@ class ProposalTest {
         assertThat(proposal.getDescription()).isEqualTo("최종 제안서 본문");
         assertThat(proposal.getTotalBudgetMin()).isEqualTo(1_000_000L);
         assertThat(proposal.getTotalBudgetMax()).isEqualTo(3_000_000L);
-        assertThat(proposal.getWorkType()).isEqualTo(ProposalWorkType.HYBRID);
-        assertThat(proposal.getWorkPlace()).isEqualTo("서울 강남구");
         assertThat(proposal.getExpectedPeriod()).isEqualTo(12L);
         assertThat(proposal.getStatus()).isEqualTo(ProposalStatus.WRITING);
     }
@@ -94,24 +90,20 @@ class ProposalTest {
                 .hasMessage("제안서 제목은 필수값입니다.");
     }
 
-    @DisplayName("원본 입력이 없으면 생성에 실패한다")
-    @ParameterizedTest
-    @NullSource
-    @ValueSource(strings = {"", " "})
-    void failWhenRawInputTextIsMissing(String rawInputText) {
-        assertThatThrownBy(() -> Proposal.create(
+    @DisplayName("원본 입력이 null이면 빈 문자열로 저장한다")
+    @Test
+    void allowWhenRawInputTextIsNull() {
+        Proposal proposal = Proposal.create(
                 createMember(),
                 "제안서 제목",
-                rawInputText,
-                null,
                 null,
                 null,
                 null,
                 null,
                 null
-        ))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("제안서 원본 입력은 필수값입니다.");
+        );
+
+        assertThat(proposal.getRawInputText()).isEmpty();
     }
 
     @DisplayName("전체 예산 범위가 뒤집히면 생성에 실패한다")
@@ -162,8 +154,6 @@ class ProposalTest {
                 "  수정된 본문  ",
                 2_000_000L,
                 4_000_000L,
-                ProposalWorkType.REMOTE,
-                "  판교  ",
                 24L
         );
 
@@ -172,8 +162,6 @@ class ProposalTest {
         assertThat(proposal.getDescription()).isEqualTo("수정된 본문");
         assertThat(proposal.getTotalBudgetMin()).isEqualTo(2_000_000L);
         assertThat(proposal.getTotalBudgetMax()).isEqualTo(4_000_000L);
-        assertThat(proposal.getWorkType()).isEqualTo(ProposalWorkType.REMOTE);
-        assertThat(proposal.getWorkPlace()).isEqualTo("판교");
         assertThat(proposal.getExpectedPeriod()).isEqualTo(24L);
         assertThat(proposal.getStatus()).isEqualTo(ProposalStatus.WRITING);
     }
@@ -235,18 +223,16 @@ class ProposalTest {
         assertThat(proposalPosition.getProposal()).isNull();
     }
 
-    @DisplayName("같은 직무 마스터를 같은 제안서 안에 중복 등록할 수 없다")
+    @DisplayName("같은 직무 마스터를 같은 제안서 안에 여러 번 등록할 수 있다")
     @Test
-    void failWhenPositionMasterIsDuplicatedWithinProposal() {
+    void allowWhenPositionMasterIsDuplicatedWithinProposal() {
         Proposal proposal = createProposal("원본 입력");
         Position backend = Position.create("백엔드 개발자");
 
-        proposal.addPosition(backend, 1L, 3_000_000L, 4_000_000L);
+        ProposalPosition first = proposal.addPosition(backend, 1L, 3_000_000L, 4_000_000L);
+        ProposalPosition second = proposal.addPosition(backend, 2L, 4_000_000L, 6_000_000L);
 
-        assertThatThrownBy(() -> proposal.addPosition(backend, 2L, 4_000_000L, 6_000_000L))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("같은 제안서에는 동일한 직무를 중복 등록할 수 없습니다.");
-        assertThat(proposal.getPositions()).hasSize(1);
+        assertThat(proposal.getPositions()).containsExactly(first, second);
     }
 
     private Proposal createProposal(String rawInputText) {
@@ -257,8 +243,6 @@ class ProposalTest {
                 "제안서 본문",
                 1_000_000L,
                 2_000_000L,
-                ProposalWorkType.SITE,
-                "서울",
                 8L
         );
     }
