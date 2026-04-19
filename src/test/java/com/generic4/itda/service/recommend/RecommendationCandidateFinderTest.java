@@ -11,6 +11,7 @@ import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
 import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
+import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.domain.resume.CareerPayload;
 import com.generic4.itda.domain.resume.Proficiency;
 import com.generic4.itda.domain.resume.Resume;
@@ -50,7 +51,7 @@ class RecommendationCandidateFinderTest {
         Resume first = createResume(11L, (byte) 7, skillData(101L, "Java", Proficiency.ADVANCED));
         Resume second = createResume(22L, (byte) 5, skillData(102L, "Spring", Proficiency.INTERMEDIATE));
 
-        given(resumeQueryRepository.findRecommendableResumeIds(100)).willReturn(List.of(11L, 22L));
+        given(resumeQueryRepository.findRecommendableResumeIds(proposalPosition, 100)).willReturn(List.of(11L, 22L));
         given(resumeRepository.findAllWithSkillsByIds(List.of(11L, 22L))).willReturn(List.of(second, first));
 
         // when
@@ -62,7 +63,7 @@ class RecommendationCandidateFinderTest {
         assertThat(result.get(0).skills()).extracting(RecommendationCandidate.CandidateSkill::skillName)
                 .containsExactly("Java");
 
-        verify(resumeQueryRepository).findRecommendableResumeIds(100);
+        verify(resumeQueryRepository).findRecommendableResumeIds(proposalPosition, 100);
         verify(resumeRepository).findAllWithSkillsByIds(List.of(11L, 22L));
         verifyNoMoreInteractions(resumeQueryRepository, resumeRepository);
     }
@@ -78,7 +79,7 @@ class RecommendationCandidateFinderTest {
         Resume first = createResume(11L, (byte) 9, skillData(101L, "Java", Proficiency.ADVANCED));
         Resume second = createResume(22L, (byte) 4, skillData(101L, "Java", Proficiency.INTERMEDIATE));
 
-        given(resumeQueryRepository.findCandidatePool(List.of(101L), 120)).willReturn(List.of(
+        given(resumeQueryRepository.findCandidatePool(proposalPosition, List.of(101L), 120)).willReturn(List.of(
                 new CandidatePoolRow(22L, 1L, 4, (byte) 4),
                 new CandidatePoolRow(11L, 1L, 9, (byte) 9)
         ));
@@ -91,7 +92,7 @@ class RecommendationCandidateFinderTest {
         assertThat(result).extracting(RecommendationCandidate::resumeId)
                 .containsExactly(22L, 11L);
 
-        verify(resumeQueryRepository).findCandidatePool(List.of(101L), 120);
+        verify(resumeQueryRepository).findCandidatePool(proposalPosition, List.of(101L), 120);
         verify(resumeRepository).findAllWithSkillsByIds(List.of(22L, 11L));
         verifyNoMoreInteractions(resumeQueryRepository, resumeRepository);
     }
@@ -103,19 +104,59 @@ class RecommendationCandidateFinderTest {
         ProposalPosition proposalPosition = createProposalPosition(
                 skillRequirement(101L, "Java", ProposalPositionSkillImportance.ESSENTIAL)
         );
-        given(resumeQueryRepository.findCandidatePool(List.of(101L), 100)).willReturn(List.of());
+        given(resumeQueryRepository.findCandidatePool(proposalPosition, List.of(101L), 100)).willReturn(List.of());
 
         // when
         List<RecommendationCandidate> result = finder.findCandidates(proposalPosition, 5);
 
         // then
         assertThat(result).isEmpty();
-        verify(resumeQueryRepository).findCandidatePool(List.of(101L), 100);
+        verify(resumeQueryRepository).findCandidatePool(proposalPosition, List.of(101L), 100);
         verifyNoInteractions(resumeRepository);
         verifyNoMoreInteractions(resumeQueryRepository);
     }
 
+    @DisplayName("후보 이력서가 경력 범위를 벗어나면 최종 후보에서 제외한다")
+    @Test
+    void findCandidates_filtersResumesOutsideCareerRange() {
+        // given
+        ProposalPosition proposalPosition = createProposalPosition(
+                "백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                3,
+                7,
+                skillRequirement(101L, "Java", ProposalPositionSkillImportance.PREFERENCE)
+        );
+        Resume inRange = createResume(11L, (byte) 5, skillData(101L, "Java", Proficiency.ADVANCED));
+        Resume belowRange = createResume(22L, (byte) 2, skillData(101L, "Java", Proficiency.INTERMEDIATE));
+        Resume aboveRange = createResume(33L, (byte) 9, skillData(101L, "Java", Proficiency.INTERMEDIATE));
+
+        given(resumeQueryRepository.findRecommendableResumeIds(proposalPosition, 100)).willReturn(List.of(11L, 22L, 33L));
+        given(resumeRepository.findAllWithSkillsByIds(List.of(11L, 22L, 33L)))
+                .willReturn(List.of(aboveRange, inRange, belowRange));
+
+        // when
+        List<RecommendationCandidate> result = finder.findCandidates(proposalPosition, 3);
+
+        // then
+        assertThat(result).extracting(RecommendationCandidate::resumeId)
+                .containsExactly(11L);
+        verify(resumeQueryRepository).findRecommendableResumeIds(proposalPosition, 100);
+        verify(resumeRepository).findAllWithSkillsByIds(List.of(11L, 22L, 33L));
+        verifyNoMoreInteractions(resumeQueryRepository, resumeRepository);
+    }
+
     private ProposalPosition createProposalPosition(SkillRequirement... requirements) {
+        return createProposalPosition("백엔드", null, null, null, requirements);
+    }
+
+    private ProposalPosition createProposalPosition(
+            String title,
+            ProposalWorkType workType,
+            Integer careerMinYears,
+            Integer careerMaxYears,
+            SkillRequirement... requirements
+    ) {
         Proposal proposal = Proposal.create(
                 createMember(),
                 "추천 요청",
@@ -123,11 +164,20 @@ class RecommendationCandidateFinderTest {
                 null,
                 null,
                 null,
-                null,
-                null,
                 null
         );
-        ProposalPosition proposalPosition = proposal.addPosition(Position.create("백엔드"), 1L, null, null);
+        ProposalPosition proposalPosition = proposal.addPosition(
+                Position.create(title),
+                title,
+                workType,
+                1L,
+                null,
+                null,
+                null,
+                careerMinYears,
+                careerMaxYears,
+                workType == ProposalWorkType.REMOTE || workType == null ? null : "서울"
+        );
 
         for (SkillRequirement requirement : requirements) {
             Skill skill = Skill.create(requirement.name(), null);

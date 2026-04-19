@@ -30,9 +30,13 @@ public class RecommendationCandidateFinder {
 
         List<Long> candidateResumeIds;
         if (requiredSkillIds.isEmpty()) {
-            candidateResumeIds = resumeQueryRepository.findRecommendableResumeIds(candidatePoolSize);
+            candidateResumeIds = resumeQueryRepository.findRecommendableResumeIds(proposalPosition, candidatePoolSize);
         } else {
-            candidateResumeIds = resumeQueryRepository.findCandidatePool(requiredSkillIds, candidatePoolSize).stream()
+            candidateResumeIds = resumeQueryRepository.findCandidatePool(
+                            proposalPosition,
+                            requiredSkillIds,
+                            candidatePoolSize
+                    ).stream()
                     .map(CandidatePoolRow::resumeId)
                     .toList();
         }
@@ -48,6 +52,7 @@ public class RecommendationCandidateFinder {
         return candidateResumeIds.stream()
                 .map(resumeMap::get)
                 .filter(Objects::nonNull)
+                .filter(resume -> passesCareerRage(resume, proposalPosition))
                 .map(this::toCandidate)
                 .toList();
     }
@@ -61,6 +66,22 @@ public class RecommendationCandidateFinder {
 
     private int resolveCandidatePoolSize(int topK) {
         return Math.max(MINIMUM_CANDIDATE_POOL_SIZE, topK * 20);
+    }
+
+    private boolean passesCareerRage(Resume resume, ProposalPosition proposalPosition) {
+        Integer candidateCareerYears = Integer.valueOf(resume.getCareerYears());
+        Integer careerMinYears = proposalPosition.getCareerMinYears();
+        Integer careerMaxYears = proposalPosition.getCareerMaxYears();
+
+        if (careerMinYears != null && candidateCareerYears < careerMinYears) {
+            return false;
+        }
+
+        if (careerMaxYears != null && candidateCareerYears > careerMaxYears) {
+            return false;
+        }
+
+        return true;
     }
 
     private RecommendationCandidate toCandidate(Resume resume) {
