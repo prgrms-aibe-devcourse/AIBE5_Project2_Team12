@@ -1,9 +1,11 @@
 package com.generic4.itda.controller;
 
+import com.generic4.itda.domain.resume.CareerEmploymentType;
 import com.generic4.itda.domain.resume.Proficiency;
 import com.generic4.itda.domain.resume.Resume;
 import com.generic4.itda.domain.resume.ResumeWritingStatus;
 import com.generic4.itda.domain.resume.WorkType;
+import com.generic4.itda.dto.resume.CareerItemForm;
 import com.generic4.itda.dto.resume.ResumeForm;
 import com.generic4.itda.dto.resume.ResumeSkillForm;
 import com.generic4.itda.dto.security.ItDaPrincipal;
@@ -144,6 +146,44 @@ public class ResumeController {
         return "redirect:/resumes/me";
     }
 
+    @PostMapping("/career/add")
+    public String addCareer(
+            @AuthenticationPrincipal ItDaPrincipal principal,
+            @ModelAttribute CareerItemForm form,
+            Model model
+    ) {
+        resumeService.addCareer(principal.getEmail(), form.toPayload());
+        return prepareCareerSection(principal, model);
+    }
+
+    @PostMapping("/career/update")
+    public String updateCareer(
+            @AuthenticationPrincipal ItDaPrincipal principal,
+            @ModelAttribute CareerItemForm form,
+            Model model
+    ) {
+        resumeService.updateCareer(principal.getEmail(), form.getIndex(), form.toPayload());
+        return prepareCareerSection(principal, model);
+    }
+
+    @PostMapping("/career/remove")
+    public String removeCareer(
+            @AuthenticationPrincipal ItDaPrincipal principal,
+            @RequestParam int index,
+            Model model
+    ) {
+        resumeService.removeCareer(principal.getEmail(), index);
+        return prepareCareerSection(principal, model);
+    }
+
+    private String prepareCareerSection(ItDaPrincipal principal, Model model) {
+        Resume resume = resumeService.findByEmail(principal.getEmail());
+        addCommonAttributes(model);
+        model.addAttribute("resume", resume);
+        model.addAttribute("isEditing", true);
+        return "freelancer/resumeForm :: #careerSection";
+    }
+
     @PostMapping("/skill/add")
     public String addSkill(
             @AuthenticationPrincipal ItDaPrincipal principal,
@@ -216,6 +256,7 @@ public class ResumeController {
         model.addAttribute("workTypes", WorkType.values());
         model.addAttribute("proficiencies", Proficiency.values());
         model.addAttribute("writingStatuses", ResumeWritingStatus.values());
+        model.addAttribute("employmentTypes", CareerEmploymentType.values());
     }
 
     private void addMemberAttributes(Model model, ItDaPrincipal principal) {
