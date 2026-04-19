@@ -63,6 +63,8 @@ class ProposalServiceTest {
         lenient().when(proposalRepository.save(any(Proposal.class))).thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(matchingRepository.existsByProposalPosition_Proposal_IdAndStatusIn(any(Long.class), any()))
                 .thenReturn(false);
+        lenient().when(proposalRepository.findFirstBySourceProposal_IdAndStatusOrderByModifiedAtDescIdDesc(any(Long.class), any()))
+                .thenReturn(Optional.empty());
     }
 
     @Test
@@ -171,6 +173,34 @@ class ProposalServiceTest {
         assertThat(copied.getTitle()).isEqualTo(source.getTitle());
         assertThat(copied.getPositions()).hasSize(1);
         assertThat(copied.getPositions().get(0).getTitle()).isEqualTo("Node.js 백엔드 개발자");
+    }
+
+    @Test
+    @DisplayName("같은 원본에서 이미 열린 WRITING draft가 있으면 그 draft를 재사용한다")
+    void createEditDraft_reusesExistingWritingDraft() {
+        Proposal source = Proposal.create(member, "기존 프로젝트", "원본", "설명", 3_000_000L, 4_000_000L, 8L);
+        ReflectionTestUtils.setField(source, "id", 1L);
+        source.startMatching();
+
+        Proposal existingDraft = Proposal.createDraftCopy(
+                source,
+                member,
+                source.getTitle(),
+                source.getRawInputText(),
+                source.getDescription(),
+                source.getTotalBudgetMin(),
+                source.getTotalBudgetMax(),
+                source.getExpectedPeriod()
+        );
+        ReflectionTestUtils.setField(existingDraft, "id", 7L);
+
+        when(proposalRepository.findById(1L)).thenReturn(Optional.of(source));
+        when(proposalRepository.findFirstBySourceProposal_IdAndStatusOrderByModifiedAtDescIdDesc(1L, ProposalStatus.WRITING))
+                .thenReturn(Optional.of(existingDraft));
+
+        Proposal reused = proposalService.createEditDraft(1L, EMAIL);
+
+        assertThat(reused).isSameAs(existingDraft);
     }
 
     @Test

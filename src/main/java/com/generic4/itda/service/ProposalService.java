@@ -77,6 +77,11 @@ public class ProposalService {
             return proposal;
         }
 
+        Proposal reusableDraft = findReusableDraft(proposalId);
+        if (reusableDraft != null) {
+            return reusableDraft;
+        }
+
         return cloneAsDraft(proposalId, proposal.getMember());
     }
 
@@ -217,7 +222,8 @@ public class ProposalService {
                 .orElseThrow(() -> new ProposalNotFoundException("제안서를 찾을 수 없습니다. id=" + proposalId));
         proposalRepository.findPositionsWithSkillsByProposalId(proposalId);
 
-        Proposal draftCopy = Proposal.create(
+        Proposal draftCopy = Proposal.createDraftCopy(
+                source,
                 member,
                 source.getTitle(),
                 source.getRawInputText(),
@@ -247,6 +253,14 @@ public class ProposalService {
         }
 
         return proposalRepository.save(draftCopy);
+    }
+
+    private Proposal findReusableDraft(Long proposalId) {
+        return proposalRepository.findFirstBySourceProposal_IdAndStatusOrderByModifiedAtDescIdDesc(
+                        proposalId,
+                        ProposalStatus.WRITING
+                )
+                .orElse(null);
     }
 
     private List<ProposalPositionForm> getPositionForms(ProposalForm form) {

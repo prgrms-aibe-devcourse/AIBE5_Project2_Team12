@@ -99,12 +99,17 @@
                                 아래 버튼을 누르면 현재 제안서 내용을 복제한 새 초안 편집 화면으로 이동합니다.
                             </p>
                             <div class="mt-5 flex flex-col gap-3">
-                                <form th:action="@{/proposals/{proposalId}/edit-draft(proposalId=${proposalId})}" method="post">
+                                <form th:action="@{/proposals/{proposalId}/edit-draft(proposalId=${proposalId})}"
+                                      method="post"
+                                      x-data="{ submitting: false }"
+                                      @submit="if (submitting) { $event.preventDefault(); return; } submitting = true">
                                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                                     <button type="submit"
+                                            :disabled="submitting"
+                                            :class="submitting ? 'opacity-60 cursor-not-allowed' : ''"
                                             class="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-slate-900/10 transition hover:bg-slate-800">
                                         <i data-lucide="copy-plus" class="h-4 w-4"></i>
-                                        수정 시작하기
+                                        <span x-text="submitting ? '초안 준비 중...' : '수정 시작하기'">수정 시작하기</span>
                                     </button>
                                 </form>
                                 <a th:href="@{/client/dashboard}"

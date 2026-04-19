@@ -6,6 +6,7 @@ import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.dto.proposal.ProposalForm;
 import com.generic4.itda.dto.proposal.ProposalPositionForm;
 import com.generic4.itda.dto.security.ItDaPrincipal;
+import com.generic4.itda.exception.ProposalNotFoundException;
 import com.generic4.itda.repository.PositionRepository;
 import com.generic4.itda.service.ProposalService;
 import jakarta.validation.Valid;
@@ -15,6 +16,7 @@ import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Controller;
 import org.springframework.util.StringUtils;
 import org.springframework.ui.Model;
@@ -121,6 +123,12 @@ public class ProposalController {
             model.addAttribute("isNew", false);
 
             return "client/proposalForm";
+        } catch (ProposalNotFoundException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", "존재하지 않는 제안서입니다.");
+            return "redirect:/client/dashboard";
+        } catch (AccessDeniedException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", "본인 제안서만 조회하거나 수정할 수 있습니다.");
+            return "redirect:/client/dashboard";
         } catch (IllegalStateException e) {
             redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
             return "redirect:/client/dashboard";
@@ -139,6 +147,12 @@ public class ProposalController {
                 redirectAttributes.addFlashAttribute("noticeMessage", "기존 매칭 이력을 보존하기 위해 새 초안으로 이동했습니다.");
             }
             return "redirect:/proposals/" + proposal.getId() + "/edit";
+        } catch (ProposalNotFoundException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", "존재하지 않는 제안서입니다.");
+            return "redirect:/client/dashboard";
+        } catch (AccessDeniedException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", "본인 제안서만 조회하거나 수정할 수 있습니다.");
+            return "redirect:/client/dashboard";
         } catch (IllegalStateException e) {
             redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
             return "redirect:/client/dashboard";
@@ -152,7 +166,8 @@ public class ProposalController {
             @Valid @ModelAttribute("proposalForm") ProposalForm form,
             BindingResult bindingResult,
             @RequestParam(name = "submitAction", defaultValue = SAVE_ACTION) String submitAction,
-            Model model
+            Model model,
+            RedirectAttributes redirectAttributes
     ) {
         boolean registerAction = isRegisterAction(submitAction);
         sanitizeForSubmit(form);
@@ -174,6 +189,12 @@ public class ProposalController {
             return registerAction
                     ? "redirect:/proposals/" + proposal.getId() + "/recommendations"
                     : "redirect:/proposals/" + proposal.getId() + "/edit";
+        } catch (ProposalNotFoundException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", "존재하지 않는 제안서입니다.");
+            return "redirect:/client/dashboard";
+        } catch (AccessDeniedException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", "본인 제안서만 조회하거나 수정할 수 있습니다.");
+            return "redirect:/client/dashboard";
         } catch (IllegalArgumentException | IllegalStateException e) {
             rejectGlobal(bindingResult, e.getMessage());
             addCommonAttributes(model);

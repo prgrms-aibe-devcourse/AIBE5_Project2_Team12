@@ -23,6 +23,7 @@ import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalStatus;
 import com.generic4.itda.dto.proposal.ProposalForm;
 import com.generic4.itda.dto.security.ItDaPrincipal;
+import com.generic4.itda.exception.ProposalNotFoundException;
 import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.PositionRepository;
 import com.generic4.itda.service.ProposalService;
@@ -275,6 +276,26 @@ class ProposalControllerTest {
         );
 
         mockMvc.perform(get("/proposals/1/edit")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/client/dashboard"));
+    }
+
+    @Test
+    @DisplayName("없는 제안서로 edit 진입하면 대시보드로 돌아가고 오류 메시지를 남긴다")
+    void redirectDashboardWhenProposalDoesNotExist() throws Exception {
+        given(proposalService.findOwnedProposal(999L, "client@example.com"))
+                .willThrow(new ProposalNotFoundException("제안서를 찾을 수 없습니다. id=999"));
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(get("/proposals/999/edit")
                         .with(authentication(new UsernamePasswordAuthenticationToken(
                                 principal,
                                 null,

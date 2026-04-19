@@ -41,6 +41,10 @@ public class Proposal extends BaseEntity {
     @JoinColumn(name = "member_id", nullable = false, updatable = false)
     private Member member;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "source_proposal_id")
+    private Proposal sourceProposal;
+
     @Column(nullable = false, length = 200)
     private String title;
 
@@ -65,13 +69,14 @@ public class Proposal extends BaseEntity {
     private final List<ProposalPosition> positions = new ArrayList<>();
 
     @Builder(access = AccessLevel.PRIVATE)
-    private Proposal(Member member, String title, String rawInputText, String description,
+    private Proposal(Member member, Proposal sourceProposal, String title, String rawInputText, String description,
             Long totalBudgetMin, Long totalBudgetMax, Long expectedPeriod, ProposalStatus status) {
         validateMember(member);
         validateBudgetRange(totalBudgetMin, totalBudgetMax, "전체");
         validateExpectedPeriod(expectedPeriod);
 
         this.member = member;
+        this.sourceProposal = sourceProposal;
         this.title = normalizeRequiredTitle(title);
         this.rawInputText = normalizeRawInputText(rawInputText);
         this.description = normalizeOptionalText(description);
@@ -85,6 +90,24 @@ public class Proposal extends BaseEntity {
             Long totalBudgetMin, Long totalBudgetMax, Long expectedPeriod) {
         return Proposal.builder()
                 .member(member)
+                .sourceProposal(null)
+                .title(title)
+                .rawInputText(rawInputText)
+                .description(description)
+                .totalBudgetMin(totalBudgetMin)
+                .totalBudgetMax(totalBudgetMax)
+                .expectedPeriod(expectedPeriod)
+                .status(ProposalStatus.WRITING)
+                .build();
+    }
+
+    public static Proposal createDraftCopy(Proposal sourceProposal, Member member, String title, String rawInputText, String description,
+            Long totalBudgetMin, Long totalBudgetMax, Long expectedPeriod) {
+        Assert.notNull(sourceProposal, "원본 제안서는 필수값입니다.");
+
+        return Proposal.builder()
+                .member(member)
+                .sourceProposal(sourceProposal)
                 .title(title)
                 .rawInputText(rawInputText)
                 .description(description)
