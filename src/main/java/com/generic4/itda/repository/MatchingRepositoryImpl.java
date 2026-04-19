@@ -3,7 +3,6 @@ package com.generic4.itda.repository;
 import com.generic4.itda.domain.matching.QMatching;
 import com.generic4.itda.domain.matching.constant.MatchingStatus;
 import com.generic4.itda.domain.member.QMember;
-import com.generic4.itda.domain.position.QPosition;
 import com.generic4.itda.domain.proposal.QProposal;
 import com.generic4.itda.domain.proposal.QProposalPosition;
 import com.generic4.itda.dto.freelancer.FreelancerDashboardItem;
@@ -22,7 +21,6 @@ public class MatchingRepositoryImpl implements MatchingRepositoryCustom {
     private final QMatching matching = QMatching.matching;
     private final QProposalPosition proposalPosition = QProposalPosition.proposalPosition;
     private final QProposal proposal = QProposal.proposal;
-    private final QPosition position = QPosition.position;
     private final QMember clientMember = new QMember("clientMember");
 
     @Override
@@ -32,7 +30,7 @@ public class MatchingRepositoryImpl implements MatchingRepositoryCustom {
                         proposal.id,
                         proposal.title,
                         clientMember.nickname,
-                        position.name,
+                        proposalPosition.title,
                         matching.status, // 여기서 MatchingStatus를 가져옴
                         proposalPosition.unitBudgetMin,
                         proposalPosition.unitBudgetMax,
@@ -42,7 +40,6 @@ public class MatchingRepositoryImpl implements MatchingRepositoryCustom {
                 .join(matching.proposalPosition, proposalPosition)
                 .join(proposalPosition.proposal, proposal)
                 .join(matching.clientMember, clientMember)
-                .join(proposalPosition.position, position)
                 .where(
                         matching.freelancerMember.email.value.eq(email),
                         statusEq(status),
