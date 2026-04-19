@@ -194,6 +194,39 @@ public class Resume extends BaseEntity {
         this.skills.removeIf(resumeSkill -> resumeSkill.getSkill().equals(skill));
     }
 
+    public void addCareerItem(CareerItemPayload item) {
+        Assert.notNull(item, "경력 항목은 필수값입니다.");
+        CareerPayload updated = new CareerPayload();
+        updated.setVersion(this.career.getVersion());
+        List<CareerItemPayload> newItems = new ArrayList<>(this.career.getItems());
+        newItems.add(item);
+        updated.setItems(newItems);
+        this.career = updated;
+    }
+
+    public void updateCareerItem(int index, CareerItemPayload item) {
+        Assert.notNull(item, "경력 항목은 필수값입니다.");
+        List<CareerItemPayload> items = this.career.getItems();
+        Assert.isTrue(index >= 0 && index < items.size(), "유효하지 않은 경력 인덱스입니다.");
+        CareerPayload updated = new CareerPayload();
+        updated.setVersion(this.career.getVersion());
+        List<CareerItemPayload> newItems = new ArrayList<>(items);
+        newItems.set(index, item);
+        updated.setItems(newItems);
+        this.career = updated;
+    }
+
+    public void removeCareerItem(int index) {
+        List<CareerItemPayload> items = this.career.getItems();
+        Assert.isTrue(index >= 0 && index < items.size(), "유효하지 않은 경력 인덱스입니다.");
+        CareerPayload updated = new CareerPayload();
+        updated.setVersion(this.career.getVersion());
+        List<CareerItemPayload> newItems = new ArrayList<>(items);
+        newItems.remove(index);
+        updated.setItems(newItems);
+        this.career = updated;
+    }
+
     public void updateSkill(Skill skill, Proficiency proficiency) {
         Assert.notNull(skill, "스킬은 필수 입력값입니다.");
         Assert.notNull(proficiency, "숙련도는 필수 입력값입니다.");
