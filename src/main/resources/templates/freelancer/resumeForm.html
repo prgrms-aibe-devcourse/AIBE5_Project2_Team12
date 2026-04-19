@@ -32,12 +32,14 @@
                                     <label class="text-xs font-bold text-slate-400 block mb-1.5">회사명 *</label>
                                     <input type="text" name="companyName" id="careerCompanyName" placeholder="회사명을 입력하세요"
                                            class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-blue-400 focus:outline-none">
+                                    <p id="err-companyName" class="text-xs text-red-500 mt-1 hidden"></p>
                                 </div>
 
                                 <div>
                                     <label class="text-xs font-bold text-slate-400 block mb-1.5">직책 *</label>
                                     <input type="text" name="position" id="careerPosition" placeholder="직책을 입력하세요"
                                            class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-blue-400 focus:outline-none">
+                                    <p id="err-position" class="text-xs text-red-500 mt-1 hidden"></p>
                                 </div>
 
                                 <div>
@@ -47,6 +49,7 @@
                                         <option value="">선택하세요</option>
                                         <option th:each="et : ${employmentTypes}" th:value="${et}" th:text="${et.description}"></option>
                                     </select>
+                                    <p id="err-employmentType" class="text-xs text-red-500 mt-1 hidden"></p>
                                 </div>
 
                                 <div class="grid grid-cols-2 gap-4">
@@ -54,19 +57,25 @@
                                         <label class="text-xs font-bold text-slate-400 block mb-1.5">시작 연월 *</label>
                                         <input type="text" name="startYearMonth" id="careerStart" placeholder="yyyy-MM"
                                                class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-blue-400 focus:outline-none">
+                                        <p id="err-startYearMonth" class="text-xs text-red-500 mt-1 hidden"></p>
                                     </div>
                                     <div>
                                         <label class="text-xs font-bold text-slate-400 block mb-1.5">종료 연월</label>
                                         <input type="text" name="endYearMonth" id="careerEnd" placeholder="yyyy-MM"
                                                class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-blue-400 focus:outline-none">
+                                        <p id="err-endYearMonth" class="text-xs text-red-500 mt-1 hidden"></p>
                                     </div>
                                 </div>
 
                                 <label class="flex items-center gap-2 cursor-pointer">
                                     <input type="checkbox" name="currentlyWorking" id="careerCurrentlyWorking" value="true"
                                            class="w-4 h-4 rounded" onchange="toggleCareerEndField(this)">
+                                    <!-- Spring field marker: unchecked checkbox -> currentlyWorking=false without duplicate param values -->
+                                    <input type="hidden" name="_currentlyWorking" value="on">
                                     <span class="text-sm text-slate-700 font-medium">현재 재직중</span>
                                 </label>
+
+                                <p id="err-currentlyWorking" class="text-xs text-red-500 mt-1 hidden"></p>
 
                                 <div>
                                     <label class="text-xs font-bold text-slate-400 block mb-1.5">요약</label>
@@ -554,24 +563,47 @@
     });
 
     // ─── 경력 모달 ────────────────────────────────────────
+    window.clearCareerErrors = function () {
+        document.querySelectorAll('[id^="err-"]').forEach(function (el) {
+            el.textContent = '';
+            el.classList.add('hidden');
+        });
+    };
+
     (function () {
         var form = document.getElementById('careerForm');
         if (!form) return;
 
+        function showCareerErrors(errors) {
+            Object.keys(errors).forEach(function (field) {
+                var el = document.getElementById('err-' + field);
+                if (el) {
+                    el.textContent = errors[field];
+                    el.classList.remove('hidden');
+                }
+            });
+        }
+
         form.addEventListener('submit', function (e) {
             e.preventDefault();
+            clearCareerErrors();
             var index = document.getElementById('careerIndex').value;
             var url   = index !== '' ? '/resumes/career/update' : '/resumes/career/add';
 
             fetch(url, { method: 'POST', body: new FormData(form) })
-                .then(function (r) { if (!r.ok) throw r; return r.text(); })
-                .then(function (html) {
-                    var tmp  = document.createElement('div');
-                    tmp.innerHTML = html;
-                    var next = tmp.querySelector('#careerSection') || tmp.firstElementChild;
-                    var old  = document.getElementById('careerSection');
-                    if (next && old) { old.replaceWith(next); if (window.lucide) lucide.createIcons(); }
-                    closeCareerModal();
+                .then(function (r) {
+                    if (r.status === 400) {
+                        return r.json().then(function (errors) { showCareerErrors(errors); });
+                    }
+                    if (!r.ok) throw r;
+                    return r.text().then(function (html) {
+                        var tmp  = document.createElement('div');
+                        tmp.innerHTML = html;
+                        var next = tmp.querySelector('#careerSection') || tmp.firstElementChild;
+                        var old  = document.getElementById('careerSection');
+                        if (next && old) { old.replaceWith(next); if (window.lucide) lucide.createIcons(); }
+                        closeCareerModal();
+                    });
                 })
                 .catch(function (err) { console.error('경력 저장 오류', err); });
         });
@@ -585,6 +617,7 @@
         document.getElementById('careerForm').reset();
         document.getElementById('careerIndex').value = '';
         document.getElementById('careerEnd').disabled = false;
+        document.getElementById('careerEnd').placeholder = 'yyyy-MM';
 
         if (mode === 'edit' && card) {
             title.textContent = '경력 수정';
@@ -598,6 +631,7 @@
             if (currentlyWorking) {
                 document.getElementById('careerEnd').disabled = true;
                 document.getElementById('careerEnd').value = '';
+                document.getElementById('careerEnd').placeholder = '재직중';
             } else {
                 document.getElementById('careerEnd').value = card.dataset.end || '';
             }
@@ -613,16 +647,21 @@
     window.closeCareerModal = function () {
         var modal = document.getElementById('careerModal');
         if (modal) modal.classList.add('hidden');
+        clearCareerErrors();
     };
 
     window.toggleCareerEndField = function (checkbox) {
         var endField = document.getElementById('careerEnd');
+        if (!endField) return;
+
         if (checkbox.checked) {
-            endField.dataset.prev = endField.value; // 기존 날짜 저장
-            endField.value = '재직중';
+            endField.dataset.prev = endField.value;
+            endField.value = '';
+            endField.placeholder = '재직중';
             endField.disabled = true;
         } else {
-            endField.value = endField.dataset.prev || ''; // 복원
+            endField.value = endField.dataset.prev || '';
+            endField.placeholder = 'yyyy-MM';
             endField.disabled = false;
         }
     };
