@@ -10,6 +10,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -468,6 +469,47 @@ class ResumeControllerTest {
                     .andExpect(model().attribute("isEditing", true));
 
             then(resumeService).should().updateSkill("user@example.com", 3L, Proficiency.ADVANCED);
+        }
+    }
+
+    // =========================================================
+    // POST /resumes/career/add
+    // =========================================================
+
+    @Nested
+    @DisplayName("POST /resumes/career/add")
+    class AddCareerTest {
+
+        @Test
+        @DisplayName("종료 연월이 시작 연월보다 빠르면 400과 endYearMonth 오류를 반환한다")
+        void return400WhenEndYearMonthIsBeforeStartYearMonth() throws Exception {
+            mockMvc.perform(post("/resumes/career/add").with(authentication(auth)).with(csrf())
+                            .param("companyName", "ACME")
+                            .param("position", "Backend Engineer")
+                            .param("employmentType", "FULL_TIME")
+                            .param("startYearMonth", "2024-05")
+                            .param("endYearMonth", "2024-04")
+                            .param("currentlyWorking", "false"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.endYearMonth").exists());
+
+            then(resumeService).should(never()).addCareer(any(), any());
+        }
+
+        @Test
+        @DisplayName("재직중이 아닌데 종료 연월이 비어있으면 400과 endYearMonth 오류를 반환한다")
+        void return400WhenEndYearMonthIsMissing() throws Exception {
+            mockMvc.perform(post("/resumes/career/add").with(authentication(auth)).with(csrf())
+                            .param("companyName", "ACME")
+                            .param("position", "Backend Engineer")
+                            .param("employmentType", "FULL_TIME")
+                            .param("startYearMonth", "2024-05")
+                            .param("endYearMonth", "")
+                            .param("currentlyWorking", "false"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.endYearMonth").exists());
+
+            then(resumeService).should(never()).addCareer(any(), any());
         }
     }
 }
