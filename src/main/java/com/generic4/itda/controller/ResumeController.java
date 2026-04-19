@@ -19,6 +19,9 @@ import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+import java.util.stream.Collectors;
+
 @Controller
 @RequestMapping("/resumes")
 @RequiredArgsConstructor
@@ -149,7 +152,7 @@ public class ResumeController {
     @PostMapping("/career/add")
     public String addCareer(
             @AuthenticationPrincipal ItDaPrincipal principal,
-            @ModelAttribute CareerItemForm form,
+            @Valid @ModelAttribute CareerItemForm form,
             Model model
     ) {
         resumeService.addCareer(principal.getEmail(), form.toPayload());
@@ -159,11 +162,23 @@ public class ResumeController {
     @PostMapping("/career/update")
     public String updateCareer(
             @AuthenticationPrincipal ItDaPrincipal principal,
-            @ModelAttribute CareerItemForm form,
+            @Valid @ModelAttribute CareerItemForm form,
             Model model
     ) {
         resumeService.updateCareer(principal.getEmail(), form.getIndex(), form.toPayload());
         return prepareCareerSection(principal, model);
+    }
+
+    @ExceptionHandler(org.springframework.validation.BindException.class)
+    @ResponseBody
+    public ResponseEntity<Map<String, String>> handleCareerValidation(org.springframework.validation.BindException ex) {
+        Map<String, String> errors = ex.getFieldErrors().stream()
+                .collect(Collectors.toMap(
+                        e -> e.getField(),
+                        e -> e.getDefaultMessage(),
+                        (a, b) -> a
+                ));
+        return ResponseEntity.badRequest().body(errors);
     }
 
     @PostMapping("/career/remove")
