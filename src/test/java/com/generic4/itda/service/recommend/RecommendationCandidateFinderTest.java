@@ -11,8 +11,6 @@ import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
 import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
-import com.generic4.itda.domain.recommendation.RecommendationRun;
-import com.generic4.itda.domain.recommendation.constant.RecommendationAlgorithm;
 import com.generic4.itda.domain.resume.CareerPayload;
 import com.generic4.itda.domain.resume.Proficiency;
 import com.generic4.itda.domain.resume.Resume;
@@ -46,8 +44,7 @@ class RecommendationCandidateFinderTest {
     @Test
     void findCandidates_usesRecommendablePoolWhenNoEssentialSkills() {
         // given
-        RecommendationRun run = createRun(
-                3,
+        ProposalPosition proposalPosition = createProposalPosition(
                 skillRequirement(201L, "Communication", ProposalPositionSkillImportance.PREFERENCE)
         );
         Resume first = createResume(11L, (byte) 7, skillData(101L, "Java", Proficiency.ADVANCED));
@@ -57,7 +54,7 @@ class RecommendationCandidateFinderTest {
         given(resumeRepository.findAllWithSkillsByIds(List.of(11L, 22L))).willReturn(List.of(second, first));
 
         // when
-        List<RecommendationCandidate> result = finder.findCandidates(run);
+        List<RecommendationCandidate> result = finder.findCandidates(proposalPosition, 3);
 
         // then
         assertThat(result).extracting(RecommendationCandidate::resumeId)
@@ -74,8 +71,7 @@ class RecommendationCandidateFinderTest {
     @Test
     void findCandidates_usesEssentialSkillsAndExpandedPoolSize() {
         // given
-        RecommendationRun run = createRun(
-                6,
+        ProposalPosition proposalPosition = createProposalPosition(
                 skillRequirement(101L, "Java", ProposalPositionSkillImportance.ESSENTIAL),
                 skillRequirement(202L, "React", ProposalPositionSkillImportance.PREFERENCE)
         );
@@ -89,7 +85,7 @@ class RecommendationCandidateFinderTest {
         given(resumeRepository.findAllWithSkillsByIds(List.of(22L, 11L))).willReturn(List.of(first, second));
 
         // when
-        List<RecommendationCandidate> result = finder.findCandidates(run);
+        List<RecommendationCandidate> result = finder.findCandidates(proposalPosition, 6);
 
         // then
         assertThat(result).extracting(RecommendationCandidate::resumeId)
@@ -104,14 +100,13 @@ class RecommendationCandidateFinderTest {
     @Test
     void findCandidates_returnsEmptyWhenCandidatePoolIsEmpty() {
         // given
-        RecommendationRun run = createRun(
-                5,
+        ProposalPosition proposalPosition = createProposalPosition(
                 skillRequirement(101L, "Java", ProposalPositionSkillImportance.ESSENTIAL)
         );
         given(resumeQueryRepository.findCandidatePool(List.of(101L), 100)).willReturn(List.of());
 
         // when
-        List<RecommendationCandidate> result = finder.findCandidates(run);
+        List<RecommendationCandidate> result = finder.findCandidates(proposalPosition, 5);
 
         // then
         assertThat(result).isEmpty();
@@ -120,7 +115,7 @@ class RecommendationCandidateFinderTest {
         verifyNoMoreInteractions(resumeQueryRepository);
     }
 
-    private RecommendationRun createRun(int topK, SkillRequirement... requirements) {
+    private ProposalPosition createProposalPosition(SkillRequirement... requirements) {
         Proposal proposal = Proposal.create(
                 createMember(),
                 "추천 요청",
@@ -140,12 +135,7 @@ class RecommendationCandidateFinderTest {
             proposalPosition.addSkill(skill, requirement.importance());
         }
 
-        return RecommendationRun.create(
-                proposalPosition,
-                "fingerprint",
-                RecommendationAlgorithm.HEURISTIC_V1,
-                topK
-        );
+        return proposalPosition;
     }
 
     private Resume createResume(long resumeId, byte careerYears, SkillData... skills) {
