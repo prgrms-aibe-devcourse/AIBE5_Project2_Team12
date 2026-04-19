@@ -7,8 +7,8 @@
 IT-da는 클라이언트의 프로젝트 요구사항을 구조화하고, 적합한 IT 프리랜서를 더 빠르게 찾을 수 있도록 돕는 매칭 플랫폼입니다.
 자유 텍스트 기반 프로젝트 입력을 AI 브리프로 정리하고, 스킬/경력 기반 추천 결과를 설명 가능하게 제공하는 것을 목표로 합니다.
 
-현재 저장소는 MVP 백엔드/웹 애플리케이션의 기반을 정리하는 단계입니다.
-홈/로그인/회원가입 진입점과 회원/이력서 중심 도메인, 파일 저장 패턴, 테스트/CI 구성이 먼저 잡혀 있으며, 제안서(`Proposal`), 매칭(`Matching`), AI 브리프, 추천 엔진은 `docs/` 문서를 기준으로 설계·확장 중입니다.
+현재 저장소는 MVP 백엔드/웹 애플리케이션의 핵심 흐름을 단계적으로 붙여가는 상태입니다.
+홈/로그인/회원가입뿐 아니라 클라이언트 대시보드, 제안서 작성/수정 화면, 프리랜서 이력서 화면, AI 브리프/추천 진입용 컨트롤러와 템플릿이 포함되어 있으며, 매칭 라이프사이클과 AI 인터뷰 자동 채움은 후속 이슈로 확장 중입니다.
 
 ## 핵심 가치
 
@@ -31,10 +31,10 @@ IT-da는 클라이언트의 프로젝트 요구사항을 구조화하고, 적합
 | 영역 | 상태 | 설명 |
 | --- | --- | --- |
 | 인증/회원 | 기초 구현 | Spring Security 폼 로그인, 회원가입 처리, 이메일 중복 검증, BCrypt 비밀번호 암호화 |
-| 프리랜서 프로필 | 도메인 기반 정리 | `Member`, `Resume`, `Skill`, `ProfileImage`, `StoredFile` 중심 엔티티와 일부 서비스/테스트 구성 |
+| 프리랜서 프로필 | 기본 구현 | `Member`, `Resume`, `Skill`, `ProfileImage`, `StoredFile` 중심 엔티티와 이력서 작성/수정 화면, 서비스, 테스트 구성 |
 | 파일 업로드 | 저장 패턴 구성 | 로컬 파일 저장 경로와 메타데이터 저장 패턴이 정리되어 있음 |
-| 화면 | 최소 화면 구성 | 홈(`/`), 로그인(`/login`), 회원가입(`/signup`) 템플릿과 진입 컨트롤러만 구성 |
-| 제안서/매칭/추천 | 설계 및 확장 예정 | `docs/project-overview.md`, `docs/domain-spec.md`, `docs/implementation-backlog.md` 기준으로 정리 중 |
+| 화면 | 주요 흐름 구현 | 홈(`/`), 로그인(`/login`), 회원가입(`/signup`), 클라이언트 대시보드(`/client/dashboard`), 제안서 작성/수정(`/proposals/**`), 프리랜서 화면, 추천 화면 템플릿과 컨트롤러 구성 |
+| 제안서/AI 브리프/추천 | 기본 구현 | `Proposal`, `ProposalPosition`, 제안서 작성/수정, AI 브리프 API, 추천 결과 진입 화면이 구현되어 있고 세부 추천/매칭 정책은 계속 확장 중 |
 | 테스트/품질 | 기반 구성 | 도메인/서비스/컨트롤러/리포지토리 테스트와 GitHub Actions CI 설정 포함 |
 
 ## 기술 스택
@@ -100,11 +100,25 @@ docker compose up -d postgres
 ./gradlew bootRun
 ```
 
+Docker Desktop을 띄우지 않고 PostgreSQL만 별도로 실행했다면 아래처럼 실행할 수 있습니다.
+
+```bash
+SPRING_DOCKER_COMPOSE_ENABLED=false ./gradlew bootRun
+```
+
 ### 4. 접속 주소
 
 - 홈: `http://localhost:8080`
 - 로그인: `http://localhost:8080/login`
 - 회원가입: `http://localhost:8080/signup`
+- 클라이언트 대시보드: `http://localhost:8080/client/dashboard`
+- 제안서 작성: `http://localhost:8080/proposals/new`
+
+기본 시드 데이터는 기본값으로 활성화되어 있습니다.
+
+- 클라이언트: `seed.client@itda.local`
+- 프리랜서: `seed.backend@itda.local`, `seed.fullstack@itda.local`, `seed.ai@itda.local`, `seed.hidden@itda.local`
+- 기본 비밀번호: `demo1234`
 
 ### 5. 테스트 실행
 
@@ -126,16 +140,16 @@ docker compose up -d postgres
 │   ├── main/
 │   │   ├── java/com/generic4/itda/
 │   │   │   ├── config/          # Security, JPA, QueryDSL, Web 설정
-│   │   │   ├── controller/      # 홈, 로그인, 회원가입 진입점
-│   │   │   ├── domain/          # member, resume, file, skill, position 도메인
-│   │   │   ├── dto/             # 폼/인증 DTO
+│   │   │   ├── controller/      # 홈, 클라이언트 대시보드, 제안서, AI 브리프, 추천, 이력서 컨트롤러
+│   │   │   ├── domain/          # member, resume, file, proposal, recommendation, position 도메인
+│   │   │   ├── dto/             # 폼/인증/대시보드/제안서 DTO
 │   │   │   ├── exception/       # 예외 정의
 │   │   │   ├── repository/      # JPA Repository
-│   │   │   ├── service/         # 회원/파일 서비스
+│   │   │   ├── service/         # 회원, 이력서, 제안서, AI 브리프, 추천 서비스
 │   │   │   └── ItDaApplication.java
 │   │   └── resources/
 │   │       ├── application.yaml
-│   │       └── templates/       # index, login, signup
+│   │       └── templates/       # landing, client, freelancer, recommendation 화면
 │   └── test/                    # domain / service / controller / repository 테스트
 ├── build.gradle
 ├── gradlew

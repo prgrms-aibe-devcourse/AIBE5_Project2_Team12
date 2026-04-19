@@ -21,13 +21,15 @@
 - `position`은 공용 직무 마스터다.
 - `proposal_position_skill`은 실제 모집 단위별 요구 스킬 집합이다.
 - 요구 스킬 테이블의 FK 기준은 `proposal_position.id`다.
-- 같은 제안서 안에서는 같은 직무 마스터를 중복 등록하지 않는다.
+- 같은 제안서 안에서도 같은 직무 마스터를 여러 번 사용할 수 있고, 구체 구분은 `proposal_position.title`로 한다.
+- `proposal_position`은 `title`, `work_type`, `expected_period`, `career_min_years`, `career_max_years`, `work_place`를 포함하는 상세 모집 단위로 확장한다.
 - `proposal_position_skill.importance`는 null 저장을 허용하지 않고, 입력이 비어 있으면 `PREFERENCE`를 기본값으로 사용한다.
 
 ### AI 브리프 저장 모델
 
 - `proposal.raw_input_text`는 사용자의 원본 자유 입력을 저장한다.
 - `proposal.description`은 사용자가 검토하고 수정하는 최종 제안서 본문이다.
+- `proposal`의 `work_type`, `work_place`는 두지 않고, 근무 형태와 근무지는 포지션 단위에서 관리한다.
 - MVP에서는 `proposal.overview`를 두지 않는다.
 - 리스트와 카드의 미리보기 텍스트는 별도 `overview`가 아니라 `description` 발췌본으로 처리한다.
 
@@ -46,6 +48,7 @@
 - `proposal.total_budget_*`는 전체 프로젝트 예산이다.
 - `proposal_position.unit_budget_*`는 1인 기준 예산이다.
 - 포지션 전체 예산은 `unit_budget * head_count`로 해석한다.
+- 제안서 저장 시 `proposal.total_budget_*`는 직접 입력하지 않고 포지션별 인원과 예산 합산값으로 계산한다.
 
 ### 상태 모델
 
@@ -58,6 +61,10 @@
 - `ACCEPTED`는 상호 수락 완료 상태지만 아직 계약 체결 완료 상태는 아니다.
 - `ACCEPTED -> IN_PROGRESS`는 양측 계약서 업로드 완료를 조건으로 둔다.
 - `IN_PROGRESS -> COMPLETED`는 양측 완료 증빙 업로드와 상호 리뷰 작성을 조건으로 둔다.
+- `MATCHING` 상태 제안서 수정은 현재 진행 중이거나 완료된 매칭이 없을 때만 허용한다.
+- 추천만 받은 상태라면 기존 제안서를 `WRITING`으로 되돌리고 추천 이력을 삭제한 뒤 수정한다.
+- `REJECTED`, `CANCELED`만 남아 있다면 원본 대신 새 `WRITING` 복제본을 만들어 그 초안에서 수정한다.
+- `PROPOSED`, `ACCEPTED`, `IN_PROGRESS`, `COMPLETED` 매칭이 하나라도 있으면 수정하지 않는다.
 
 ### 매칭/프로젝트 모델
 
@@ -99,14 +106,12 @@
 
 ## 2. 현재 보류 결정
 
-- `proposal_position` 상세 필드 확장 여부
 - 제안서 파일을 정식 도메인 자산으로 승격할지 여부
 - `ProfileImage`를 제거하고 `StoredFile`로 통합할지 여부
 - 위 통합 여부는 프로필 이미지 서비스에서 책임 경계가 실제로 어떻게 나뉘는지 확인한 뒤 다시 결정한다.
 - `matching.initiator_type`, `requested_by_member_id` 추가 여부
 - 참여자별 완료 증빙을 여러 파일로 허용할지, 제출 묶음 엔티티로 확장할지
 - 리뷰 평점 스케일과 완료 이후 수정 허용 범위
-- `MATCHING` 상태 제안서 수정 정책
 
 ## 3. 구현 시 해석 원칙
 

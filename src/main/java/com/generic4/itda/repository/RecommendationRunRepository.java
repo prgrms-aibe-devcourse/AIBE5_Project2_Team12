@@ -12,6 +12,10 @@ import org.springframework.data.jpa.repository.Query;
 
 public interface RecommendationRunRepository extends JpaRepository<RecommendationRun, Long> {
 
+    boolean existsByProposalPosition_Proposal_Id(Long proposalId);
+
+    void deleteAllByProposalPosition_Proposal_Id(Long proposalId);
+
     Optional<RecommendationRun> findByProposalPosition_IdAndRequestFingerprintAndAlgorithm(
             Long proposalPositionId,
             String requestFingerprint,

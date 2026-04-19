@@ -1,7 +1,7 @@
 # IT-da 프로젝트 문서
 
 이 문서는 `IT-da`의 제품 기획과 현재 구현 상태를 한 번에 파악하기 위한 기준 문서다.
-2026-04-10 기준으로는 현재 리포와 현재 `ERDCloud` 초안을 우선 기준으로 삼고, 이전에 논의했던 확장 설계는 별도 보류 항목으로 취급한다.
+2026-04-19 기준으로는 현재 리포와 현재 `ERDCloud` 초안을 우선 기준으로 삼고, 이전에 논의했던 확장 설계는 별도 보류 항목으로 취급한다.
 
 ## 참고 링크
 
@@ -25,6 +25,10 @@
 - `proposal`은 프로젝트 전체 문서이고 `proposal_position`은 실제 모집 단위다.
 - `proposal.raw_input_text`는 AI 브리프의 원본 자유 입력을 보존한다.
 - `proposal.total_budget_*`와 `proposal_position.unit_budget_*`는 의미가 다르므로 둘 다 유지한다.
+- `proposal.total_budget_*`는 직접 입력하지 않고 포지션 예산 합산값으로 계산한다.
+- `proposal`의 `work_type`, `work_place`는 두지 않고, 근무 형태와 근무지는 `proposal_position`에 둔다.
+- `proposal_position`은 `title`, `work_type`, `expected_period`, `career_min/max_years`, `work_place`를 포함하는 상세 모집 단위다.
+- 같은 제안서 안에서도 같은 직무 마스터를 여러 번 사용할 수 있고, 세부 구분은 `proposal_position.title`로 처리한다.
 - MVP에서는 별도 `project` 테이블 없이 `matching.status` 단일 모델로 진행 흐름을 관리한다.
 - `matching`은 `proposal_position_id`, `resume_id`와 함께 `client_member_id`, `freelancer_member_id`를 유지한다.
 - 계약서와 완료 증빙은 `matching_attachments(matching_id, member_id, file_id, attachment_type)`로 관리한다.
@@ -68,7 +72,7 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 2. 프리랜서가 프로필 이미지, 포트폴리오, 이력서 첨부파일을 등록한다.
 3. 클라이언트가 자유 텍스트로 프로젝트를 설명한다.
 4. AI 브리프가 제안서 초안을 만든다.
-5. 클라이언트가 제안서의 `title`, `description`, 예산, 근무 형태, 모집 단위를 정리한다.
+5. 클라이언트가 제안서의 `title`, `description`, 전체 예상 기간과 포지션별 상세 모집 단위를 정리한다.
 6. 제안서가 `MATCHING` 상태가 되면 추천과 지원 흐름이 열린다.
 7. 클라이언트가 추천 후보와 지원자 리스트를 비교해 요청을 보낸다.
 8. 프리랜서가 수락하면 매칭이 성립하고 연락처가 공개된다.
@@ -141,10 +145,8 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 - 제안서 제목
 - 프로젝트 설명
 - 전체 예산 범위
-- 전체 근무 형태
-- 근무 장소
 - 예상 기간
-- 모집 단위별 직무, 인원, 1인 기준 예산
+- 모집 단위별 직무, 포지션 제목, 근무 형태, 인원, 1인 기준 예산, 예상 기간, 경력 범위, 근무지
 - 현재 ERD에 있는 이력서 보조 자산과의 연결은 별도다. 즉, 프로필 이미지는 `profile_image`, 이력서 첨부는 `resume_attachments`로 관리한다.
 
 중요한 점은 아래와 같다.
@@ -221,8 +223,11 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 - `MATCHING`: 제출 완료 및 모집/추천 진행 중
 - `COMPLETE`: 종료
 
-현재 ERD 기준으로는 이전에 논의했던 `DONE -> WRITING` 재오픈 정책이 반영되어 있지 않다.
-즉, `MATCHING` 이후 수정 정책은 추후 재논의 대상이다.
+현재 구현 기준 제안서 수정 정책은 아래처럼 정리돼 있다.
+
+- 추천만 받은 `MATCHING` 제안서는 기존 제안서를 `WRITING`으로 되돌리고 추천 이력을 비운 뒤 수정한다.
+- `REJECTED`, `CANCELED`만 남아 있는 제안서는 원본 대신 새 `WRITING` 복제본에서 수정한다.
+- `PROPOSED`, `ACCEPTED`, `IN_PROGRESS`, `COMPLETED` 매칭이 하나라도 있으면 수정하지 않는다.
 
 ### 7.2 제안서 포지션 상태
 
@@ -254,7 +259,6 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 - `matching.status`의 정확한 enum literal
 - `Resume.status`, `Resume.writing_status`를 추천 필터에 어떻게 반영할지
 - `proposal_position_skill`의 최소 입력 기준을 어디까지 강제할지
-- `MATCHING` 상태 제안서의 수정 UX를 어디까지 허용할지
 - 완료 증빙을 참여자당 1개 파일로 유지할지, 다중 파일 제출 묶음으로 확장할지
 
 ## 9. 핵심 운영 규칙
@@ -319,7 +323,7 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 
 ## 12. 현재 구현 상태
 
-현재 리포지토리 기준으로 이미 구현된 항목은 제한적이며, 아래 범위가 확인된다.
+현재 리포지토리 기준으로 이미 구현되었거나 확인 가능한 범위는 아래와 같다.
 
 ### 구현됨
 
@@ -330,18 +334,18 @@ IT-da는 이 문제를 아래 두 축으로 풀고자 한다.
 - 스킬 도메인
 - 파일 업로드 및 로컬 저장
 - 프로필 이미지, 이력서 파일 경로 분리용 기반 `StoredFile`
+- 클라이언트 대시보드와 필터링 카드
+- 제안서 작성/수정 UI와 포지션 추가/상세 모달
+- 제안서 임시저장(`WRITING`) / 등록(`MATCHING`) 흐름
+- MATCHING 상태 제안서 수정 정책과 추천 이력 정리/복제 처리
+- AI 브리프 API와 제안서 반영용 매퍼
+- 추천 결과 진입 화면과 상태 화면
 
 ### 아직 구현되지 않음
 
-- `members.memo`
-- `resumes.status`, `resumes.writing_status`, `resumes.portfolio_url`
-- `profile_image`
-- `resume_attachments`
-- 프로젝트 제안서 작성 UI
-- AI 브리프 생성
-- 직무 마스터 및 제안서 포지션 스킬 관리
-- 제안서 포지션 관리
-- 추천 엔진
+- AI 인터뷰 위젯의 실제 질문/응답과 폼 즉시 자동 채움
+- AI 브리프 응답 스키마와 확장된 `proposal_position` 필드 정렬
+- 추천 엔진 고도화
 - 지원자 비교 및 선택
 - 매칭 요청, 수락, 진행, 완료 플로우
 - 운영자용 운영 화면

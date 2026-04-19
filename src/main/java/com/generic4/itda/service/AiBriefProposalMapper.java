@@ -3,7 +3,6 @@ package com.generic4.itda.service;
 import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
-import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.domain.skill.Skill;
 import com.generic4.itda.dto.proposal.AiBriefPositionResult;
 import com.generic4.itda.dto.proposal.AiBriefResult;
@@ -34,8 +33,6 @@ public class AiBriefProposalMapper {
                 resolveDescription(proposal, aiBriefResult),
                 resolveTotalBudgetMin(proposal, aiBriefResult),
                 resolveTotalBudgetMax(proposal, aiBriefResult),
-                resolveWorkType(proposal, aiBriefResult),
-                resolveWorkPlace(proposal, aiBriefResult),
                 resolveExpectedPeriod(proposal, aiBriefResult)
         );
 
@@ -56,9 +53,15 @@ public class AiBriefProposalMapper {
             Position position = findOrCreatePosition(positionResult.getPositionName());
             ProposalPosition proposalPosition = proposal.addPosition(
                     position,
+                    positionResult.getPositionName(),
+                    null,
                     positionResult.getHeadCount(),
                     positionResult.getUnitBudgetMin(),
-                    positionResult.getUnitBudgetMax()
+                    positionResult.getUnitBudgetMax(),
+                    null,
+                    null,
+                    null,
+                    null
             );
             addSkills(proposalPosition, positionResult.getSkills());
         }
@@ -107,20 +110,6 @@ public class AiBriefProposalMapper {
             return aiBriefResult.getTotalBudgetMax();
         }
         return proposal.getTotalBudgetMax();
-    }
-
-    private ProposalWorkType resolveWorkType(Proposal proposal, AiBriefResult aiBriefResult) {
-        if (aiBriefResult.getWorkType() != null) {
-            return aiBriefResult.getWorkType();
-        }
-        return proposal.getWorkType();
-    }
-
-    private String resolveWorkPlace(Proposal proposal, AiBriefResult aiBriefResult) {
-        if (StringUtils.hasText(aiBriefResult.getWorkPlace())) {
-            return aiBriefResult.getWorkPlace();
-        }
-        return proposal.getWorkPlace();
     }
 
     private Long resolveExpectedPeriod(Proposal proposal, AiBriefResult aiBriefResult) {

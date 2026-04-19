@@ -79,8 +79,6 @@ class AiBriefProposalMapperTest {
         assertThat(proposal.getDescription()).isEqualTo("AI가 정리한 설명");
         assertThat(proposal.getTotalBudgetMin()).isEqualTo(5_000_000L);
         assertThat(proposal.getTotalBudgetMax()).isEqualTo(8_000_000L);
-        assertThat(proposal.getWorkType()).isEqualTo(ProposalWorkType.HYBRID);
-        assertThat(proposal.getWorkPlace()).isEqualTo("판교");
         assertThat(proposal.getExpectedPeriod()).isEqualTo(12L);
         assertThat(proposal.getPositions()).hasSize(1);
         assertThat(proposal.getPositions().get(0).getPosition().getName()).isEqualTo("백엔드 개발자");
@@ -109,8 +107,6 @@ class AiBriefProposalMapperTest {
 
         assertThat(proposal.getTitle()).isEqualTo("제안서 제목");
         assertThat(proposal.getDescription()).isEqualTo("설명만 갱신");
-        assertThat(proposal.getWorkType()).isEqualTo(ProposalWorkType.REMOTE);
-        assertThat(proposal.getWorkPlace()).isEqualTo("강남");
         assertThat(proposal.getExpectedPeriod()).isEqualTo(8L);
     }
 
@@ -140,8 +136,6 @@ class AiBriefProposalMapperTest {
         assertThat(proposal.getDescription()).isEqualTo("기존 설명");
         assertThat(proposal.getTotalBudgetMin()).isEqualTo(1_000_000L);
         assertThat(proposal.getTotalBudgetMax()).isEqualTo(2_000_000L);
-        assertThat(proposal.getWorkType()).isEqualTo(ProposalWorkType.SITE);
-        assertThat(proposal.getWorkPlace()).isEqualTo("서울");
         assertThat(proposal.getExpectedPeriod()).isEqualTo(3L);
         assertThat(proposal.getPositions()).hasSize(1);
         assertThat(proposal.getPositions().get(0).getPosition().getName()).isEqualTo("디자이너");

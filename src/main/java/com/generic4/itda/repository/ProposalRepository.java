@@ -16,6 +16,8 @@ public interface ProposalRepository extends JpaRepository<Proposal, Long> {
 
     List<Proposal> findAllByMember_Email_ValueAndStatusOrderByModifiedAtDesc(String email, ProposalStatus status);
 
+    Optional<Proposal> findFirstBySourceProposal_IdAndStatusOrderByModifiedAtDescIdDesc(Long sourceProposalId, ProposalStatus status);
+
     long countByMember_Email_Value(String email);
 
     long countByMember_Email_ValueAndStatus(String email, ProposalStatus status);

@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/base}">
+<head>
+    <title th:text="${isNew} ? '새 프로젝트 만들기 | IT-da' : '제안서 수정 | IT-da'">제안서 작성 | IT-da</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <main class="min-h-screen bg-slate-50 px-4 py-6 lg:px-8 lg:py-8">
+        <form id="proposalForm"
+              th:action="${isNew}
+                         ? @{/proposals/new}
+                         : @{/proposals/{proposalId}/edit(proposalId=${proposalId})}"
+              th:object="${proposalForm}"
+              method="post"
+              x-data="proposalEditorState(window.proposalEditorBootstrap)"
+              x-init="init()"
+              class="mx-auto max-w-[1680px]">
+
+            <div th:if="${#fields.hasGlobalErrors()}"
+                 class="mb-4 rounded-[24px] border border-red-200 bg-red-50 px-6 py-5 text-sm text-red-700">
+                <p th:each="err : ${#fields.globalErrors()}" th:text="${err}"></p>
+            </div>
+
+            <div th:if="${noticeMessage != null}"
+                 class="mb-4 rounded-[24px] border border-blue-200 bg-blue-50 px-6 py-5 text-sm text-blue-700">
+                <p th:text="${noticeMessage}">안내 메시지</p>
+            </div>
+
+            <input type="hidden" name="status" :value="status">
+            <input type="hidden" name="rawInputText" :value="rawInputText">
+            <input type="hidden" name="submitAction" :value="submitAction">
+
+            <template x-for="(position, index) in positions" :key="position.clientKey">
+                <div>
+                    <input type="hidden" :name="`positions[${index}].id`" :value="position.id ?? ''">
+                    <input type="hidden" :name="`positions[${index}].positionId`" :value="position.positionId ?? ''">
+                    <input type="hidden" :name="`positions[${index}].title`" :value="position.title">
+                    <input type="hidden" :name="`positions[${index}].workType`" :value="position.workType">
+                    <input type="hidden" :name="`positions[${index}].headCount`" :value="position.headCount">
+                    <input type="hidden" :name="`positions[${index}].unitBudgetMin`" :value="position.unitBudgetMin">
+                    <input type="hidden" :name="`positions[${index}].unitBudgetMax`" :value="position.unitBudgetMax">
+                    <input type="hidden" :name="`positions[${index}].expectedPeriod`" :value="position.expectedPeriod">
+                    <input type="hidden" :name="`positions[${index}].careerMinYears`" :value="position.careerMinYears">
+                    <input type="hidden" :name="`positions[${index}].careerMaxYears`" :value="position.careerMaxYears">
+                    <input type="hidden" :name="`positions[${index}].workPlace`" :value="position.workPlace">
+                    <input type="hidden" :name="`positions[${index}].status`" :value="position.status">
+
+                    <template x-for="(skill, skillIndex) in position.essentialSkillNames" :key="`${position.clientKey}-essential-${skillIndex}`">
+                        <input type="hidden" :name="`positions[${index}].essentialSkillNames[${skillIndex}]`" :value="skill">
+                    </template>
+
+                    <template x-for="(skill, skillIndex) in position.preferredSkillNames" :key="`${position.clientKey}-preferred-${skillIndex}`">
+                        <input type="hidden" :name="`positions[${index}].preferredSkillNames[${skillIndex}]`" :value="skill">
+                    </template>
+                </div>
+            </template>
+
+            <div class="fade-up overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm shadow-slate-200/70"
+                 x-show="loaded"
+                 x-transition.enter>
+                <div class="flex h-[calc(100vh-9rem)] flex-col lg:flex-row">
+
+                    <aside class="border-b border-slate-200 bg-white transition-all duration-300 ease-out lg:border-b-0 lg:border-r"
+                           :class="chatOpen
+                               ? 'h-[42vh] lg:h-auto lg:w-[34%] border-slate-200 opacity-100'
+                               : 'h-0 w-full overflow-hidden border-transparent opacity-0 pointer-events-none lg:h-auto lg:w-0'">
+                        <div class="flex h-full flex-col">
+                            <div class="border-b border-slate-200 px-6 py-6">
+                                <p class="text-xs font-black uppercase tracking-widest text-slate-400">AI Proposal Interview</p>
+                                <h1 class="mt-2 text-2xl font-black tracking-tight text-slate-950">AI 제안서 작성 도우미</h1>
+                                <p class="mt-2 text-sm leading-7 text-slate-500">
+                                    프로젝트 아이디어를 먼저 정리해두면, 다음 단계에서 AI 인터뷰 흐름과 폼 자동 채움 기능을 연결할 수 있습니다.
+                                </p>
+                            </div>
+
+                            <div class="flex-1 overflow-y-auto px-6 py-6">
+                                <div class="space-y-5">
+                                    <div class="max-w-[92%] rounded-[24px] border border-slate-200 bg-slate-50 px-5 py-4 text-sm leading-7 text-slate-600">
+                                        안녕하세요! 만들고 싶은 IT 서비스나 프로젝트를 자유롭게 적어주세요.
+                                        이 입력은 다음 단계에서 AI 브리프와 후속 질문의 기준이 됩니다.
+                                    </div>
+
+                                    <template x-if="rawInputText.trim().length > 0">
+                                        <div class="space-y-5">
+                                            <div class="ml-auto max-w-[88%] rounded-[24px] bg-slate-950 px-5 py-4 text-sm leading-7 text-white shadow-sm shadow-slate-900/10"
+                                                 x-text="rawInputText"></div>
+
+                                            <div class="max-w-[92%] rounded-[24px] border border-blue-100 bg-blue-50 px-5 py-4 text-sm leading-7 text-blue-700">
+                                                프로젝트 원본 입력을 확인했습니다. 실제 후속 질문과 제안서 자동 채움 로직은 다음 단계에서 연결할 예정입니다.
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <template x-if="rawInputText.trim().length === 0">
+                                        <div class="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-6 py-8 text-sm leading-7 text-slate-500">
+                                            아직 입력된 프로젝트 아이디어가 없습니다. 아래 입력창에 원하는 서비스를 적어두면, 이후 AI 인터뷰 단계에서 이 내용을 바탕으로 질문을 이어갑니다.
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <div class="border-t border-slate-200 bg-white px-5 py-4">
+                                <label for="draftInput" class="sr-only">프로젝트 아이디어 입력</label>
+                                <div class="flex items-end gap-3">
+                                    <textarea id="draftInput"
+                                              x-model="draftInput"
+                                              rows="2"
+                                              placeholder="예: 온라인 쇼핑몰 앱을 만들고 싶어요. 결제와 관리자 화면이 필요합니다."
+                                              class="min-h-[72px] flex-1 rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"></textarea>
+                                    <button type="button"
+                                            @click="sendPrompt()"
+                                            class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white transition hover:bg-slate-800">
+                                        <i data-lucide="send" class="h-4 w-4"></i>
+                                    </button>
+                                </div>
+                                <p th:if="${#fields.hasErrors('rawInputText')}"
+                                   th:errors="*{rawInputText}"
+                                   class="mt-2 text-xs font-semibold text-red-500"></p>
+                            </div>
+                        </div>
+                    </aside>
+
+                    <section class="relative flex-1 bg-slate-50/70">
+                        <button type="button"
+                                @click="toggleChat()"
+                                class="absolute left-0 top-8 z-20 hidden h-12 w-12 -translate-x-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-blue-300 hover:text-blue-600 lg:flex">
+                            <i x-show="chatOpen" x-cloak data-lucide="panel-left-close" class="h-4 w-4"></i>
+                            <i x-show="!chatOpen" x-cloak data-lucide="panel-left-open" class="h-4 w-4"></i>
+                        </button>
+
+                        <div class="h-full overflow-y-auto">
+                            <div class="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-6 py-5 backdrop-blur lg:px-8">
+                                <div class="flex flex-wrap items-start justify-between gap-5">
+                                    <div>
+                                        <p class="text-xs font-black uppercase tracking-widest text-slate-400">Proposal Editor</p>
+                                        <h2 class="mt-2 text-3xl font-black tracking-tight text-slate-950">제안서 작성</h2>
+                                        <p class="mt-2 text-sm leading-7 text-slate-500">
+                                            AI가 자동으로 작성하거나 직접 수정할 수 있습니다. 현재 단계에서는 편집기 구조와 포지션 편집 흐름을 먼저 맞춥니다.
+                                        </p>
+                                        <div class="mt-4 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-400">
+                                            <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">
+                                                <i data-lucide="user-round" class="h-3.5 w-3.5"></i>
+                                                <span th:text="${memberName}">클라이언트</span>
+                                            </span>
+                                            <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">
+                                                <i data-lucide="mail" class="h-3.5 w-3.5"></i>
+                                                <span th:text="${memberEmail}">seed.client@itda.local</span>
+                                            </span>
+                                            <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">
+                                                <i data-lucide="badge-check" class="h-3.5 w-3.5"></i>
+                                                <span th:text="${proposalForm.status != null ? proposalForm.status.description : '작성 중'}">작성 중</span>
+                                            </span>
+                                            <span th:if="${proposalId != null}"
+                                                  class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">
+                                                <i data-lucide="hash" class="h-3.5 w-3.5"></i>
+                                                <span th:text="'Proposal #' + ${proposalId}">Proposal #1</span>
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex flex-col items-start gap-3 sm:items-end">
+                                        <div class="flex flex-wrap items-center gap-3">
+                                            <a th:href="@{/client/dashboard}"
+                                               class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600">
+                                                <i data-lucide="arrow-left" class="h-4 w-4"></i>
+                                                대시보드로
+                                            </a>
+                                            <button type="button"
+                                                    @click="submitProposal('save')"
+                                                    class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600">
+                                                <i data-lucide="save" class="h-4 w-4"></i>
+                                                임시저장
+                                            </button>
+                                            <button type="button"
+                                                    @click="submitProposal('register')"
+                                                    class="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-slate-900/10 transition hover:bg-slate-800">
+                                                <i data-lucide="rocket" class="h-4 w-4"></i>
+                                                제안서 등록
+                                            </button>
+                                        </div>
+                                        <p class="text-xs font-semibold text-slate-400">
+                                            임시저장은 작성 중 상태로 저장되고, 제안서 등록은 검증을 통과하면 MATCHING 상태로 전환됩니다.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="space-y-6 px-6 py-6 lg:px-8 lg:py-8">
+                                <section class="fade-up rounded-[32px] border border-slate-200 bg-white p-8 shadow-sm shadow-slate-200/70"
+                                         x-show="loaded"
+                                         x-transition.enter>
+                                    <div class="space-y-6">
+                                        <div>
+                                            <label for="title" class="ml-1 text-[11px] font-black uppercase tracking-widest text-slate-400">
+                                                프로젝트 제목
+                                            </label>
+                                            <input id="title"
+                                                   name="title"
+                                                   type="text"
+                                                   th:value="*{title}"
+                                                   x-model="title"
+                                                   placeholder="예: 온라인 쇼핑몰 모바일 앱 개발"
+                                                   class="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100">
+                                            <p th:if="${#fields.hasErrors('title')}" th:errors="*{title}" class="mt-2 text-xs font-semibold text-red-500"></p>
+                                        </div>
+
+                                        <div>
+                                            <label for="description" class="ml-1 text-[11px] font-black uppercase tracking-widest text-slate-400">
+                                                프로젝트 설명
+                                            </label>
+                                            <textarea id="description"
+                                                      name="description"
+                                                      rows="8"
+                                                      th:text="*{description}"
+                                                      x-model="description"
+                                                      placeholder="프리랜서에게 전달하고 싶은 배경, 주요 기능, 기대 산출물, 협업 방식 등을 적어주세요."
+                                                      class="mt-3 w-full rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"></textarea>
+                                            <p th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="mt-2 text-xs font-semibold text-red-500"></p>
+                                        </div>
+
+                                        <div class="grid gap-4 lg:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)]">
+                                            <div class="rounded-[24px] border border-slate-200 bg-slate-50 px-5 py-4">
+                                                <label for="expectedPeriod" class="text-[11px] font-black uppercase tracking-widest text-slate-400">
+                                                    전체 예상 기간(주)
+                                                </label>
+                                                <input id="expectedPeriod"
+                                                       name="expectedPeriod"
+                                                       type="number"
+                                                       min="1"
+                                                       th:value="*{expectedPeriod}"
+                                                       x-model="expectedPeriod"
+                                                       placeholder="예: 6"
+                                                       class="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100">
+                                                <p th:if="${#fields.hasErrors('expectedPeriod')}" th:errors="*{expectedPeriod}" class="mt-2 text-xs font-semibold text-red-500"></p>
+                                            </div>
+
+                                            <div class="rounded-[24px] border border-slate-200 bg-slate-50 px-5 py-4">
+                                                <p class="text-[11px] font-black uppercase tracking-widest text-slate-400">예상 총 예산</p>
+                                                <p class="mt-3 text-2xl font-black tracking-tight text-slate-950" x-text="totalBudgetText()">미정</p>
+                                                <p class="mt-2 text-sm leading-7 text-slate-500">
+                                                    포지션별 인원과 최소/최대 예산을 기준으로 자동 요약됩니다.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <section class="fade-up rounded-[32px] border border-slate-200 bg-white p-8 shadow-sm shadow-slate-200/70"
+                                         x-show="loaded"
+                                         x-transition.enter
+                                         style="transition-delay: 70ms;">
+                                    <div class="flex flex-wrap items-start justify-between gap-4">
+                                        <div>
+                                            <h3 class="text-2xl font-black tracking-tight text-slate-950">포지션 목록</h3>
+                                            <p class="mt-2 text-sm leading-7 text-slate-500">
+                                                포지션은 AI 인터뷰를 통해 자동 추가될 수 있고, 직접 모달에서 추가/수정/삭제할 수도 있습니다.
+                                            </p>
+                                        </div>
+
+                                        <button type="button"
+                                                @click="openAddPosition()"
+                                                class="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-slate-900/10 transition hover:bg-slate-800">
+                                            <i data-lucide="plus" class="h-4 w-4"></i>
+                                            포지션 추가
+                                        </button>
+                                    </div>
+
+                                    <div class="mt-6 space-y-4" x-show="positions.length > 0">
+                                        <template x-for="(position, index) in positions" :key="position.clientKey">
+                                            <article class="rounded-[28px] border border-slate-200 bg-slate-50 px-6 py-6 shadow-sm shadow-slate-200/50">
+                                                <div class="flex flex-wrap items-start justify-between gap-4">
+                                                    <div class="space-y-2">
+                                                        <h4 class="text-2xl font-black tracking-tight text-slate-950" x-text="position.title || '새 포지션'"></h4>
+                                                        <p class="text-base font-medium text-slate-400" x-text="positionNameById(position.positionId) || '직무 미선택'"></p>
+                                                    </div>
+                                                    <div class="flex items-center gap-3">
+                                                        <button type="button"
+                                                                @click="openPositionDetail(index)"
+                                                                class="rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600">
+                                                            상세
+                                                        </button>
+                                                        <button type="button"
+                                                                @click="removePosition(index)"
+                                                                class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-300 bg-white text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-500">
+                                                            <i data-lucide="trash-2" class="h-4 w-4"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mt-6 grid gap-6 lg:grid-cols-3">
+                                                    <div>
+                                                        <p class="text-sm font-black uppercase tracking-widest text-slate-400">인원</p>
+                                                        <p class="mt-2 text-2xl font-black tracking-tight text-slate-900" x-text="countText(position.headCount)">미정</p>
+                                                    </div>
+                                                    <div>
+                                                        <p class="text-sm font-black uppercase tracking-widest text-slate-400">예산</p>
+                                                        <p class="mt-2 text-2xl font-black tracking-tight text-slate-900" x-text="budgetText(position)">미정</p>
+                                                    </div>
+                                                    <div>
+                                                        <p class="text-sm font-black uppercase tracking-widest text-slate-400">기간</p>
+                                                        <p class="mt-2 text-2xl font-black tracking-tight text-slate-900" x-text="periodText(position.expectedPeriod)">미정</p>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+                                                    <div class="space-y-3">
+                                                        <div>
+                                                            <p class="text-sm font-black uppercase tracking-widest text-slate-400">필수 기술</p>
+                                                            <div class="mt-3 flex flex-wrap gap-2">
+                                                                <template x-for="skill in position.essentialSkillNames" :key="`${position.clientKey}-essential-${skill}`">
+                                                                    <span class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-600" x-text="skill"></span>
+                                                                </template>
+                                                                <span x-show="position.essentialSkillNames.length === 0"
+                                                                      class="rounded-full border border-dashed border-slate-200 px-3 py-1.5 text-sm text-slate-400">
+                                                                    미정
+                                                                </span>
+                                                            </div>
+                                                        </div>
+
+                                                        <div>
+                                                            <p class="text-sm font-black uppercase tracking-widest text-slate-400">우대 기술</p>
+                                                            <div class="mt-3 flex flex-wrap gap-2">
+                                                                <template x-for="skill in position.preferredSkillNames" :key="`${position.clientKey}-preferred-${skill}`">
+                                                                    <span class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-600" x-text="skill"></span>
+                                                                </template>
+                                                                <span x-show="position.preferredSkillNames.length === 0"
+                                                                      class="rounded-full border border-dashed border-slate-200 px-3 py-1.5 text-sm text-slate-400">
+                                                                    미정
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="rounded-[24px] border border-white bg-white px-5 py-5">
+                                                        <div class="grid gap-4 sm:grid-cols-2">
+                                                            <div>
+                                                                <p class="text-sm font-black uppercase tracking-widest text-slate-400">근무 형태</p>
+                                                                <p class="mt-2 text-base font-bold text-slate-900" x-text="workTypeText(position.workType)">미정</p>
+                                                            </div>
+                                                            <div>
+                                                                <p class="text-sm font-black uppercase tracking-widest text-slate-400">근무지</p>
+                                                                <p class="mt-2 text-base font-bold text-slate-900" x-text="textOrDefault(position.workPlace)">미정</p>
+                                                            </div>
+                                                            <div>
+                                                                <p class="text-sm font-black uppercase tracking-widest text-slate-400">경력 범위</p>
+                                                                <p class="mt-2 text-base font-bold text-slate-900" x-text="careerRangeText(position)">미정</p>
+                                                            </div>
+                                                            <div>
+                                                                <p class="text-sm font-black uppercase tracking-widest text-slate-400">모집 상태</p>
+                                                                <p class="mt-2 text-base font-bold text-slate-900" x-text="statusText(position.status)">모집 중</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </article>
+                                        </template>
+                                    </div>
+
+                                    <div x-show="positions.length === 0"
+                                         class="mt-6 rounded-[28px] border border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center">
+                                        <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-white text-slate-400 shadow-sm shadow-slate-200/70">
+                                            <i data-lucide="briefcase-business" class="h-6 w-6"></i>
+                                        </div>
+                                        <h4 class="mt-5 text-xl font-black text-slate-900">아직 추가된 포지션이 없습니다</h4>
+                                        <p class="mt-3 text-sm leading-7 text-slate-500">
+                                            포지션 추가 버튼으로 모집 단위를 만들고, 이후 AI 인터뷰 단계에서 이 목록을 자동으로 채울 수 있도록 연결할 예정입니다.
+                                        </p>
+                                    </div>
+                                </section>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <div x-show="positionModalOpen"
+                 x-cloak
+                 x-transition.opacity
+                 class="fixed inset-0 z-40 bg-slate-950/35 backdrop-blur-sm"></div>
+
+            <div x-show="positionModalOpen"
+                 x-cloak
+                 x-transition
+                 class="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
+                <div @click.away="closePositionModal()"
+                     class="flex h-[min(88vh,880px)] w-full max-w-5xl flex-col overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl shadow-slate-900/10">
+                    <div class="flex items-center justify-between border-b border-slate-200 px-8 py-6">
+                        <div>
+                            <h3 class="text-3xl font-black tracking-tight text-slate-950"
+                                x-text="editingIndex === null ? '포지션 추가' : '포지션 상세 정보'">
+                                포지션 추가
+                            </h3>
+                            <p class="mt-2 text-sm text-slate-500">
+                                포지션별 근무 조건과 요구 기술을 입력하면 리스트 카드에 즉시 반영됩니다.
+                            </p>
+                        </div>
+                        <button type="button"
+                                @click="closePositionModal()"
+                                class="inline-flex h-12 w-12 items-center justify-center rounded-2xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
+                            <i data-lucide="x" class="h-5 w-5"></i>
+                        </button>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto px-8 py-8">
+                        <div x-show="positionErrors.length > 0"
+                             x-cloak
+                             class="mb-6 rounded-[24px] border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
+                            <ul class="space-y-1">
+                                <template x-for="(error, index) in positionErrors" :key="`position-error-${index}`">
+                                    <li x-text="error"></li>
+                                </template>
+                            </ul>
+                        </div>
+
+                        <div class="grid gap-6 md:grid-cols-2">
+                            <div>
+                                <label class="ml-1 text-[11px] font-black uppercase tracking-widest text-slate-400">직무</label>
+                                <select x-model="currentPosition.positionId"
+                                        class="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100">
+                                    <option value="">직무를 선택해주세요</option>
+                                    <template x-for="option in positionOptions" :key="option.id">
+                                        <option :value="String(option.id)" x-text="option.name"></option>
+                                    </template>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="ml-1 text-[11px] font-black uppercase tracking-widest text-slate-400">포지션 제목</label>
+                                <input type="text"
+                                       x-model="currentPosition.title"
+                                       placeholder="예: Node.js 백엔드 개발자"
+                                       class="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100">
+                            </div>
+
+                            <div>
+                                <label class="ml-1 text-[11px] font-black uppercase tracking-widest text-slate-400">근무 형태</label>
+                                <select x-model="currentPosition.workType"
+                                        @change="handleCurrentWorkTypeChange()"
+                                        class="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100">
+                                    <option value="">선택 안함</option>
+                                    <template x-for="item in workTypes" :key="item.name">
+                                        <option :value="item.name" x-text="item.description"></option>
+                                    </template>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="ml-1 text-[11px] font-black uppercase tracking-widest text-slate-400">인원(명)</label>
+                                <input type="number"
+                                       min="1"
+                                       x-model="currentPosition.headCount"
+                                       placeholder="예: 1"
+                                       class="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100">
+                            </div>
+
+                            <div>
+                                <label class="ml-1 text-[11px] font-black uppercase tracking-widest text-slate-400">최소 예산(원)</label>
+                                <input type="number"
+                                       min="0"
+                                       x-model="currentPosition.unitBudgetMin"
+                                       placeholder="예: 3000000"
+                                       class="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100">
+                            </div>
+
+                            <div>
+                                <label class="ml-1 text-[11px] font-black uppercase tracking-widest text-slate-400">최대 예산(원)</label>
+                                <input type="number"
+                                       min="0"
+                                       x-model="currentPosition.unitBudgetMax"
+                                       placeholder="예: 4000000"
+                                       class="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100">
+                            </div>
+
+                            <div>
+                                <label class="ml-1 text-[11px] font-black uppercase tracking-widest text-slate-400">예상 기간(주)</label>
+                                <input type="number"
+                                       min="1"
+                                       x-model="currentPosition.expectedPeriod"
+                                       placeholder="예: 8"
+                                       class="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100">
+                            </div>
+
+                            <div class="grid gap-6 sm:grid-cols-2">
+                                <div>
+                                    <label class="ml-1 text-[11px] font-black uppercase tracking-widest text-slate-400">최소 경력(년)</label>
+                                    <input type="number"
+                                           min="0"
+                                           x-model="currentPosition.careerMinYears"
+                                           placeholder="예: 3"
+                                           class="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100">
+                                </div>
+                                <div>
+                                    <label class="ml-1 text-[11px] font-black uppercase tracking-widest text-slate-400">최대 경력(년)</label>
+                                    <input type="number"
+                                           min="0"
+                                           x-model="currentPosition.careerMaxYears"
+                                           placeholder="예: 5"
+                                           class="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100">
+                                </div>
+                            </div>
+
+                            <div class="md:col-span-2">
+                                <label class="ml-1 text-[11px] font-black uppercase tracking-widest text-slate-400">근무지</label>
+                                <input type="text"
+                                       x-model="currentPosition.workPlace"
+                                       :disabled="currentPosition.workType === 'REMOTE'"
+                                       :placeholder="currentPosition.workType === 'REMOTE' ? '원격 근무는 근무지를 입력하지 않습니다.' : '예: 서울시 강남구'"
+                                       class="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100">
+                            </div>
+                        </div>
+
+                        <div class="mt-8 space-y-6">
+                            <section class="rounded-[28px] border border-slate-200 bg-slate-50 px-5 py-5">
+                                <p class="text-sm font-black uppercase tracking-widest text-slate-400">필수 기술</p>
+                                <div class="mt-4 flex flex-wrap gap-2">
+                                    <template x-for="(skill, index) in currentPosition.essentialSkillNames" :key="`essential-${index}-${skill}`">
+                                        <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700">
+                                            <span x-text="skill"></span>
+                                            <button type="button" @click="removeSkill('essential', index)" class="text-slate-400 transition hover:text-slate-700">
+                                                <i data-lucide="x" class="h-3 w-3"></i>
+                                            </button>
+                                        </span>
+                                    </template>
+                                </div>
+                                <div class="mt-4 flex flex-col gap-3 sm:flex-row">
+                                    <input type="text"
+                                           x-model="currentPosition.essentialSkillDraft"
+                                           @keydown.enter.prevent="addSkill('essential')"
+                                           placeholder="기술 이름 입력"
+                                           class="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100">
+                                    <button type="button"
+                                            @click="addSkill('essential')"
+                                            class="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600">
+                                        추가
+                                    </button>
+                                </div>
+                            </section>
+
+                            <section class="rounded-[28px] border border-slate-200 bg-slate-50 px-5 py-5">
+                                <p class="text-sm font-black uppercase tracking-widest text-slate-400">우대 기술</p>
+                                <div class="mt-4 flex flex-wrap gap-2">
+                                    <template x-for="(skill, index) in currentPosition.preferredSkillNames" :key="`preferred-${index}-${skill}`">
+                                        <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700">
+                                            <span x-text="skill"></span>
+                                            <button type="button" @click="removeSkill('preferred', index)" class="text-slate-400 transition hover:text-slate-700">
+                                                <i data-lucide="x" class="h-3 w-3"></i>
+                                            </button>
+                                        </span>
+                                    </template>
+                                </div>
+                                <div class="mt-4 flex flex-col gap-3 sm:flex-row">
+                                    <input type="text"
+                                           x-model="currentPosition.preferredSkillDraft"
+                                           @keydown.enter.prevent="addSkill('preferred')"
+                                           placeholder="기술 이름 입력"
+                                           class="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100">
+                                    <button type="button"
+                                            @click="addSkill('preferred')"
+                                            class="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600">
+                                        추가
+                                    </button>
+                                </div>
+                            </section>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-end gap-3 border-t border-slate-200 px-8 py-5">
+                        <button type="button"
+                                @click="closePositionModal()"
+                                class="rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-slate-400">
+                            취소
+                        </button>
+                        <button type="button"
+                                @click="savePosition()"
+                                class="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-slate-900/10 transition hover:bg-slate-800">
+                            <span x-text="editingIndex === null ? '추가' : '저장'">저장</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </main>
+</div>
+
+<th:block layout:fragment="scripts">
+    <script th:inline="javascript">
+        window.proposalEditorBootstrap = {
+            proposalId: /*[[${proposalId}]]*/ null,
+            memberName: /*[[${memberName}]]*/ '',
+            memberEmail: /*[[${memberEmail}]]*/ '',
+            isNew: /*[[${isNew}]]*/ true,
+            status: /*[[${proposalForm.status != null ? proposalForm.status.name() : 'WRITING'}]]*/ 'WRITING',
+            title: /*[[${proposalForm.title}]]*/ '',
+            rawInputText: /*[[${proposalForm.rawInputText}]]*/ '',
+            description: /*[[${proposalForm.description}]]*/ '',
+            expectedPeriod: /*[[${proposalForm.expectedPeriod}]]*/ null,
+            workTypes: [
+                /*[# th:each="workType, stat : ${workTypes}"]*/
+                {
+                    name: /*[[${workType.name()}]]*/ '',
+                    description: /*[[${workType.description}]]*/ ''
+                }/*[(${stat.last} ? '' : ',')]*/
+                /*[/]*/
+            ],
+            positionOptions: [
+                /*[# th:each="position, stat : ${positionOptions}"]*/
+                {
+                    id: /*[[${position.id}]]*/ null,
+                    name: /*[[${position.name}]]*/ ''
+                }/*[(${stat.last} ? '' : ',')]*/
+                /*[/]*/
+            ],
+            positions: [
+                /*[# th:each="positionForm, stat : ${proposalForm.positions}"]*/
+                {
+                    id: /*[[${positionForm.id}]]*/ null,
+                    positionId: /*[[${positionForm.positionId}]]*/ null,
+                    title: /*[[${positionForm.title}]]*/ '',
+                    workType: /*[[${positionForm.workType != null ? positionForm.workType.name() : null}]]*/ null,
+                    headCount: /*[[${positionForm.headCount}]]*/ null,
+                    unitBudgetMin: /*[[${positionForm.unitBudgetMin}]]*/ null,
+                    unitBudgetMax: /*[[${positionForm.unitBudgetMax}]]*/ null,
+                    expectedPeriod: /*[[${positionForm.expectedPeriod}]]*/ null,
+                    careerMinYears: /*[[${positionForm.careerMinYears}]]*/ null,
+                    careerMaxYears: /*[[${positionForm.careerMaxYears}]]*/ null,
+                    workPlace: /*[[${positionForm.workPlace}]]*/ '',
+                    status: /*[[${positionForm.status != null ? positionForm.status.name() : 'OPEN'}]]*/ 'OPEN',
+                    essentialSkillNames: [
+                        /*[# th:each="skill, skillStat : ${positionForm.essentialSkillNames}"]*/
+                        /*[[${skill}]]*/ ''/*[(${skillStat.last} ? '' : ',')]*/
+                        /*[/]*/
+                    ],
+                    preferredSkillNames: [
+                        /*[# th:each="skill, skillStat : ${positionForm.preferredSkillNames}"]*/
+                        /*[[${skill}]]*/ ''/*[(${skillStat.last} ? '' : ',')]*/
+                        /*[/]*/
+                    ]
+                }/*[(${stat.last} ? '' : ',')]*/
+                /*[/]*/
+            ]
+        };
+
+        function proposalEditorState(bootstrap) {
+            return {
+                loaded: false,
+                chatOpen: true,
+                submitAction: 'save',
+                title: bootstrap.title || '',
+                rawInputText: bootstrap.rawInputText || '',
+                draftInput: bootstrap.rawInputText || '',
+                description: bootstrap.description || '',
+                expectedPeriod: bootstrap.expectedPeriod ?? '',
+                status: bootstrap.status || 'WRITING',
+                workTypes: bootstrap.workTypes || [],
+                positionOptions: bootstrap.positionOptions || [],
+                positions: [],
+                positionModalOpen: false,
+                editingIndex: null,
+                currentPosition: null,
+                positionErrors: [],
+
+                init() {
+                    this.positions = (bootstrap.positions || []).map((position, index) => this.normalizePosition({
+                        ...position,
+                        clientKey: position.id ? `position-${position.id}` : `seed-${index}`
+                    }));
+                    this.currentPosition = this.blankPosition();
+                    this.loaded = true;
+                    this.refreshIcons();
+                },
+
+                toggleChat() {
+                    this.chatOpen = !this.chatOpen;
+                    this.refreshIcons();
+                },
+
+                sendPrompt() {
+                    if (!this.draftInput || !this.draftInput.trim()) {
+                        return;
+                    }
+                    this.rawInputText = this.draftInput.trim();
+                    this.refreshIcons();
+                },
+
+                openAddPosition() {
+                    this.editingIndex = null;
+                    this.currentPosition = this.blankPosition();
+                    this.positionErrors = [];
+                    this.positionModalOpen = true;
+                    this.refreshIcons();
+                },
+
+                openPositionDetail(index) {
+                    this.editingIndex = index;
+                    this.currentPosition = this.normalizePosition(JSON.parse(JSON.stringify(this.positions[index])));
+                    this.positionErrors = [];
+                    this.positionModalOpen = true;
+                    this.refreshIcons();
+                },
+
+                closePositionModal() {
+                    this.positionModalOpen = false;
+                    this.currentPosition = this.blankPosition();
+                    this.positionErrors = [];
+                    this.refreshIcons();
+                },
+
+                savePosition() {
+                    const errors = this.validateCurrentPosition();
+                    if (errors.length > 0) {
+                        this.positionErrors = errors;
+                        return;
+                    }
+
+                    const normalized = this.normalizePosition(this.currentPosition);
+                    if (this.editingIndex === null) {
+                        this.positions.push(normalized);
+                    } else {
+                        this.positions.splice(this.editingIndex, 1, normalized);
+                    }
+                    this.closePositionModal();
+                    this.refreshIcons();
+                },
+
+                removePosition(index) {
+                    this.positions.splice(index, 1);
+                    this.refreshIcons();
+                },
+
+                addSkill(type) {
+                    const draftKey = type === 'essential' ? 'essentialSkillDraft' : 'preferredSkillDraft';
+                    const listKey = type === 'essential' ? 'essentialSkillNames' : 'preferredSkillNames';
+                    const draft = (this.currentPosition[draftKey] || '').trim();
+
+                    if (!draft) {
+                        return;
+                    }
+
+                    if (!this.currentPosition[listKey].includes(draft)) {
+                        const otherListKey = type === 'essential' ? 'preferredSkillNames' : 'essentialSkillNames';
+                        if (this.currentPosition[otherListKey].includes(draft)) {
+                            this.positionErrors = ['필수 기술과 우대 기술에는 같은 값을 넣을 수 없습니다.'];
+                            return;
+                        }
+                        this.currentPosition[listKey].push(draft);
+                    }
+                    this.currentPosition[draftKey] = '';
+                    this.positionErrors = [];
+                    this.refreshIcons();
+                },
+
+                removeSkill(type, index) {
+                    const listKey = type === 'essential' ? 'essentialSkillNames' : 'preferredSkillNames';
+                    this.currentPosition[listKey].splice(index, 1);
+                    this.positionErrors = [];
+                    this.refreshIcons();
+                },
+
+                submitProposal(action) {
+                    this.submitAction = action;
+                    this.$nextTick(() => {
+                        this.$root.requestSubmit();
+                    });
+                },
+
+                handleCurrentWorkTypeChange() {
+                    if (this.currentPosition.workType === 'REMOTE') {
+                        this.currentPosition.workPlace = '';
+                    }
+                    this.positionErrors = [];
+                },
+
+                blankPosition() {
+                    return {
+                        id: null,
+                        clientKey: this.generateKey(),
+                        positionId: '',
+                        title: '',
+                        workType: '',
+                        headCount: '',
+                        unitBudgetMin: '',
+                        unitBudgetMax: '',
+                        expectedPeriod: '',
+                        careerMinYears: '',
+                        careerMaxYears: '',
+                        workPlace: '',
+                        status: 'OPEN',
+                        essentialSkillNames: [],
+                        preferredSkillNames: [],
+                        essentialSkillDraft: '',
+                        preferredSkillDraft: ''
+                    };
+                },
+
+                normalizePosition(position) {
+                    const workType = position.workType || '';
+                    return {
+                        id: position.id ?? null,
+                        clientKey: position.clientKey || this.generateKey(),
+                        positionId: position.positionId != null ? String(position.positionId) : '',
+                        title: (position.title || '').trim(),
+                        workType,
+                        headCount: this.normalizeNumberField(position.headCount),
+                        unitBudgetMin: this.normalizeNumberField(position.unitBudgetMin),
+                        unitBudgetMax: this.normalizeNumberField(position.unitBudgetMax),
+                        expectedPeriod: this.normalizeNumberField(position.expectedPeriod),
+                        careerMinYears: this.normalizeNumberField(position.careerMinYears),
+                        careerMaxYears: this.normalizeNumberField(position.careerMaxYears),
+                        workPlace: workType === 'REMOTE' ? '' : (position.workPlace || '').trim(),
+                        status: position.status || 'OPEN',
+                        essentialSkillNames: this.uniqueSkills(position.essentialSkillNames || []),
+                        preferredSkillNames: this.uniqueSkills(position.preferredSkillNames || []),
+                        essentialSkillDraft: '',
+                        preferredSkillDraft: ''
+                    };
+                },
+
+                normalizeNumberField(value) {
+                    return value === null || value === undefined || value === '' ? '' : String(value);
+                },
+
+                uniqueSkills(skills) {
+                    return Array.from(new Set((skills || []).filter(skill => skill && skill.trim()).map(skill => skill.trim())));
+                },
+
+                generateKey() {
+                    return `position-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+                },
+
+                validateCurrentPosition() {
+                    const errors = [];
+                    const position = this.currentPosition;
+
+                    if (!position.positionId) {
+                        errors.push('직무를 선택해야 합니다.');
+                    }
+                    if (!position.title || !position.title.trim()) {
+                        errors.push('포지션 제목을 입력해야 합니다.');
+                    }
+                    if (!position.workType) {
+                        errors.push('근무 형태를 선택해야 합니다.');
+                    }
+                    if (!position.headCount || Number(position.headCount) < 1) {
+                        errors.push('모집 인원은 1명 이상이어야 합니다.');
+                    }
+                    if ((position.workType === 'SITE' || position.workType === 'HYBRID')
+                            && (!position.workPlace || !position.workPlace.trim())) {
+                        errors.push('상주 또는 하이브리드 근무 포지션은 근무지를 입력해야 합니다.');
+                    }
+                    if (position.workType === 'REMOTE' && position.workPlace && position.workPlace.trim()) {
+                        errors.push('원격 근무 포지션은 근무지를 입력할 수 없습니다.');
+                    }
+
+                    const minBudget = position.unitBudgetMin === '' ? null : Number(position.unitBudgetMin);
+                    const maxBudget = position.unitBudgetMax === '' ? null : Number(position.unitBudgetMax);
+                    if (minBudget !== null && maxBudget !== null && minBudget > maxBudget) {
+                        errors.push('최소 예산은 최대 예산보다 클 수 없습니다.');
+                    }
+
+                    const minCareer = position.careerMinYears === '' ? null : Number(position.careerMinYears);
+                    const maxCareer = position.careerMaxYears === '' ? null : Number(position.careerMaxYears);
+                    if (minCareer !== null && maxCareer !== null && minCareer > maxCareer) {
+                        errors.push('최소 경력은 최대 경력보다 클 수 없습니다.');
+                    }
+
+                    const proposalPeriod = this.expectedPeriod === '' ? null : Number(this.expectedPeriod);
+                    const positionPeriod = position.expectedPeriod === '' ? null : Number(position.expectedPeriod);
+                    if (proposalPeriod !== null && positionPeriod !== null && positionPeriod > proposalPeriod) {
+                        errors.push('포지션 예상 기간은 제안서 전체 예상 기간보다 길 수 없습니다.');
+                    }
+
+                    const essential = new Set(position.essentialSkillNames);
+                    const overlap = position.preferredSkillNames.filter(skill => essential.has(skill));
+                    if (overlap.length > 0) {
+                        errors.push('필수 기술과 우대 기술에는 같은 값을 넣을 수 없습니다.');
+                    }
+
+                    return [...new Set(errors)];
+                },
+
+                positionNameById(positionId) {
+                    const match = this.positionOptions.find(option => String(option.id) === String(positionId));
+                    return match ? match.name : '';
+                },
+
+                workTypeText(workType) {
+                    const match = this.workTypes.find(option => option.name === workType);
+                    return match ? match.description : '미정';
+                },
+
+                statusText(status) {
+                    if (status === 'FULL') return '정원 충족';
+                    if (status === 'CLOSED') return '모집 종료';
+                    return '모집 중';
+                },
+
+                countText(value) {
+                    return value ? `${value}명` : '미정';
+                },
+
+                periodText(value) {
+                    return value ? `${value}주` : '미정';
+                },
+
+                budgetText(position) {
+                    if (!position.unitBudgetMin && !position.unitBudgetMax) {
+                        return '미정';
+                    }
+                    if (position.unitBudgetMin && position.unitBudgetMax) {
+                        return `${this.formatNumber(position.unitBudgetMin)}원 ~ ${this.formatNumber(position.unitBudgetMax)}원`;
+                    }
+                    return `${this.formatNumber(position.unitBudgetMin || position.unitBudgetMax)}원`;
+                },
+
+                careerRangeText(position) {
+                    const min = position.careerMinYears;
+                    const max = position.careerMaxYears;
+                    if (min && max) {
+                        return `${min}년 ~ ${max}년`;
+                    }
+                    if (min) {
+                        return `${min}년 이상`;
+                    }
+                    if (max) {
+                        return `${max}년 이하`;
+                    }
+                    return '미정';
+                },
+
+                textOrDefault(value) {
+                    return value && value.trim() ? value : '미정';
+                },
+
+                totalBudgetText() {
+                    if (this.positions.length === 0) {
+                        return '미정';
+                    }
+
+                    let minTotal = 0;
+                    let maxTotal = 0;
+
+                    for (const position of this.positions) {
+                        const headCount = Number(position.headCount);
+                        const minBudget = Number(position.unitBudgetMin);
+                        const maxBudget = Number(position.unitBudgetMax);
+
+                        if (!headCount || Number.isNaN(minBudget) || Number.isNaN(maxBudget)) {
+                            return '미정';
+                        }
+
+                        minTotal += headCount * minBudget;
+                        maxTotal += headCount * maxBudget;
+                    }
+
+                    return `${this.formatNumber(minTotal)}원 ~ ${this.formatNumber(maxTotal)}원`;
+                },
+
+                formatNumber(value) {
+                    return new Intl.NumberFormat('ko-KR').format(Number(value));
+                },
+
+                refreshIcons() {
+                    this.$nextTick(() => {
+                        if (window.lucide) {
+                            lucide.createIcons();
+                        }
+                    });
+                }
+            };
+        }
+    </script>
+</th:block>
+</body>
+</html>
