@@ -52,7 +52,7 @@ public class RecommendationCandidateFinder {
         return candidateResumeIds.stream()
                 .map(resumeMap::get)
                 .filter(Objects::nonNull)
-                .filter(resume -> passesCareerRage(resume, proposalPosition))
+                .filter(resume -> passesCareerRange(resume, proposalPosition))
                 .map(this::toCandidate)
                 .toList();
     }
@@ -68,7 +68,7 @@ public class RecommendationCandidateFinder {
         return Math.max(MINIMUM_CANDIDATE_POOL_SIZE, topK * 20);
     }
 
-    private boolean passesCareerRage(Resume resume, ProposalPosition proposalPosition) {
+    private boolean passesCareerRange(Resume resume, ProposalPosition proposalPosition) {
         Integer candidateCareerYears = Integer.valueOf(resume.getCareerYears());
         Integer careerMinYears = proposalPosition.getCareerMinYears();
         Integer careerMaxYears = proposalPosition.getCareerMaxYears();
