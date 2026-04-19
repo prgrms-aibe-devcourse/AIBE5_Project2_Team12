@@ -1,6 +1,9 @@
 package com.generic4.itda.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.generic4.itda.domain.member.Member;
+import com.generic4.itda.domain.resume.CareerItemPayload;
 import com.generic4.itda.domain.resume.Proficiency;
 import com.generic4.itda.domain.resume.Resume;
 import com.generic4.itda.domain.skill.Skill;
@@ -22,6 +25,7 @@ public class ResumeService {
     private final ResumeRepository resumeRepository;
     private final MemberRepository memberRepository;
     private final SkillRepository skillRepository;
+    private final ObjectMapper objectMapper;
 
     // 이력서 생성
     @Transactional
@@ -58,8 +62,8 @@ public class ResumeService {
         resume.update(
                 form.getIntroduction(),
                 form.getCareerYears(),
-                form.getCareer(),
-                form.getPreferredWorkType(), // 서비스에서는 preferredWorkType, 엔티티는 workType일 수 있으니 이름 확인!
+                resume.getCareer(), // 경력은 AJAX(/career/add,update,remove)로만 관리 — 메인 폼이 덮어쓰지 않도록 기존 값 유지
+                form.getPreferredWorkType(),
                 form.getWritingStatus(),
                 form.getPortfolioUrl()
         );
@@ -70,6 +74,35 @@ public class ResumeService {
         }
         if (resume.isAiMatchingEnabled() != form.isAiMatchingEnabled()) {
             resume.toggleAiMatchingEnabled();
+        }
+    }
+
+    // 경력 추가
+    public void addCareer(String email, CareerItemPayload item) {
+        Resume resume = getResumeByEmail(email);
+        resume.addCareerItem(item);
+        resumeRepository.updateCareerJson(resume.getId(), toCareerJson(resume));
+    }
+
+    // 경력 수정
+    public void updateCareer(String email, int index, CareerItemPayload item) {
+        Resume resume = getResumeByEmail(email);
+        resume.updateCareerItem(index, item);
+        resumeRepository.updateCareerJson(resume.getId(), toCareerJson(resume));
+    }
+
+    // 경력 삭제
+    public void removeCareer(String email, int index) {
+        Resume resume = getResumeByEmail(email);
+        resume.removeCareerItem(index);
+        resumeRepository.updateCareerJson(resume.getId(), toCareerJson(resume));
+    }
+
+    private String toCareerJson(Resume resume) {
+        try {
+            return objectMapper.writeValueAsString(resume.getCareer());
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("경력 JSON 직렬화에 실패했습니다.", e);
         }
     }
 
