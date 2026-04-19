@@ -36,13 +36,17 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
             - 반드시 JSON만 반환한다.
             - title, description은 한국어로 자연스럽게 작성한다.
             - 근거가 부족한 값은 추측하지 말고 null로 반환한다.
-            - workType은 SITE, REMOTE, HYBRID 중 하나만 사용한다.
             - totalBudgetMin, totalBudgetMax, unitBudgetMin, unitBudgetMax는 원화 기준 정수로 반환한다.
             - expectedPeriod는 주 단위 기준 정수로 반환한다.
-            - positions는 직무명별로 나누고 같은 직무를 중복 생성하지 않는다.
+            - positions는 실제 모집 단위 배열이다.
+            - positionCategoryName은 공용 직무 마스터에 대응하는 큰 분류명이다. 예: 백엔드 개발자, 프론트엔드 개발자, 앱 개발자
+            - title은 사용자가 화면에서 보게 될 구체 포지션 제목이다. 예: Node.js 백엔드 개발자, React Native 앱 개발자
+            - position별 workType은 SITE, REMOTE, HYBRID 중 하나만 사용한다.
+            - 같은 positionCategoryName 아래에서도 title이 다르면 별도 position으로 분리할 수 있다.
+            - 동일한 title을 불필요하게 중복 생성하지 않는다.
             - skills.importance는 ESSENTIAL 또는 PREFERENCE만 사용한다.
             - importance를 확신할 수 없으면 PREFERENCE를 사용한다.
-            - skillName, positionName은 짧고 일반적인 명칭으로 정리한다.
+            - skillName은 짧고 일반적인 명칭으로 정리한다.
             """;
 
     private final RestClient restClient;
@@ -115,8 +119,6 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
                 "description",
                 "totalBudgetMin",
                 "totalBudgetMax",
-                "workType",
-                "workPlace",
                 "expectedPeriod",
                 "positions"
         ));
@@ -125,8 +127,6 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
                 "description", nullableStringSchema(),
                 "totalBudgetMin", nullableIntegerSchema(),
                 "totalBudgetMax", nullableIntegerSchema(),
-                "workType", nullableEnumSchema("SITE", "REMOTE", "HYBRID"),
-                "workPlace", nullableStringSchema(),
                 "expectedPeriod", nullableIntegerSchema(),
                 "positions", Map.of(
                         "type", "array",
@@ -139,17 +139,35 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
 
     private Map<String, Object> buildPositionSchema() {
         Map<String, Object> schema = objectSchema();
-        schema.put("required", List.of("positionName", "headCount", "unitBudgetMin", "unitBudgetMax", "skills"));
-        schema.put("properties", Map.of(
-                "positionName", Map.of("type", "string"),
-                "headCount", nullableIntegerSchema(),
-                "unitBudgetMin", nullableIntegerSchema(),
-                "unitBudgetMax", nullableIntegerSchema(),
-                "skills", Map.of(
-                        "type", "array",
-                        "items", buildSkillSchema()
-                )
+        schema.put("required", List.of(
+                "positionCategoryName",
+                "title",
+                "workType",
+                "headCount",
+                "unitBudgetMin",
+                "unitBudgetMax",
+                "expectedPeriod",
+                "careerMinYears",
+                "careerMaxYears",
+                "workPlace",
+                "skills"
         ));
+        Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("positionCategoryName", Map.of("type", "string"));
+        properties.put("title", Map.of("type", "string"));
+        properties.put("workType", nullableEnumSchema("SITE", "REMOTE", "HYBRID"));
+        properties.put("headCount", nullableIntegerSchema());
+        properties.put("unitBudgetMin", nullableIntegerSchema());
+        properties.put("unitBudgetMax", nullableIntegerSchema());
+        properties.put("expectedPeriod", nullableIntegerSchema());
+        properties.put("careerMinYears", nullableIntegerSchema());
+        properties.put("careerMaxYears", nullableIntegerSchema());
+        properties.put("workPlace", nullableStringSchema());
+        properties.put("skills", Map.of(
+                "type", "array",
+                "items", buildSkillSchema()
+        ));
+        schema.put("properties", properties);
         return schema;
     }
 
@@ -246,8 +264,6 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
                 normalizeText(root.get("description")),
                 asLong(root.get("totalBudgetMin")),
                 asLong(root.get("totalBudgetMax")),
-                parseWorkType(root.get("workType")),
-                normalizeText(root.get("workPlace")),
                 asLong(root.get("expectedPeriod")),
                 parsePositions(root.get("positions"))
         );
@@ -261,10 +277,16 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
         List<AiBriefPositionResult> positions = new ArrayList<>();
         for (JsonNode positionNode : positionsNode) {
             positions.add(AiBriefPositionResult.of(
-                    normalizeRequiredText(positionNode.get("positionName"), "AI 브리프 직무명은 필수값입니다."),
+                    normalizeRequiredText(positionNode.get("positionCategoryName"), "AI 브리프 포지션 카테고리는 필수값입니다."),
+                    normalizeRequiredText(positionNode.get("title"), "AI 브리프 포지션 제목은 필수값입니다."),
+                    parseWorkType(positionNode.get("workType")),
                     asLong(positionNode.get("headCount")),
                     asLong(positionNode.get("unitBudgetMin")),
                     asLong(positionNode.get("unitBudgetMax")),
+                    asLong(positionNode.get("expectedPeriod")),
+                    asInteger(positionNode.get("careerMinYears")),
+                    asInteger(positionNode.get("careerMaxYears")),
+                    normalizeText(positionNode.get("workPlace")),
                     parseSkills(positionNode.get("skills"))
             ));
         }
@@ -326,6 +348,17 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
         } catch (NumberFormatException exception) {
             throw new AiBriefGenerationException("숫자 필드 파싱에 실패했습니다. value=" + value, exception);
         }
+    }
+
+    private Integer asInteger(JsonNode node) {
+        Long value = asLong(node);
+        if (value == null) {
+            return null;
+        }
+        if (value < Integer.MIN_VALUE || value > Integer.MAX_VALUE) {
+            throw new AiBriefGenerationException("정수 범위를 벗어났습니다. value=" + value);
+        }
+        return value.intValue();
     }
 
     private String normalizeRequiredText(JsonNode node, String message) {
