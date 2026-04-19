@@ -1,7 +1,7 @@
 package com.generic4.itda.service.recommend;
 
+import com.generic4.itda.domain.proposal.ProposalPosition;
 import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
-import com.generic4.itda.domain.recommendation.RecommendationRun;
 import com.generic4.itda.domain.resume.Resume;
 import com.generic4.itda.repository.ResumeQueryRepository;
 import com.generic4.itda.repository.ResumeRepository;
@@ -24,9 +24,9 @@ public class RecommendationCandidateFinder {
     private final ResumeQueryRepository resumeQueryRepository;
     private final ResumeRepository resumeRepository;
 
-    public List<RecommendationCandidate> findCandidates(RecommendationRun run) {
-        List<Long> requiredSkillIds = extractRequiredSkillIds(run);
-        int candidatePoolSize = resolveCandidatePoolSize(run.getTopK());
+    public List<RecommendationCandidate> findCandidates(ProposalPosition proposalPosition, int topK) {
+        List<Long> requiredSkillIds = extractRequiredSkillIds(proposalPosition);
+        int candidatePoolSize = resolveCandidatePoolSize(topK);
 
         List<Long> candidateResumeIds;
         if (requiredSkillIds.isEmpty()) {
@@ -52,8 +52,8 @@ public class RecommendationCandidateFinder {
                 .toList();
     }
 
-    private List<Long> extractRequiredSkillIds(RecommendationRun run) {
-        return run.getProposalPosition().getSkills().stream()
+    private List<Long> extractRequiredSkillIds(ProposalPosition proposalPosition) {
+        return proposalPosition.getSkills().stream()
                 .filter(pps -> pps.getImportance() == ProposalPositionSkillImportance.ESSENTIAL)
                 .map(pps -> pps.getSkill().getId())
                 .toList();
