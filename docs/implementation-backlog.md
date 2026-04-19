@@ -146,9 +146,12 @@
 - 제안서와 모집 단위 저장 구조
 - `WRITING -> MATCHING -> COMPLETE` 상태 전이 서비스
 
-### Phase 3. AI 브리프를 현재 스키마에 연결
+### Phase 3. AI 브리프를 현재 스키마에 연결 (완료)
 
 목표는 자유 입력을 현재 ERD 기준 제안서 필드에 매핑하는 것이다.
+
+현재 기준으로 AI 브리프 요청/응답 DTO, structured output schema, `Proposal` / `ProposalPosition`
+매핑 로직은 구현 완료됐다. 남은 후속 작업은 AI 인터뷰 위젯 연결과 입력 품질 고도화다.
 
 작업 항목은 아래와 같다.
 
