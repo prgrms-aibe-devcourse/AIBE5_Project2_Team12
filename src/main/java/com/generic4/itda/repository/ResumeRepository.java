@@ -2,6 +2,7 @@ package com.generic4.itda.repository;
 
 import com.generic4.itda.domain.resume.Resume;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -17,4 +18,8 @@ public interface ResumeRepository extends JpaRepository<Resume, Long> {
             "left join fetch r.attachments " +
             "where r.member.email.value = :email")
     Optional<Resume> findByMemberEmailWithDetails(@Param("email") String email);
+
+    @Modifying
+    @Query(value = "UPDATE resume SET career = :career WHERE id = :id", nativeQuery = true)
+    void updateCareerJson(@Param("id") Long id, @Param("career") String career);
 }
