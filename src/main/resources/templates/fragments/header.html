@@ -3,7 +3,9 @@
       xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 
 <header th:fragment="headerFragment" class="px-8 py-6 flex items-center justify-between bg-white border-b border-slate-200 shadow-sm relative z-10">
-    <a th:href="@{/}" class="flex items-center gap-2 transition-transform hover:scale-[1.02] active:scale-95">
+    <a th:href="@{/}"
+       onclick="if(window.handleBackAction){ event.preventDefault(); handleBackAction('/'); }"
+       class="flex items-center gap-2 transition-transform hover:scale-[1.02] active:scale-95">
         <img th:src="@{/IT-da_logo.png}" alt="IT-da Logo" class="h-12 w-auto" />
     </a>
 
