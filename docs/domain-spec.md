@@ -1,6 +1,6 @@
 # IT-da 도메인 상세 명세
 
-이 문서는 2026-04-10 기준 `ERDCloud` 초안과 이번에 함께 반영하는 추천 도메인 테이블(`5.16 ~ 5.18`)을 기준으로
+이 문서는 2026-04-19 기준 `ERDCloud` 초안과 이번에 함께 반영하는 추천 도메인 테이블(`5.16 ~ 5.18`)을 기준으로
 `member`, `resume`, `file`, `skill`, `proposal`, `proposal_position`, `position`, `matching` 도메인을 다시 정렬한 명세다.
 이전 대화에서 나온 확장 설계 중 ERD에 아직 반영되지 않은 항목은 현재 모델로 취급하지 않고, 문서 마지막의 `추후 재논의`로 내린다.
 
@@ -42,12 +42,12 @@
 - 파일은 로컬 저장 + `StoredFile` 메타데이터 저장 패턴을 사용한다.
 - `ProfileImage`는 `StoredFile`을 감싸는 별도 엔티티이며, 현재 ERD와 코드 모두 `Member`를 1:1 연관관계 주인으로 둔다.
 
-현재 ERD와 코드가 어긋나는 부분도 있다.
+현재 ERD와 코드가 완전히 일치하지 않는 부분도 있다.
 
-- ERD에는 `members.memo`가 있지만 현재 코드에는 없다.
-- ERD에는 `resumes.status`, `resumes.writing_status`, `resumes.portfolio_url`이 있지만 현재 코드에는 없다.
-- ERD는 `resumes.career`를 nullable로 보지만 현재 코드는 필수로 검증한다.
-- ERD에는 `resume_attachments`가 있지만 현재 코드 엔티티는 아직 없다.
+- `members.memo`는 현재 코드에도 반영되어 있다.
+- `resumes.status`, `resumes.writing_status`, `resumes.portfolio_url`도 현재 코드에 반영되어 있다.
+- ERD는 `resumes.career`를 nullable로 볼 여지가 있지만 현재 코드는 필수로 검증한다.
+- `resume_attachments`와 `profile_image`는 현재 코드 엔티티가 존재한다.
 - `stored_file.content_type`은 ERDCloud 표기와 별개로 현재 구현 기준 MIME 문자열(`String` / `varchar`)로 본다.
 
 따라서 신규 도메인은 현재 패턴을 깨지 않는 선에서 추가하는 것이 우선이다.
@@ -65,11 +65,10 @@
 - `skills.description`은 optional이다.
 - `proposal_position_skills`는 현재 ERD에 존재하는 정규화된 모집 단위-스킬 연결 테이블이다.
 - `proposal`은 프로젝트 전체 수준의 문서다.
-- `proposal`은 `raw_input_text`, `title`, `description`, `total_budget_*`, `work_type`, `work_place`, `expected_period`,
-  `status`를 가진다.
+- `proposal`은 `raw_input_text`, `title`, `description`, `total_budget_*`, `expected_period`, `status`를 가진다.
 - `proposal.status`는 `WRITING`, `MATCHING`, `COMPLETE` 3단계다.
-- `proposal_position`은 실제 모집 단위지만 현재 ERD에서는 최소 필드만 가진다.
-- `proposal_position`은 `position_id`, `head_count`, `unit_budget_*`, `status`를 가진다.
+- `proposal_position`은 실제 모집 단위이며 `position_id`, `title`, `work_type`, `head_count`, `unit_budget_*`,
+  `expected_period`, `career_min_years`, `career_max_years`, `work_place`, `status`를 가진다.
 - `proposal_position.status`는 `OPEN`, `FULL`, `CLOSED`를 저장한다.
 - `proposal_position_skills`는 `proposal_position`별 요구 스킬을 저장한다.
 - `matching`은 `proposal_position`과 `resume`의 조합을 표현하되, 당사자 판정 anchor로 `client_member_id`, `freelancer_member_id`를 함께 가진다.
@@ -131,8 +130,8 @@
 ### 4.4 ProposalPosition
 
 - 하나의 제안서 내부에서 실제로 모집되는 단위
-- 현재 ERD에서는 직무, 인원, 포지션 예산, 상태만 가진다.
-- 직무별 세부 요구사항, 경력 범위, 근무 형태, 정렬 순서는 아직 정규화되어 있지 않다.
+- 직무 마스터(`position`)와 사용자에게 보이는 포지션 제목(`title`)을 함께 가진다.
+- 근무 형태, 근무지, 포지션별 예상 기간, 경력 범위, 인원, 예산, 요구 스킬을 포지션 단위에서 관리한다.
 
 ### 4.5 Matching
 
@@ -368,8 +367,6 @@
 | `description`      | text                                    | N  | 프로젝트 설명                  |
 | `total_budget_min` | bigint                                  | N  | 전체 프로젝트 최소 예산            |
 | `total_budget_max` | bigint                                  | N  | 전체 프로젝트 최대 예산            |
-| `work_type`        | enum(`SITE`, `REMOTE`, `HYBRID`)        | N  | 전체 프로젝트 근무 형태            |
-| `work_place`       | varchar(255)                            | N  | 근무 장소 텍스트                |
 | `expected_period`  | bigint                                  | N  | 예상 기간, 현재 ERD 주석 기준 주 단위 |
 | `status`           | enum(`WRITING`, `MATCHING`, `COMPLETE`) | Y  | 제안서 상태                   |
 | `created_at`       | timestamp                               | Y  | 생성 시각                    |
@@ -382,6 +379,7 @@
 - `member_id`는 클라이언트 계정이어야 한다.
 - `total_budget_min`, `total_budget_max`는 둘 다 null일 수 있다.
 - 둘 다 존재하면 `total_budget_min <= total_budget_max`여야 한다.
+- 현재 구현에서는 `total_budget_*`를 직접 입력하지 않고 포지션별 인원과 최소/최대 예산 합산값으로 계산해 저장한다.
 - 현재 ERD 기준으로 추천과 모집 시작 상태는 `MATCHING`이다.
 - `COMPLETE`는 제안서 단위의 종료 상태다.
 
@@ -394,10 +392,16 @@
 | `id`              | bigint                         | Y  | PK          |
 | `proposal_id`     | bigint                         | Y  | 상위 제안서      |
 | `position_id`     | bigint                         | Y  | 직무 마스터      |
+| `title`           | varchar(200)                   | Y  | 포지션 제목      |
+| `work_type`       | enum(`SITE`, `REMOTE`, `HYBRID`) | N  | 근무 형태      |
 | `head_count`      | bigint                         | N  | 모집 인원       |
 | `status`          | enum(`OPEN`, `FULL`, `CLOSED`) | Y  | 모집 상태       |
 | `unit_budget_min` | bigint                         | N  | 1인 기준 최소 예산 |
 | `unit_budget_max` | bigint                         | N  | 1인 기준 최대 예산 |
+| `expected_period` | bigint                         | N  | 포지션 예상 기간(주) |
+| `career_min_years`| integer                        | N  | 최소 경력 연차    |
+| `career_max_years`| integer                        | N  | 최대 경력 연차    |
+| `work_place`      | varchar(255)                   | N  | 근무지          |
 | `created_at`      | timestamp                      | Y  | 생성 시각       |
 | `modified_at`     | timestamp                      | Y  | 수정 시각       |
 | `created_by`      | varchar                        | N  | 감사 정보       |
@@ -405,16 +409,19 @@
 
 규칙은 아래와 같다.
 
-- `head_count`는 현재 ERD에서는 nullable이지만, 서비스 계층에서는 모집 시작 전 양수 검증을 두는 편이 안전하다.
+- `title`은 필수다.
+- `head_count`는 현재 ERD에서는 nullable이지만, 서비스 계층에서는 모집 시작 전 양수 검증을 둔다.
+- `work_type = REMOTE`이면 `work_place`를 비워야 하고, `SITE`, `HYBRID`이면 `work_place`가 필요하다.
 - 예산이 둘 다 존재하면 `unit_budget_min <= unit_budget_max`여야 한다.
+- `expected_period`가 존재하면 양수여야 하고, 제안서 전체 예상 기간이 있으면 그 값을 넘길 수 없다.
+- 경력 범위가 둘 다 존재하면 `career_min_years <= career_max_years`여야 한다.
 - `FULL`은 현재 ERD에서는 파생 상태가 아니라 저장 상태다.
 - 현재 문서에서는 `ACCEPTED`, `IN_PROGRESS` 상태 매칭만 정원을 점유하는 것으로 해석한다.
 - 현재 문서에서는 `PROPOSED` 상태 매칭은 정원을 점유하지 않는다.
 - `head_count`가 존재하고 정원 점유 매칭 수가 `head_count`에 도달하면 `FULL`로 전이한다.
 - 수락된 매칭 취소, 반려, 정원 변경으로 여석이 다시 생기면 명시적 재계산 후 `OPEN`으로 되돌릴 수 있다.
 - `CLOSED`이면 신규 요청과 지원을 받을 수 없다.
-- 현재 ERD에는 포지션별 제목, 요구사항 요약, 근무 형태, 경력 범위, 정렬 순서가 없다.
-- 같은 제안서 안에서는 같은 직무 마스터를 중복 등록하지 않도록 `UNIQUE (proposal_id, position_id)`를 강제한다.
+- 같은 제안서 안에서도 같은 직무 마스터를 여러 번 사용할 수 있고, 실제 구분은 `title`로 한다.
 
 ### 5.11 resume_skills
 
@@ -539,7 +546,7 @@
 | 집합                  | 상태                     | 허용 액션                   | 비고            |
 |---------------------|------------------------|-------------------------|---------------|
 | `proposal`          | `WRITING`              | 생성, 수정, 포지션 편집          | 추천/매칭 진입 전 상태 |
-| `proposal`          | `MATCHING`             | 조회, 추천 조회, 매칭 진행, 완료 처리 | 수정 정책은 추후 재논의 |
+| `proposal`          | `MATCHING`             | 조회, 추천 조회, 조건부 수정, 매칭 진행, 완료 처리 | 매칭 이력 상태에 따라 원본 수정/복제/차단 |
 | `proposal`          | `COMPLETE`             | 조회                      | 신규 모집 종료 상태   |
 | `proposal_position` | `OPEN`                 | 신규 요청/지원 생성             | 정원 미충족 전제     |
 | `proposal_position` | `FULL`                 | 조회, 기존 매칭 관리            | 신규 요청/지원 차단   |
@@ -662,8 +669,9 @@ WRITING -> MATCHING -> COMPLETE
 
 중요한 점은 아래와 같다.
 
-- 이전 문서에서 가정했던 `DONE -> WRITING` 재오픈 정책은 현재 ERD에 반영되어 있지 않다.
-- `MATCHING` 상태 제안서의 수정 가능 범위와 재오픈 정책은 추후 재논의 대상이다.
+- 추천만 받은 `MATCHING` 제안서는 추천 이력을 삭제하고 원본을 `WRITING`으로 되돌린 뒤 수정한다.
+- `REJECTED`, `CANCELED`만 남아 있는 제안서는 원본 대신 새 `WRITING` 복제본을 만들어 수정한다.
+- `PROPOSED`, `ACCEPTED`, `IN_PROGRESS`, `COMPLETED` 매칭이 하나라도 있으면 수정하지 않는다.
 
 ### 6.2 ProposalPosition 상태
 
@@ -715,13 +723,17 @@ PROPOSED -> CANCELED
 ### 제안서 쪽
 
 - `proposal.description`
-- `proposal.work_type`
-- `proposal.work_place`
 - `proposal.expected_period`
 - `proposal_position.position_id`
+- `proposal_position.title`
+- `proposal_position.work_type`
 - `proposal_position.head_count`
 - `proposal_position.unit_budget_min`
 - `proposal_position.unit_budget_max`
+- `proposal_position.expected_period`
+- `proposal_position.career_min_years`
+- `proposal_position.career_max_years`
+- `proposal_position.work_place`
 - `proposal_position_skills.skill_id`
 - `proposal_position_skills.importance`
 
@@ -729,7 +741,7 @@ PROPOSED -> CANCELED
 
 - `proposal_position_skills`는 현재 스킬 ID와 중요도만 가지므로 요구 이유나 숙련도 조건을 담기 어렵다.
 - 직무 마스터 `position` 자체에는 기본 스킬 템플릿이 없어서 생성 보조 시 재사용성이 약하다.
-- 포지션별 경력 범위나 요구사항 요약이 없어서 하드 필터와 설명 근거가 거칠어진다.
+- AI 브리프 응답 스키마는 아직 확장된 `proposal_position` 상세 필드를 모두 채우지 못한다.
 
 ## 8. 핵심 운영 규칙
 
@@ -778,16 +790,11 @@ PROPOSED -> CANCELED
 아래 항목은 이전 대화에서 한 번 논의됐고, 일부는 현재 문서에 방향만 반영돼 있다.
 현재 문서에서는 "미래 확장 후보" 또는 "추가 정교화 포인트"로 유지한다.
 
-### 10.1 proposal_position 상세 필드 확장
+### 10.1 AI 브리프 응답 스키마 정렬
 
-- `title`
-- `requirement_summary`
-- `work_type`
-- `career_years_min`
-- `career_years_max`
-- `sort_order`
-
-현재 ERD는 최소 모집 단위만 갖고 있어서, 포지션별 세부 조건을 표현하기 어렵다.
+- 현재 `proposal_position`은 `title`, `work_type`, `expected_period`, `career_min_years`, `career_max_years`, `work_place`를 가진다.
+- 하지만 AI 브리프 응답과 매퍼는 아직 이 상세 필드를 모두 안정적으로 채우지 못한다.
+- 따라서 AI 브리프 스키마와 매퍼를 확장된 `proposal_position` 구조에 맞추는 후속 작업이 필요하다.
 
 ### 10.2 position 기본 스킬 템플릿
 

@@ -1,7 +1,7 @@
 # IT-da 구현 백로그
 
 이 문서는 [project-overview.md](./project-overview.md)와 [domain-spec.md](./domain-spec.md)를 기준으로 MVP 구현 순서를 정리한 실행 백로그다.
-2026-04-10 기준으로는 현재 ERD 초안과 이번에 함께 반영하는 추천 도메인 테이블 기준으로 범위를 다시 정리했다.
+2026-04-19 기준으로는 현재 ERD 초안과 이번에 함께 반영하는 추천 도메인 테이블 기준으로 범위를 다시 정리했다.
 
 ## 1. 구현 원칙
 
@@ -24,8 +24,10 @@
 - `proposal.raw_input_text`는 AI 브리프 원본 입력을 저장한다.
 - `proposal.total_budget_*`는 전체 프로젝트 예산이다.
 - `proposal_position.unit_budget_*`는 1인 기준 예산이다.
+- `proposal.total_budget_*`는 제안서 폼에서 직접 입력하지 않고 포지션 예산 합산값으로 계산한다.
 - `proposal.status`는 `WRITING`, `MATCHING`, `COMPLETE`다.
 - `proposal_position.status`는 `OPEN`, `FULL`, `CLOSED`다.
+- `proposal_position`은 `title`, `work_type`, `expected_period`, `career_min/max_years`, `work_place`를 포함하는 상세 모집 단위다.
 - `proposal_position.status = FULL`은 `matching.status in (ACCEPTED, IN_PROGRESS)` 수가 `head_count`에 도달했다는 뜻이고, `PROPOSED`는 정원을 점유하지 않는다.
 - `matching`은 `proposal_position_id`, `resume_id`, `client_member_id`, `freelancer_member_id`, `status`, `contract_date`, `complete_date`를 유지하되, `ACCEPTED -> IN_PROGRESS`는 양측 계약서 업로드 완료를 조건으로 둔다.
 - `contract_date`는 수락 시각이 아니라 양측 계약서가 모두 제출되어 계약이 체결된 시각이다.
@@ -64,6 +66,12 @@
 - `MatchingAttachment`, `MatchingReview` 모델
 - 추천 엔진의 하드 필터 + Top 3 응답 뼈대
 - 상태 전이와 노출 조건을 검증하는 테스트 세트
+
+## 2.2 2026-04-19 구현 메모
+
+- Phase 1의 프리랜서 프로필/이력서 흐름은 기본 구현이 들어가 있다.
+- Phase 2와 Phase 4의 제안서 저장, 대시보드, 작성/수정 화면, 포지션 모달 UI는 기본 구현이 들어가 있다.
+- 현재 남은 큰 축은 AI 인터뷰 위젯의 실제 동작, AI 브리프 스키마 정렬, 매칭 라이프사이클 완성이다.
 
 ## 3. 단계별 계획
 
@@ -130,7 +138,7 @@
 - 예산, 인원, 상태 검증 테스트
 - `MATCHING` 상태 진입 전 최소 입력 검증 테스트
 - `proposal_position_skills` 중복 방지 테스트
-- 같은 제안서 안에 같은 직무 마스터를 중복 등록할 수 없는지 테스트
+- 같은 제안서 안에서도 같은 직무 마스터를 여러 번 사용할 수 있고 `title`로 구분되는지 테스트
 
 종료 산출물은 아래와 같다.
 
@@ -148,7 +156,7 @@
 - 외부 LLM API 연동 어댑터 추가
 - 사용자 자유 입력을 `proposal.raw_input_text`에 저장
 - 응답을 `Proposal`, `ProposalPosition` 구조로 변환
-- `description`, `work_type`, `work_place`, `expected_period`, `position_id`, `head_count`, `unit_budget_*` 매핑 로직 구현
+- `description`, `expected_period`, `position_id`, `title`, `work_type`, `head_count`, `unit_budget_*` 매핑 로직 구현
 - 실패 시 수동 입력 fallback 구현
 
 중요한 제약은 아래와 같다.
@@ -309,7 +317,7 @@ MVP 운영 원칙은 아래와 같다.
 현재 점수화 기준은 아래를 우선한다.
 
 - `embedding similarity`
-- `preferred_work_type`와 `proposal.work_type`의 호환성
+- `preferred_work_type`와 `proposal_position.work_type`의 호환성
 - 우대 스킬 겹침 정도
 - `career_years`
 
@@ -317,7 +325,7 @@ MVP 운영 원칙은 아래와 같다.
 
 - `proposal_position_skills`는 현재 스킬 ID와 중요도만 표현하므로 세부 요구 수준은 담기 어렵다.
 - 직무 마스터 `position`에는 기본 스킬 템플릿이 없어서 생성 보조 재사용성이 낮다.
-- `proposal_position`에 경력 최소/최대 범위가 없어서 `career_years`는 강한 하드 필터보다 점수 항목으로 해석하는 편이 안전하다.
+- `proposal_position`에 경력 최소/최대 범위가 추가됐지만, 초기 추천 단계에서는 `career_years`를 강한 하드 필터보다 점수 항목으로 해석하는 편이 안전하다.
 
 검증은 아래와 같다.
 
@@ -353,7 +361,6 @@ MVP 운영 원칙은 아래와 같다.
 현재 ERD에 없어서 이번 백로그에서 제외한 항목은 아래와 같다.
 
 - `proposal_attachments` 또는 정식 제안서 파일 연관 모델
-- `proposal_position`의 상세 요구사항 필드
 - `matching.initiator_type`
 - `matching.participation_status`
 - 명시적 시작 승인 / 종료 승인 버튼 모델

@@ -1,7 +1,7 @@
 # IT-da Figma Make 와이어프레임 프롬프트
 
 이 문서는 `IT-da`의 MVP 화면을 Figma Make로 빠르게 와이어프레임화하기 위한 프롬프트 모음이다.
-기준 문서는 [project-overview.md](/Users/ilhyeon/Documents/study/devcourse/backend/projects/IT-da/docs/project-overview.md)와 [domain-spec.md](/Users/ilhyeon/Documents/study/devcourse/backend/projects/IT-da/docs/domain-spec.md)다.
+기준 문서는 [project-overview.md](./project-overview.md)와 [domain-spec.md](./domain-spec.md)다.
 
 ## 1. 사용 방식
 
@@ -75,14 +75,18 @@ Create these 6 screens as separate frames in one file:
 
 3. AI brief editor / proposal editing
 - Two-column layout.
-- Left: large free-text input, helper text, AI 브리프 생성 button, save state, last saved time, proposal status.
-- Right: structured proposal form with title, description, total budget, project work type, work place, expected period, and repeatable proposal positions.
+- Left: interview-style input panel that can collapse, helper text, free-text message input, save state, proposal status.
+- Right: structured proposal form with title, description, derived total budget, overall expected period, and repeatable proposal positions.
 - Each proposal position block should include:
   - 직무 선택
+  - 포지션 제목
+  - 근무 형태
   - 모집 인원
   - 1인 기준 예산 범위
+  - 포지션 예상 기간
+  - 필수 / 우대 기술 요약
   - 모집 상태
-- Bottom actions: 임시 저장, 매칭 시작, 추천 보기.
+- Bottom actions: 임시 저장, 제안서 등록.
 - Show inline notice that recommendation is disabled while WRITING and becomes available in MATCHING.
 - Show fallback hint for AI generation failure.
 
@@ -168,33 +172,35 @@ Create 4 frames in one consistent grayscale B2B SaaS wireframe style:
 2. AI brief editor / proposal editing
 - Desktop two-column layout.
 - Left panel:
-  - raw_input_text textarea
+  - raw_input_text textarea or chat-style input area
   - helper text explaining this is the original user input
-  - AI brief generate / regenerate action
+  - collapsible interview panel behavior
   - save state and proposal status
 - Right main editing area:
   - editable description field as the main proposal body
   - title
-  - total budget range
-  - work type
-  - work place
-  - expected period
+  - derived total budget range
+  - overall expected period
   - repeatable proposal positions
 - Each proposal position should include:
   - position selector
+  - position title
+  - work type
   - headcount
   - unit budget range
-  - position status
+  - expected period
+  - career range
+  - work place
+  - essential / preferred skills
 - Bottom actions:
   - 임시 저장
-  - AI 재생성
-  - 매칭 시작
+  - 제안서 등록
 - The screen must clearly show that description is editable now, not hidden for later.
 
 3. Proposal detail / review screen
 - Header with proposal title and status
 - Main content block with full description
-- Secondary metadata blocks for budget, work type, work place, expected period, positions
+- Secondary metadata blocks for budget, expected period, positions
 - Show the original input as a secondary collapsible block or side panel, not as a competing main summary.
 
 4. Recommendation results screen
@@ -233,8 +239,8 @@ Important domain constraints:
 - Resume.aiMatchingEnabled controls inclusion in AI recommendation only, not direct application.
 - There is no separate project runtime entity in MVP. Matching records handle lifecycle history directly.
 - Proposal status is WRITING, MATCHING, or COMPLETE.
-- Proposal has total project budget.
-- Proposal position has per-person unit budget and headcount.
+- Proposal has total project budget and overall expected period.
+- Proposal position has per-person unit budget, headcount, work type, and optional work place.
 - Proposal position status is OPEN, FULL, or CLOSED.
 
 Design requirements:
@@ -358,9 +364,9 @@ Purpose:
 Required layout:
 - Two-column workspace.
 - Left column:
-  - large free-text input area titled "프로젝트를 자유롭게 설명해 주세요"
+  - interview-style free-text area titled "프로젝트를 자유롭게 설명해 주세요"
   - helper text with example input
-  - AI 브리프 생성 button
+  - 패널 열기/닫기 affordance
   - save status area showing:
     - 로컬 자동 저장
     - 마지막 저장 시각
@@ -371,25 +377,28 @@ Required layout:
     - 프로젝트 제목
     - 프로젝트 설명
     - 전체 예산 범위
-    - 전체 근무 형태
-    - 근무 장소
     - 예상 기간
     - 포지션 섹션 repeatable list
 
 Each proposal position block should include:
 - 직무 선택
+- 포지션 제목
+- 근무 형태
 - 모집 인원
 - 1인 기준 예산 범위
+- 포지션 예상 기간
+- 경력 범위
+- 근무지
+- 필수 / 우대 기술
 - 모집 상태
 
 Bottom actions:
 - 임시 저장
-- 매칭 시작
-- 추천 보기
+- 제안서 등록
 
 Important state hints:
 - Show that recommendation is enabled only when status is MATCHING.
-- Add helper text that current ERD does not store raw input text separately after structured save.
+- Add helper text that raw input text is preserved separately for later regeneration and trust.
 - Include a small fallback area for "AI 생성 실패 시 수동 입력 가능".
 
 Wireframe rules:
