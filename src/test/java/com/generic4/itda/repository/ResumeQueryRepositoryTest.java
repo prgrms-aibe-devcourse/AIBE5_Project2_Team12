@@ -2,7 +2,12 @@ package com.generic4.itda.repository;
 
 import static com.generic4.itda.fixture.MemberFixture.createMember;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
+import com.generic4.itda.domain.position.Position;
+import com.generic4.itda.domain.proposal.Proposal;
+import com.generic4.itda.domain.proposal.ProposalPosition;
+import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.annotation.H2RepositoryTest;
 import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.resume.CareerPayload;
@@ -13,8 +18,12 @@ import com.generic4.itda.domain.resume.WorkType;
 import com.generic4.itda.domain.skill.Skill;
 import com.generic4.itda.service.recommend.CandidatePoolRow;
 import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 
@@ -70,7 +79,9 @@ class ResumeQueryRepositoryTest {
                 skill(aws, Proficiency.ADVANCED));
 
         // when
+        ProposalPosition proposalPosition = createProposalPosition(null);
         List<CandidatePoolRow> result = resumeQueryRepository.findCandidatePool(
+                proposalPosition,
                 List.of(java.getId(), spring.getId()),
                 10
         );
@@ -110,7 +121,9 @@ class ResumeQueryRepositoryTest {
                 skill(java, Proficiency.ADVANCED));
 
         // when
+        ProposalPosition proposalPosition = createProposalPosition(null);
         List<CandidatePoolRow> result = resumeQueryRepository.findCandidatePool(
+                proposalPosition,
                 List.of(java.getId(), spring.getId()),
                 2
         );
@@ -137,7 +150,7 @@ class ResumeQueryRepositoryTest {
         saveResume("recommend-inactive", (byte) 99, true, true, false);
 
         // when
-        List<Long> result = resumeQueryRepository.findRecommendableResumeIds(10);
+        List<Long> result = resumeQueryRepository.findRecommendableResumeIds(createProposalPosition(null), 10);
 
         // then
         assertThat(result).containsExactly(
@@ -176,7 +189,9 @@ class ResumeQueryRepositoryTest {
         );
 
         // when
+        ProposalPosition proposalPosition = createProposalPosition(null);
         List<CandidatePoolRow> result = resumeQueryRepository.findCandidatePool(
+                proposalPosition,
                 List.of(java.getId(), spring.getId()),
                 10
         );
@@ -184,6 +199,56 @@ class ResumeQueryRepositoryTest {
         // then
         assertThat(result).extracting(CandidatePoolRow::resumeId)
                 .containsExactly(doneResume.getId());
+    }
+
+    @DisplayName("findCandidatePool은 근무 형태 정책 조합에 따라 후보를 필터링한다")
+    @ParameterizedTest(name = "proposalWorkType={0}")
+    @MethodSource("workTypePolicyCases")
+    void findCandidatePool_filtersByProposalWorkTypePolicies(
+            ProposalWorkType proposalWorkType,
+            List<WorkType> expectedWorkTypes
+    ) {
+        // given
+        Skill java = skillRepository.saveAndFlush(Skill.create("Java-query-pool-work-type", null));
+
+        Resume remote = saveResume(
+                "pool-work-type-remote",
+                (byte) 4,
+                true,
+                true,
+                true,
+                WorkType.REMOTE,
+                skill(java, Proficiency.INTERMEDIATE)
+        );
+        Resume hybrid = saveResume(
+                "pool-work-type-hybrid",
+                (byte) 5,
+                true,
+                true,
+                true,
+                WorkType.HYBRID,
+                skill(java, Proficiency.INTERMEDIATE)
+        );
+        Resume site = saveResume(
+                "pool-work-type-site",
+                (byte) 20,
+                true,
+                true,
+                true,
+                WorkType.SITE,
+                skill(java, Proficiency.INTERMEDIATE)
+        );
+
+        // when
+        List<CandidatePoolRow> result = resumeQueryRepository.findCandidatePool(
+                createProposalPosition(proposalWorkType),
+                List.of(java.getId()),
+                10
+        );
+
+        // then
+        assertThat(result).extracting(CandidatePoolRow::resumeId)
+                .containsExactlyElementsOf(expectedResumeIds(expectedWorkTypes, site, hybrid, remote));
     }
 
     @DisplayName("findRecommendableResumeIds는 정렬된 이력서 중 limit 개수만 반환한다")
@@ -196,7 +261,7 @@ class ResumeQueryRepositoryTest {
         saveResume("recommend-limit-4", (byte) 1, true, true, true);
 
         // when
-        List<Long> result = resumeQueryRepository.findRecommendableResumeIds(2);
+        List<Long> result = resumeQueryRepository.findRecommendableResumeIds(createProposalPosition(null), 2);
 
         // then
         assertThat(result).hasSize(2);
@@ -228,10 +293,53 @@ class ResumeQueryRepositoryTest {
         );
 
         // when
-        List<Long> result = resumeQueryRepository.findRecommendableResumeIds(10);
+        List<Long> result = resumeQueryRepository.findRecommendableResumeIds(createProposalPosition(null), 10);
 
         // then
         assertThat(result).containsExactly(doneResume.getId());
+    }
+
+    @DisplayName("findRecommendableResumeIds는 fallback 조회 경로에서도 근무 형태 정책 조합을 적용한다")
+    @ParameterizedTest(name = "proposalWorkType={0}")
+    @MethodSource("workTypePolicyCases")
+    void findRecommendableResumeIds_filtersByProposalWorkTypePolicies(
+            ProposalWorkType proposalWorkType,
+            List<WorkType> expectedWorkTypes
+    ) {
+        // given
+        Resume remote = saveResume("recommend-remote", (byte) 4, true, true, true, WorkType.REMOTE);
+        Resume hybrid = saveResume("recommend-hybrid", (byte) 5, true, true, true, WorkType.HYBRID);
+        Resume site = saveResume("recommend-site", (byte) 6, true, true, true, WorkType.SITE);
+
+        // when
+        List<Long> result = resumeQueryRepository.findRecommendableResumeIds(
+                createProposalPosition(proposalWorkType),
+                10
+        );
+
+        // then
+        assertThat(result).containsExactlyElementsOf(expectedResumeIds(expectedWorkTypes, site, hybrid, remote));
+    }
+
+    private static Stream<Arguments> workTypePolicyCases() {
+        return Stream.of(
+                arguments(null, List.of(WorkType.SITE, WorkType.HYBRID, WorkType.REMOTE)),
+                arguments(ProposalWorkType.SITE, List.of(WorkType.SITE, WorkType.HYBRID)),
+                arguments(ProposalWorkType.REMOTE, List.of(WorkType.HYBRID, WorkType.REMOTE)),
+                arguments(ProposalWorkType.HYBRID, List.of(WorkType.HYBRID))
+        );
+    }
+
+    private List<Long> expectedResumeIds(
+            List<WorkType> expectedWorkTypes,
+            Resume site,
+            Resume hybrid,
+            Resume remote
+    ) {
+        return Stream.of(site, hybrid, remote)
+                .filter(resume -> expectedWorkTypes.contains(resume.getPreferredWorkType()))
+                .map(Resume::getId)
+                .toList();
     }
 
     private Resume saveResume(
@@ -248,6 +356,7 @@ class ResumeQueryRepositoryTest {
                 publiclyVisible,
                 aiMatchingEnabled,
                 active,
+                WorkType.REMOTE,
                 ResumeWritingStatus.DONE,
                 skills
         );
@@ -259,6 +368,49 @@ class ResumeQueryRepositoryTest {
             boolean publiclyVisible,
             boolean aiMatchingEnabled,
             boolean active,
+            WorkType preferredWorkType,
+            SkillAssignment... skills
+    ) {
+        return saveResume(
+                suffix,
+                careerYears,
+                publiclyVisible,
+                aiMatchingEnabled,
+                active,
+                preferredWorkType,
+                ResumeWritingStatus.DONE,
+                skills
+        );
+    }
+
+    private Resume saveResume(
+            String suffix,
+            byte careerYears,
+            boolean publiclyVisible,
+            boolean aiMatchingEnabled,
+            boolean active,
+            ResumeWritingStatus writingStatus,
+            SkillAssignment... skills
+    ) {
+        return saveResume(
+                suffix,
+                careerYears,
+                publiclyVisible,
+                aiMatchingEnabled,
+                active,
+                WorkType.REMOTE,
+                writingStatus,
+                skills
+        );
+    }
+
+    private Resume saveResume(
+            String suffix,
+            byte careerYears,
+            boolean publiclyVisible,
+            boolean aiMatchingEnabled,
+            boolean active,
+            WorkType preferredWorkType,
             ResumeWritingStatus writingStatus,
             SkillAssignment... skills
     ) {
@@ -276,7 +428,7 @@ class ResumeQueryRepositoryTest {
                 "소개-" + suffix,
                 careerYears,
                 new CareerPayload(),
-                WorkType.REMOTE,
+                preferredWorkType,
                 writingStatus,
                 null
         );
@@ -299,6 +451,32 @@ class ResumeQueryRepositoryTest {
 
     private static SkillAssignment skill(Skill skill, Proficiency proficiency) {
         return new SkillAssignment(skill, proficiency);
+    }
+
+    private ProposalPosition createProposalPosition(ProposalWorkType workType) {
+        Proposal proposal = Proposal.create(
+                createMember(),
+                "추천 요청",
+                "raw-input",
+                null,
+                null,
+                null,
+                null
+        );
+
+        String workPlace = workType == ProposalWorkType.REMOTE ? null : "서울";
+        return proposal.addPosition(
+                Position.create("백엔드 개발자"),
+                "백엔드 개발자",
+                workType,
+                1L,
+                null,
+                null,
+                null,
+                null,
+                null,
+                workPlace
+        );
     }
 
     private record SkillAssignment(Skill skill, Proficiency proficiency) {
