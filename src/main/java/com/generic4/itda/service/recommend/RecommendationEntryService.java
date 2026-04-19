@@ -69,15 +69,24 @@ public class RecommendationEntryService {
     private RecommendationEntryPositionItem toPositionItem(ProposalPosition position) {
         return new RecommendationEntryPositionItem(
                 position.getId(),
+                resolvePositionTitle(position),
                 position.getPosition().getName(),
                 position.getHeadCount(),
                 formatBudget(position.getUnitBudgetMin(), position.getUnitBudgetMax()),
+                position.getExpectedPeriod(),
                 position.getSkills().stream()
                         .map(skill -> new RecommendationEntrySkillItem(
                                 skill.getSkill().getName(),
                                 skill.getImportance().getDescription()
                         )).toList()
         );
+    }
+
+    private String resolvePositionTitle(ProposalPosition position) {
+        if (position.getTitle() != null && !position.getTitle().isBlank()) {
+            return position.getTitle();
+        }
+        return position.getPosition().getName();
     }
 
     private String formatBudget(Long min, Long max) {
