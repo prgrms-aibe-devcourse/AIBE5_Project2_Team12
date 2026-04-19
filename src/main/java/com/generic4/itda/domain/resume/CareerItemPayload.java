@@ -51,6 +51,11 @@ public class CareerItemPayload {
             String> techStack = new ArrayList<>();
 
     @JsonIgnore
+    public String getTechStackJoined() {
+        return techStack == null ? "" : String.join(", ", techStack);
+    }
+
+    @JsonIgnore
     @AssertTrue(message = "재직중인 경력은 종료 연월을 비워야 합니다.")
     public boolean isEndYearMonthEmptyWhenCurrentlyWorking() {
         if (currentlyWorking == null || !currentlyWorking) {
