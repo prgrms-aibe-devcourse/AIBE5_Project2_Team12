@@ -507,10 +507,9 @@ public class SeedDataInitializer implements ApplicationRunner {
     }
 
     private boolean hasSamePositionIdentity(ProposalPosition existing, Position position, String title) {
-        boolean samePosition = existing.getPosition().getId() != null && position.getId() != null
+        return existing.getPosition().getId() != null && position.getId() != null
                 ? existing.getPosition().getId().equals(position.getId())
                 : existing.getPosition().getName().equals(position.getName());
-        return samePosition && existing.getTitle().equals(title);
     }
 
     private Position ensurePosition(String name) {
