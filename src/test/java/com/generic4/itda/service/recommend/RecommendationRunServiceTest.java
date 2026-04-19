@@ -15,7 +15,6 @@ import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
 import com.generic4.itda.domain.proposal.ProposalPositionStatus;
 import com.generic4.itda.domain.proposal.ProposalStatus;
-import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.domain.recommendation.RecommendationRun;
 import com.generic4.itda.domain.recommendation.constant.RecommendationAlgorithm;
 import com.generic4.itda.domain.recommendation.constant.RecommendationRunStatus;
@@ -331,8 +330,6 @@ class RecommendationRunServiceTest {
                 "설명",
                 3_000_000L,
                 5_000_000L,
-                ProposalWorkType.REMOTE,
-                "판교",
                 3L
         );
         ReflectionTestUtils.setField(proposal, "id", proposalId);
@@ -349,7 +346,18 @@ class RecommendationRunServiceTest {
         Position position = Position.create(positionName);
         ReflectionTestUtils.setField(position, "id", proposalPositionId + 1000);
 
-        ProposalPosition proposalPosition = proposal.addPosition(position, 1L, 1_000_000L, 2_000_000L);
+        ProposalPosition proposalPosition = proposal.addPosition(
+                position,
+                positionName,
+                null,
+                1L,
+                1_000_000L,
+                2_000_000L,
+                null,
+                null,
+                null,
+                null
+        );
         ReflectionTestUtils.setField(proposalPosition, "id", proposalPositionId);
         proposalPosition.changeStatus(status);
         return proposalPosition;

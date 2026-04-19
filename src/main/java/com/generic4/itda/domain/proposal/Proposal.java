@@ -118,12 +118,6 @@ public class Proposal extends BaseEntity {
                 .build();
     }
 
-    public static Proposal create(Member member, String title, String rawInputText, String description,
-            Long totalBudgetMin, Long totalBudgetMax, ProposalWorkType workType, String workPlace,
-            Long expectedPeriod) {
-        return create(member, title, rawInputText, description, totalBudgetMin, totalBudgetMax, expectedPeriod);
-    }
-
     public void update(String title, String rawInputText, String description, Long totalBudgetMin,
             Long totalBudgetMax, Long expectedPeriod) {
         validateBudgetRange(totalBudgetMin, totalBudgetMax, "전체");
@@ -135,11 +129,6 @@ public class Proposal extends BaseEntity {
         this.totalBudgetMin = totalBudgetMin;
         this.totalBudgetMax = totalBudgetMax;
         this.expectedPeriod = expectedPeriod;
-    }
-
-    public void update(String title, String rawInputText, String description, Long totalBudgetMin,
-            Long totalBudgetMax, ProposalWorkType workType, String workPlace, Long expectedPeriod) {
-        update(title, rawInputText, description, totalBudgetMin, totalBudgetMax, expectedPeriod);
     }
 
     public void startMatching() {
@@ -176,21 +165,6 @@ public class Proposal extends BaseEntity {
         validatePositionChange(proposalPosition, proposalPosition.getPosition());
         this.positions.add(proposalPosition);
         return proposalPosition;
-    }
-
-    public ProposalPosition addPosition(Position position, Long headCount, Long unitBudgetMin, Long unitBudgetMax) {
-        return addPosition(
-                position,
-                position == null ? null : position.getName(),
-                null,
-                headCount,
-                unitBudgetMin,
-                unitBudgetMax,
-                null,
-                null,
-                null,
-                null
-        );
     }
 
     void validatePositionChange(ProposalPosition proposalPosition, Position position) {

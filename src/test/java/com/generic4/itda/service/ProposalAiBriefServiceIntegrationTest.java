@@ -78,7 +78,18 @@ class ProposalAiBriefServiceIntegrationTest {
                 2_000_000L,
                 4L
         );
-        ProposalPosition existingPosition = proposal.addPosition(oldPosition, 1L, 500_000L, 700_000L);
+        ProposalPosition existingPosition = proposal.addPosition(
+                oldPosition,
+                "기존 디자이너",
+                null,
+                1L,
+                500_000L,
+                700_000L,
+                null,
+                null,
+                null,
+                null
+        );
         existingPosition.addSkill(oldSkill, ProposalPositionSkillImportance.ESSENTIAL);
         Proposal savedProposal = proposalRepository.save(proposal);
 

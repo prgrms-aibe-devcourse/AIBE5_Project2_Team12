@@ -333,7 +333,7 @@ class RecommendationEntryServiceTest {
     private Proposal createProposalWithStatus(Member owner, Long proposalId, ProposalStatus status) {
         Proposal proposal = Proposal.create(
                 owner, "테스트 제안서", "원본 입력", "설명",
-                1_000_000L, 5_000_000L, ProposalWorkType.REMOTE, "판교", 3L
+                1_000_000L, 5_000_000L, 3L
         );
         setId(proposal, proposalId);
 

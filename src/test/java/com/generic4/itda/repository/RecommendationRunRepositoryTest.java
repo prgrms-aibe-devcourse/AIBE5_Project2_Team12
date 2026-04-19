@@ -8,7 +8,6 @@ import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
-import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.domain.recommendation.RecommendationRun;
 import com.generic4.itda.domain.recommendation.constant.RecommendationAlgorithm;
 import com.generic4.itda.domain.recommendation.constant.RecommendationRunStatus;
@@ -50,8 +49,19 @@ class RecommendationRunRepositoryTest {
 
         proposal = Proposal.create(
                 member, "AI 매칭 플랫폼 구축", "원문 내용", null,
-                null, null, ProposalWorkType.REMOTE, null, null);
-        proposalPosition = proposal.addPosition(position, 2L, 500_000L, 1_000_000L);
+                null, null, null);
+        proposalPosition = proposal.addPosition(
+                position,
+                "백엔드 개발자",
+                null,
+                2L,
+                500_000L,
+                1_000_000L,
+                null,
+                null,
+                null,
+                null
+        );
         proposalRepository.saveAndFlush(proposal);
     }
 
@@ -144,7 +154,18 @@ class RecommendationRunRepositoryTest {
         @DisplayName("proposalPositionId가 다르면 조회되지 않는다")
         void proposalPositionId가_다르면_조회되지_않는다() {
             Position otherPosition = persistPosition("프론트엔드 개발자");
-            ProposalPosition otherPP = proposal.addPosition(otherPosition, 1L, 300_000L, 600_000L);
+            ProposalPosition otherPP = proposal.addPosition(
+                    otherPosition,
+                    "프론트엔드 개발자",
+                    null,
+                    1L,
+                    300_000L,
+                    600_000L,
+                    null,
+                    null,
+                    null,
+                    null
+            );
             proposalRepository.saveAndFlush(proposal);
 
             Optional<RecommendationRun> result =

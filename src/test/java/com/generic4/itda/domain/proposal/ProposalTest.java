@@ -62,8 +62,6 @@ class ProposalTest {
                 null,
                 null,
                 null,
-                null,
-                null,
                 null
         ))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -79,8 +77,6 @@ class ProposalTest {
                 createMember(),
                 title,
                 "원본 입력",
-                null,
-                null,
                 null,
                 null,
                 null,
@@ -116,8 +112,6 @@ class ProposalTest {
                 null,
                 5_000_000L,
                 1_000_000L,
-                null,
-                null,
                 null
         ))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -132,8 +126,6 @@ class ProposalTest {
                 createMember(),
                 "제안서 제목",
                 "원본 입력",
-                null,
-                null,
                 null,
                 null,
                 null,
@@ -212,7 +204,18 @@ class ProposalTest {
     @Test
     void addAndRemovePosition() {
         Proposal proposal = createProposal("원본 입력");
-        ProposalPosition proposalPosition = proposal.addPosition(Position.create("백엔드 개발자"), 2L, 3_000_000L, 5_000_000L);
+        ProposalPosition proposalPosition = proposal.addPosition(
+                Position.create("백엔드 개발자"),
+                "백엔드 개발자",
+                null,
+                2L,
+                3_000_000L,
+                5_000_000L,
+                null,
+                null,
+                null,
+                null
+        );
 
         assertThat(proposal.getPositions()).hasSize(1);
         assertThat(proposalPosition.getProposal()).isEqualTo(proposal);
@@ -229,8 +232,10 @@ class ProposalTest {
         Proposal proposal = createProposal("원본 입력");
         Position backend = Position.create("백엔드 개발자");
 
-        ProposalPosition first = proposal.addPosition(backend, 1L, 3_000_000L, 4_000_000L);
-        ProposalPosition second = proposal.addPosition(backend, 2L, 4_000_000L, 6_000_000L);
+        ProposalPosition first = proposal.addPosition(backend, "백엔드 개발자 A", null, 1L, 3_000_000L, 4_000_000L,
+                null, null, null, null);
+        ProposalPosition second = proposal.addPosition(backend, "백엔드 개발자 B", null, 2L, 4_000_000L, 6_000_000L,
+                null, null, null, null);
 
         assertThat(proposal.getPositions()).containsExactly(first, second);
     }

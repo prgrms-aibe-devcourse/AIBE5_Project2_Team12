@@ -86,11 +86,20 @@ class ProposalPositionSkillTest {
                 "본문",
                 1_000_000L,
                 2_000_000L,
-                ProposalWorkType.HYBRID,
-                "서울",
                 8L
         );
 
-        return proposal.addPosition(Position.create("백엔드 개발자"), 1L, 2_000_000L, 3_000_000L);
+        return proposal.addPosition(
+                Position.create("백엔드 개발자"),
+                "백엔드 개발자",
+                ProposalWorkType.HYBRID,
+                1L,
+                2_000_000L,
+                3_000_000L,
+                8L,
+                null,
+                null,
+                "서울"
+        );
     }
 }

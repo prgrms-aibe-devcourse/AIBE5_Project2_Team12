@@ -219,8 +219,6 @@ class RecommendationFingerprintGeneratorTest {
                 "기본 설명",
                 1_000_000L,
                 5_000_000L,
-                ProposalWorkType.REMOTE,
-                "판교",
                 3L
         );
         setId(proposal, 1L);

@@ -9,7 +9,6 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalStatus;
-import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.dto.client.ClientDashboardFilter;
 import com.generic4.itda.dto.client.ClientDashboardProjectItem;
 import com.generic4.itda.dto.client.ClientDashboardSummaryItem;
@@ -177,8 +176,6 @@ class ClientDashboardServiceTest {
                 "설명",
                 budgetMin,
                 budgetMax,
-                ProposalWorkType.HYBRID,
-                "판교",
                 12L
         );
 
@@ -187,7 +184,9 @@ class ClientDashboardServiceTest {
         ReflectionTestUtils.setField(proposal, "modifiedAt", modifiedAt);
 
         for (int index = 0; index < positionCount; index++) {
-            proposal.addPosition(Position.create("포지션" + index), 1L, null, null);
+            String positionTitle = "포지션" + index;
+            proposal.addPosition(Position.create(positionTitle), positionTitle, null, 1L, null, null,
+                    null, null, null, null);
         }
 
         return proposal;

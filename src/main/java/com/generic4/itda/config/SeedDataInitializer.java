@@ -202,19 +202,23 @@ public class SeedDataInitializer implements ApplicationRunner {
                 추천 설명, 필터링, 결과 비교 흐름까지 한 번에 다듬을 수 있는 팀이 필요합니다.
                 """,
                 "추천 엔진 MVP를 운영 가능한 수준으로 끌어올리는 고도화 프로젝트",
-                45_000_000L,
-                70_000_000L,
-                ProposalWorkType.HYBRID,
-                "서울 강남 / 주 2회 협업",
+                19_500_000L,
+                25_500_000L,
                 16L,
                 true
         );
         ensureProposalPosition(
                 matchingProposal,
                 positions.get("백엔드 개발자"),
+                "추천 API 백엔드 개발자",
+                ProposalWorkType.HYBRID,
                 2L,
                 6_000_000L,
                 8_000_000L,
+                14L,
+                4,
+                8,
+                "서울 강남 / 주 2회 협업",
                 skillRequirements(
                         skillRequirement("Java", ProposalPositionSkillImportance.ESSENTIAL),
                         skillRequirement("Spring", ProposalPositionSkillImportance.ESSENTIAL),
@@ -225,10 +229,36 @@ public class SeedDataInitializer implements ApplicationRunner {
         );
         ensureProposalPosition(
                 matchingProposal,
+                positions.get("백엔드 개발자"),
+                "LLM 워크플로 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                6_500_000L,
+                8_500_000L,
+                12L,
+                3,
+                6,
+                null,
+                skillRequirements(
+                        skillRequirement("Java", ProposalPositionSkillImportance.ESSENTIAL),
+                        skillRequirement("Spring", ProposalPositionSkillImportance.ESSENTIAL),
+                        skillRequirement("Docker", ProposalPositionSkillImportance.PREFERENCE),
+                        skillRequirement("Redis", ProposalPositionSkillImportance.PREFERENCE)
+                ),
+                skills
+        );
+        ensureProposalPosition(
+                matchingProposal,
                 positions.get("AI 엔지니어"),
+                "추천 모델/프롬프트 AI 엔지니어",
+                ProposalWorkType.HYBRID,
                 1L,
                 7_000_000L,
                 9_000_000L,
+                16L,
+                3,
+                5,
+                "서울 강남 / 주 2회 협업",
                 skillRequirements(
                         skillRequirement("Python", ProposalPositionSkillImportance.ESSENTIAL),
                         skillRequirement("LLM", ProposalPositionSkillImportance.ESSENTIAL),
@@ -247,17 +277,21 @@ public class SeedDataInitializer implements ApplicationRunner {
                 "운영자용 프론트 대시보드 개편 제안서 초안",
                 12_000_000L,
                 18_000_000L,
-                ProposalWorkType.REMOTE,
-                "원격",
                 8L,
                 false
         );
         ensureProposalPosition(
                 writingProposal,
                 positions.get("프론트엔드 개발자"),
+                "운영 대시보드 프론트엔드 개발자",
+                ProposalWorkType.REMOTE,
                 1L,
                 5_000_000L,
                 7_000_000L,
+                8L,
+                2,
+                4,
+                null,
                 skillRequirements(
                         skillRequirement("React", ProposalPositionSkillImportance.ESSENTIAL),
                         skillRequirement("TypeScript", ProposalPositionSkillImportance.ESSENTIAL),
@@ -385,8 +419,6 @@ public class SeedDataInitializer implements ApplicationRunner {
             String description,
             Long totalBudgetMin,
             Long totalBudgetMax,
-            ProposalWorkType workType,
-            String workPlace,
             Long expectedPeriod,
             boolean matching
     ) {
@@ -399,14 +431,11 @@ public class SeedDataInitializer implements ApplicationRunner {
                                 description,
                                 totalBudgetMin,
                                 totalBudgetMax,
-                                workType,
-                                workPlace,
                                 expectedPeriod
                         )
                 ));
 
-        proposal.update(title, rawInputText, description, totalBudgetMin, totalBudgetMax, workType, workPlace,
-                expectedPeriod);
+        proposal.update(title, rawInputText, description, totalBudgetMin, totalBudgetMax, expectedPeriod);
 
         if (matching && proposal.getStatus().name().equals("WRITING")) {
             proposal.startMatching();
@@ -418,18 +447,46 @@ public class SeedDataInitializer implements ApplicationRunner {
     private ProposalPosition ensureProposalPosition(
             Proposal proposal,
             Position position,
+            String title,
+            ProposalWorkType workType,
             Long headCount,
             Long unitBudgetMin,
             Long unitBudgetMax,
+            Long expectedPeriod,
+            Integer careerMinYears,
+            Integer careerMaxYears,
+            String workPlace,
             List<SeedSkillRequirement> skillRequirements,
             Map<String, Skill> skills
     ) {
         ProposalPosition proposalPosition = proposal.getPositions().stream()
-                .filter(existing -> existing.getPosition().getName().equals(position.getName()))
+                .filter(existing -> hasSamePositionIdentity(existing, position, title))
                 .findFirst()
-                .orElseGet(() -> proposal.addPosition(position, headCount, unitBudgetMin, unitBudgetMax));
+                .orElseGet(() -> proposal.addPosition(
+                        position,
+                        title,
+                        workType,
+                        headCount,
+                        unitBudgetMin,
+                        unitBudgetMax,
+                        expectedPeriod,
+                        careerMinYears,
+                        careerMaxYears,
+                        workPlace
+                ));
 
-        proposalPosition.update(position, headCount, unitBudgetMin, unitBudgetMax);
+        proposalPosition.update(
+                position,
+                title,
+                workType,
+                headCount,
+                unitBudgetMin,
+                unitBudgetMax,
+                expectedPeriod,
+                careerMinYears,
+                careerMaxYears,
+                workPlace
+        );
 
         for (SeedSkillRequirement requirement : skillRequirements) {
             Skill skill = skills.get(requirement.skillName());
@@ -447,6 +504,13 @@ public class SeedDataInitializer implements ApplicationRunner {
 
         proposalRepository.save(proposal);
         return proposalPosition;
+    }
+
+    private boolean hasSamePositionIdentity(ProposalPosition existing, Position position, String title) {
+        boolean samePosition = existing.getPosition().getId() != null && position.getId() != null
+                ? existing.getPosition().getId().equals(position.getId())
+                : existing.getPosition().getName().equals(position.getName());
+        return samePosition && existing.getTitle().equals(title);
     }
 
     private Position ensurePosition(String name) {

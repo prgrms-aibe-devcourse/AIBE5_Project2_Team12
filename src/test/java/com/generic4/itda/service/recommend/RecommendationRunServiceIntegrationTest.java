@@ -11,7 +11,6 @@ import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
 import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
 import com.generic4.itda.domain.proposal.ProposalPositionStatus;
-import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.domain.recommendation.RecommendationRun;
 import com.generic4.itda.domain.recommendation.constant.RecommendationAlgorithm;
 import com.generic4.itda.domain.recommendation.constant.RecommendationRunStatus;
@@ -66,11 +65,20 @@ class RecommendationRunServiceIntegrationTest {
                 "설명",
                 5_000_000L,
                 8_000_000L,
-                ProposalWorkType.REMOTE,
-                "판교",
                 4L
         );
-        ProposalPosition proposalPosition = proposal.addPosition(backend, 2L, 1_500_000L, 2_500_000L);
+        ProposalPosition proposalPosition = proposal.addPosition(
+                backend,
+                "런 백엔드 개발자",
+                null,
+                2L,
+                1_500_000L,
+                2_500_000L,
+                null,
+                null,
+                null,
+                null
+        );
         proposalPosition.addSkill(java, ProposalPositionSkillImportance.ESSENTIAL);
         proposalPosition.addSkill(spring, ProposalPositionSkillImportance.PREFERENCE);
         proposal.startMatching();
@@ -122,11 +130,20 @@ class RecommendationRunServiceIntegrationTest {
                 "설명",
                 5_000_000L,
                 8_000_000L,
-                ProposalWorkType.HYBRID,
-                "서울",
                 5L
         );
-        ProposalPosition proposalPosition = proposal.addPosition(backend, 1L, 1_000_000L, 2_000_000L);
+        ProposalPosition proposalPosition = proposal.addPosition(
+                backend,
+                "런 변경 백엔드",
+                null,
+                1L,
+                1_000_000L,
+                2_000_000L,
+                null,
+                null,
+                null,
+                null
+        );
         proposalPosition.addSkill(java, ProposalPositionSkillImportance.ESSENTIAL);
         proposal.startMatching();
         proposalRepository.saveAndFlush(proposal);
@@ -183,11 +200,20 @@ class RecommendationRunServiceIntegrationTest {
                 null,
                 null,
                 null,
-                ProposalWorkType.REMOTE,
+                null
+        );
+        ProposalPosition proposalPosition = proposal.addPosition(
+                backend,
+                "런 종료 백엔드",
+                null,
+                1L,
+                null,
+                null,
+                null,
+                null,
                 null,
                 null
         );
-        ProposalPosition proposalPosition = proposal.addPosition(backend, 1L, null, null);
         proposalPosition.changeStatus(ProposalPositionStatus.FULL);
         proposal.startMatching();
         proposalRepository.saveAndFlush(proposal);

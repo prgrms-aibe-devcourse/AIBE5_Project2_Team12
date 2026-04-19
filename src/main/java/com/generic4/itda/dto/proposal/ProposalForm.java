@@ -2,7 +2,6 @@ package com.generic4.itda.dto.proposal;
 
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalStatus;
-import com.generic4.itda.domain.proposal.ProposalWorkType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -33,19 +32,6 @@ public class ProposalForm {
 
     @Min(value = 0, message = "최대 예산은 0 이상이어야 합니다.")
     private Long totalBudgetMax;
-
-    /**
-     * 기존 단일 폼 화면과의 호환을 위해 잠시 유지합니다.
-     * 실제 저장 모델은 proposal_position으로 이동합니다.
-     */
-    private ProposalWorkType workType;
-
-    /**
-     * 기존 단일 폼 화면과의 호환을 위해 잠시 유지합니다.
-     * 실제 저장 모델은 proposal_position으로 이동합니다.
-     */
-    @Size(max = 255, message = "근무 장소는 255자를 초과할 수 없습니다.")
-    private String workPlace;
 
     @Min(value = 1, message = "예상 기간은 1 이상이어야 합니다.")
     private Long expectedPeriod;
