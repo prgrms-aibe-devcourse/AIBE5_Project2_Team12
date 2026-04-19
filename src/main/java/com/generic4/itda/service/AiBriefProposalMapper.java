@@ -50,18 +50,18 @@ public class AiBriefProposalMapper {
         }
 
         for (AiBriefPositionResult positionResult : positions) {
-            Position position = findOrCreatePosition(positionResult.getPositionName());
+            Position position = findOrCreatePosition(positionResult.getPositionCategoryName());
             ProposalPosition proposalPosition = proposal.addPosition(
                     position,
-                    positionResult.getPositionName(),
-                    null,
+                    positionResult.getTitle(),
+                    positionResult.getWorkType(),
                     positionResult.getHeadCount(),
                     positionResult.getUnitBudgetMin(),
                     positionResult.getUnitBudgetMax(),
-                    null,
-                    null,
-                    null,
-                    null
+                    positionResult.getExpectedPeriod(),
+                    positionResult.getCareerMinYears(),
+                    positionResult.getCareerMaxYears(),
+                    positionResult.getWorkPlace()
             );
             addSkills(proposalPosition, positionResult.getSkills());
         }
@@ -74,9 +74,9 @@ public class AiBriefProposalMapper {
         }
     }
 
-    private Position findOrCreatePosition(String positionName) {
-        return positionRepository.findByName(positionName)
-                .orElseGet(() -> positionRepository.save(Position.create(positionName)));
+    private Position findOrCreatePosition(String positionCategoryName) {
+        return positionRepository.findByName(positionCategoryName)
+                .orElseGet(() -> positionRepository.save(Position.create(positionCategoryName)));
     }
 
     private Skill findOrCreateSkill(String skillName) {

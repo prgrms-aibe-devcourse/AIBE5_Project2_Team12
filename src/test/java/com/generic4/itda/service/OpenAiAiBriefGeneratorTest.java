@@ -70,19 +70,23 @@ class OpenAiAiBriefGeneratorTest {
                 "description", "백엔드와 프론트엔드 개발자를 찾는 프로젝트입니다.",
                 "totalBudgetMin", 5000000,
                 "totalBudgetMax", 8000000,
-                "workType", "HYBRID",
-                "workPlace", "판교",
                 "expectedPeriod", 6,
                 "positions", List.of(
-                        Map.of(
-                                "positionName", "백엔드 개발자",
-                                "headCount", 1,
-                                "unitBudgetMin", 3000000,
-                                "unitBudgetMax", 4000000,
-                                "skills", List.of(
+                        Map.ofEntries(
+                                Map.entry("positionCategoryName", "백엔드 개발자"),
+                                Map.entry("title", "Node.js 백엔드 개발자"),
+                                Map.entry("workType", "HYBRID"),
+                                Map.entry("headCount", 1),
+                                Map.entry("unitBudgetMin", 3000000),
+                                Map.entry("unitBudgetMax", 4000000),
+                                Map.entry("expectedPeriod", 6),
+                                Map.entry("careerMinYears", 3),
+                                Map.entry("careerMaxYears", 6),
+                                Map.entry("workPlace", "판교"),
+                                Map.entry("skills", List.of(
                                         Map.of("skillName", "Java", "importance", "ESSENTIAL"),
                                         Map.of("skillName", "Spring Boot", "importance", "PREFERENCE")
-                                )
+                                ))
                         )
                 )
         ));
@@ -101,14 +105,25 @@ class OpenAiAiBriefGeneratorTest {
                         "description",
                         "totalBudgetMin",
                         "totalBudgetMax",
-                        "workType",
-                        "workPlace",
                         "expectedPeriod",
                         "positions"
                 )))
                 .andExpect(jsonPath("$.text.format.schema.properties.title.type[*]").value(containsInAnyOrder(
                         "string",
                         "null"
+                )))
+                .andExpect(jsonPath("$.text.format.schema.properties.positions.items.required[*]").value(containsInAnyOrder(
+                        "positionCategoryName",
+                        "title",
+                        "workType",
+                        "headCount",
+                        "unitBudgetMin",
+                        "unitBudgetMax",
+                        "expectedPeriod",
+                        "careerMinYears",
+                        "careerMaxYears",
+                        "workPlace",
+                        "skills"
                 )))
                 .andExpect(jsonPath("$.text.format.schema.properties.positions.items.properties.skills.items.required[*]")
                         .value(containsInAnyOrder("skillName", "importance")))
@@ -123,11 +138,15 @@ class OpenAiAiBriefGeneratorTest {
         assertThat(result.getDescription()).isEqualTo("백엔드와 프론트엔드 개발자를 찾는 프로젝트입니다.");
         assertThat(result.getTotalBudgetMin()).isEqualTo(5_000_000L);
         assertThat(result.getTotalBudgetMax()).isEqualTo(8_000_000L);
-        assertThat(result.getWorkType()).isEqualTo(ProposalWorkType.HYBRID);
-        assertThat(result.getWorkPlace()).isEqualTo("판교");
         assertThat(result.getExpectedPeriod()).isEqualTo(6L);
         assertThat(result.getPositions()).hasSize(1);
-        assertThat(result.getPositions().get(0).getPositionName()).isEqualTo("백엔드 개발자");
+        assertThat(result.getPositions().get(0).getPositionCategoryName()).isEqualTo("백엔드 개발자");
+        assertThat(result.getPositions().get(0).getTitle()).isEqualTo("Node.js 백엔드 개발자");
+        assertThat(result.getPositions().get(0).getWorkType()).isEqualTo(ProposalWorkType.HYBRID);
+        assertThat(result.getPositions().get(0).getExpectedPeriod()).isEqualTo(6L);
+        assertThat(result.getPositions().get(0).getCareerMinYears()).isEqualTo(3);
+        assertThat(result.getPositions().get(0).getCareerMaxYears()).isEqualTo(6);
+        assertThat(result.getPositions().get(0).getWorkPlace()).isEqualTo("판교");
         assertThat(result.getPositions().get(0).getSkills()).hasSize(2);
         assertThat(result.getPositions().get(0).getSkills().get(0).getSkillName()).isEqualTo("Java");
         assertThat(result.getPositions().get(0).getSkills().get(0).getImportance())
@@ -155,8 +174,21 @@ class OpenAiAiBriefGeneratorTest {
         String briefJson = objectMapper.writeValueAsString(Map.of(
                 "title", "제목",
                 "description", "설명",
-                "workType", "OFFICE",
-                "positions", List.of()
+                "positions", List.of(
+                        Map.ofEntries(
+                                Map.entry("positionCategoryName", "백엔드 개발자"),
+                                Map.entry("title", "백엔드 개발자"),
+                                Map.entry("workType", "OFFICE"),
+                                Map.entry("headCount", 1),
+                                Map.entry("unitBudgetMin", 1000000),
+                                Map.entry("unitBudgetMax", 2000000),
+                                Map.entry("expectedPeriod", 4),
+                                Map.entry("careerMinYears", 1),
+                                Map.entry("careerMaxYears", 3),
+                                Map.entry("workPlace", "판교"),
+                                Map.entry("skills", List.of())
+                        )
+                )
         ));
 
         server.expect(requestTo(API_URL))

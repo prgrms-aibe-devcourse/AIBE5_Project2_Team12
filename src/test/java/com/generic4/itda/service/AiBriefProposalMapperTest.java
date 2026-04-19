@@ -59,15 +59,19 @@ class AiBriefProposalMapperTest {
                 "AI가 정리한 설명",
                 5_000_000L,
                 8_000_000L,
-                ProposalWorkType.HYBRID,
-                "판교",
                 12L,
                 List.of(
                         AiBriefPositionResult.of(
                                 "백엔드 개발자",
+                                "Node.js 백엔드 개발자",
+                                ProposalWorkType.HYBRID,
                                 2L,
                                 3_000_000L,
                                 4_000_000L,
+                                12L,
+                                3,
+                                6,
+                                "판교",
                                 List.of(AiBriefSkillResult.of("Java", null))
                         )
                 )
@@ -82,6 +86,12 @@ class AiBriefProposalMapperTest {
         assertThat(proposal.getExpectedPeriod()).isEqualTo(12L);
         assertThat(proposal.getPositions()).hasSize(1);
         assertThat(proposal.getPositions().get(0).getPosition().getName()).isEqualTo("백엔드 개발자");
+        assertThat(proposal.getPositions().get(0).getTitle()).isEqualTo("Node.js 백엔드 개발자");
+        assertThat(proposal.getPositions().get(0).getWorkType()).isEqualTo(ProposalWorkType.HYBRID);
+        assertThat(proposal.getPositions().get(0).getExpectedPeriod()).isEqualTo(12L);
+        assertThat(proposal.getPositions().get(0).getCareerMinYears()).isEqualTo(3);
+        assertThat(proposal.getPositions().get(0).getCareerMaxYears()).isEqualTo(6);
+        assertThat(proposal.getPositions().get(0).getWorkPlace()).isEqualTo("판교");
         assertThat(proposal.getPositions().get(0).getSkills()).hasSize(1);
         assertThat(proposal.getPositions().get(0).getSkills().get(0).getSkill().getName()).isEqualTo("Java");
         assertThat(proposal.getPositions().get(0).getSkills().get(0).getImportance())
@@ -97,8 +107,6 @@ class AiBriefProposalMapperTest {
                 "설명만 갱신",
                 null,
                 null,
-                ProposalWorkType.REMOTE,
-                "강남",
                 8L,
                 List.of()
         );
@@ -121,8 +129,6 @@ class AiBriefProposalMapperTest {
 
         AiBriefResult aiBriefResult = AiBriefResult.of(
                 " ",
-                null,
-                null,
                 null,
                 null,
                 null,
@@ -160,12 +166,16 @@ class AiBriefProposalMapperTest {
                 null,
                 null,
                 null,
-                null,
-                null,
                 List.of(
                         AiBriefPositionResult.of(
                                 "백엔드 개발자",
+                                "플랫폼 백엔드 개발자",
+                                ProposalWorkType.REMOTE,
                                 1L,
+                                null,
+                                null,
+                                null,
+                                null,
                                 null,
                                 null,
                                 List.of(AiBriefSkillResult.of("Java", ProposalPositionSkillImportance.ESSENTIAL))
@@ -191,8 +201,6 @@ class AiBriefProposalMapperTest {
                 "기존 설명",
                 1_000_000L,
                 2_000_000L,
-                ProposalWorkType.SITE,
-                "서울",
                 3L
         );
     }

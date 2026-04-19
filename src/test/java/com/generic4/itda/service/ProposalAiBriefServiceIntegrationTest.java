@@ -76,8 +76,6 @@ class ProposalAiBriefServiceIntegrationTest {
                 "기존 설명",
                 1_000_000L,
                 2_000_000L,
-                ProposalWorkType.SITE,
-                "서울",
                 4L
         );
         ProposalPosition existingPosition = proposal.addPosition(oldPosition, 1L, 500_000L, 700_000L);
@@ -89,15 +87,19 @@ class ProposalAiBriefServiceIntegrationTest {
                 "웹 서비스 개발 외주입니다. 백엔드 개발자 1명과 프론트엔드 개발자 1명을 12주 동안 채용합니다.",
                 8_000_000L,
                 8_000_000L,
-                ProposalWorkType.HYBRID,
-                "판교",
                 12L,
                 List.of(
                         AiBriefPositionResult.of(
                                 "백엔드 개발자",
+                                "Node.js 백엔드 개발자",
+                                ProposalWorkType.HYBRID,
                                 1L,
                                 null,
                                 null,
+                                12L,
+                                3,
+                                6,
+                                "판교",
                                 List.of(
                                         AiBriefSkillResult.of("Java", ProposalPositionSkillImportance.ESSENTIAL),
                                         AiBriefSkillResult.of("Spring Boot",
@@ -106,8 +108,14 @@ class ProposalAiBriefServiceIntegrationTest {
                         ),
                         AiBriefPositionResult.of(
                                 "프론트엔드 개발자",
+                                "React 프론트엔드 개발자",
+                                ProposalWorkType.REMOTE,
                                 1L,
                                 null,
+                                null,
+                                10L,
+                                null,
+                                4,
                                 null,
                                 List.of(AiBriefSkillResult.of("React", null))
                         )
@@ -140,6 +148,12 @@ class ProposalAiBriefServiceIntegrationTest {
 
         ProposalPosition backendPosition = positionsByName.get("백엔드 개발자");
         assertThat(backendPosition).isNotNull();
+        assertThat(backendPosition.getTitle()).isEqualTo("Node.js 백엔드 개발자");
+        assertThat(backendPosition.getWorkType()).isEqualTo(ProposalWorkType.HYBRID);
+        assertThat(backendPosition.getExpectedPeriod()).isEqualTo(12L);
+        assertThat(backendPosition.getCareerMinYears()).isEqualTo(3);
+        assertThat(backendPosition.getCareerMaxYears()).isEqualTo(6);
+        assertThat(backendPosition.getWorkPlace()).isEqualTo("판교");
         assertThat(backendPosition.getHeadCount()).isEqualTo(1L);
         assertThat(backendPosition.getSkills())
                 .extracting(skill -> skill.getSkill().getName(), skill -> skill.getImportance())
@@ -150,6 +164,12 @@ class ProposalAiBriefServiceIntegrationTest {
 
         ProposalPosition frontendPosition = positionsByName.get("프론트엔드 개발자");
         assertThat(frontendPosition).isNotNull();
+        assertThat(frontendPosition.getTitle()).isEqualTo("React 프론트엔드 개발자");
+        assertThat(frontendPosition.getWorkType()).isEqualTo(ProposalWorkType.REMOTE);
+        assertThat(frontendPosition.getExpectedPeriod()).isEqualTo(10L);
+        assertThat(frontendPosition.getCareerMinYears()).isNull();
+        assertThat(frontendPosition.getCareerMaxYears()).isEqualTo(4);
+        assertThat(frontendPosition.getWorkPlace()).isNull();
         assertThat(frontendPosition.getHeadCount()).isEqualTo(1L);
         assertThat(frontendPosition.getSkills())
                 .extracting(skill -> skill.getSkill().getName(), skill -> skill.getImportance())

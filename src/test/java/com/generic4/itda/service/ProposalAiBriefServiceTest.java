@@ -55,8 +55,6 @@ class ProposalAiBriefServiceTest {
                 "AI가 만든 설명",
                 3_000_000L,
                 5_000_000L,
-                ProposalWorkType.REMOTE,
-                "판교",
                 6L,
                 null
         );
@@ -142,8 +140,6 @@ class ProposalAiBriefServiceTest {
                 "제안서 본문",
                 1_000_000L,
                 2_000_000L,
-                ProposalWorkType.SITE,
-                "서울",
                 3L
         );
     }

@@ -52,15 +52,19 @@ class ProposalAiBriefControllerTest {
                 "AI가 만든 설명",
                 3_000_000L,
                 5_000_000L,
-                ProposalWorkType.HYBRID,
-                "판교",
                 6L,
                 List.of(
                         AiBriefPositionResult.of(
                                 "백엔드 개발자",
+                                "Node.js 백엔드 개발자",
+                                ProposalWorkType.HYBRID,
                                 1L,
                                 3_000_000L,
                                 4_000_000L,
+                                6L,
+                                3,
+                                6,
+                                "판교",
                                 List.of(
                                         AiBriefSkillResult.of("Java", ProposalPositionSkillImportance.ESSENTIAL),
                                         AiBriefSkillResult.of("Spring Boot",
@@ -82,8 +86,9 @@ class ProposalAiBriefControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.title").value("AI가 만든 제목"))
                 .andExpect(jsonPath("$.description").value("AI가 만든 설명"))
-                .andExpect(jsonPath("$.workType").value("HYBRID"))
-                .andExpect(jsonPath("$.positions[0].positionName").value("백엔드 개발자"))
+                .andExpect(jsonPath("$.positions[0].positionCategoryName").value("백엔드 개발자"))
+                .andExpect(jsonPath("$.positions[0].title").value("Node.js 백엔드 개발자"))
+                .andExpect(jsonPath("$.positions[0].workType").value("HYBRID"))
                 .andExpect(jsonPath("$.positions[0].skills[0].skillName").value("Java"))
                 .andExpect(jsonPath("$.positions[0].skills[0].importance").value("ESSENTIAL"));
 
