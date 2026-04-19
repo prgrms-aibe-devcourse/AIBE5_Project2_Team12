@@ -63,13 +63,13 @@ class RecommendationEntryServiceTest {
         Member owner = createMemberWithId(OWNER_ID);
         Proposal proposal = createProposalWithStatus(owner, PROPOSAL_ID, ProposalStatus.MATCHING);
 
-        ProposalPosition designer = addPosition(proposal, 30L, "디자이너", 1L, null, null);
+        ProposalPosition designer = addPosition(proposal, 30L, "디자인", "프로덕트 디자이너", 1L, null, null, null);
         addSkill(designer, 201L, "Figma", ProposalPositionSkillImportance.PREFERENCE);
 
-        ProposalPosition backend = addPosition(proposal, 10L, "백엔드 개발자", 3L, 1_000_000L, 2_000_000L);
+        ProposalPosition backend = addPosition(proposal, 10L, "백엔드", "Node.js 백엔드 개발자", 3L, 1_000_000L, 2_000_000L, 3L);
         addSkill(backend, 202L, "Java", ProposalPositionSkillImportance.ESSENTIAL);
 
-        ProposalPosition frontend = addPosition(proposal, 20L, "프론트엔드 개발자", 2L, 700_000L, 900_000L);
+        ProposalPosition frontend = addPosition(proposal, 20L, "프론트엔드", "프론트엔드 개발자", 2L, 700_000L, 900_000L, 2L);
         addSkill(frontend, 203L, "React", ProposalPositionSkillImportance.PREFERENCE);
 
         stubProposalDetailLoad(proposal);
@@ -96,9 +96,11 @@ class RecommendationEntryServiceTest {
                 .containsExactly(10L, 20L, 30L);
 
         RecommendationEntryPositionItem firstPosition = result.positions().get(0);
-        assertThat(firstPosition.positionName()).isEqualTo("백엔드 개발자");
+        assertThat(firstPosition.positionTitle()).isEqualTo("Node.js 백엔드 개발자");
+        assertThat(firstPosition.positionCategoryName()).isEqualTo("백엔드");
         assertThat(firstPosition.headCount()).isEqualTo(3L);
         assertThat(firstPosition.budgetText()).isEqualTo("1,000,000 ~ 2,000,000");
+        assertThat(firstPosition.expectedPeriod()).isEqualTo(3L);
         assertThat(firstPosition.skills())
                 .singleElement()
                 .satisfies(skill -> {
@@ -162,6 +164,27 @@ class RecommendationEntryServiceTest {
         // then
         assertThat(result.runnable()).isFalse();
         assertThat(result.helperMessage()).isEqualTo("제안서가 MATCHING 상태일 때만 추천을 실행할 수 있습니다.");
+        verifyExpectedInteractions();
+    }
+
+    @Test
+    @DisplayName("포지션 title이 비어 있으면 category 이름을 fallback으로 사용한다")
+    void getEntry_usesCategoryNameWhenPositionTitleIsBlank() {
+        // given
+        Member owner = createMemberWithId(OWNER_ID);
+        Proposal proposal = createProposalWithStatus(owner, PROPOSAL_ID, ProposalStatus.MATCHING);
+        ProposalPosition position = addPosition(proposal, 100L, "백엔드", "백엔드 개발자", 1L, null, null, null);
+        ReflectionTestUtils.setField(position, "title", "   ");
+
+        stubProposalDetailLoad(proposal);
+        given(memberRepository.findByEmail_Value(OWNER_EMAIL)).willReturn(owner);
+
+        // when
+        RecommendationEntryPositionItem result = service.getEntry(PROPOSAL_ID, OWNER_EMAIL).positions().get(0);
+
+        // then
+        assertThat(result.positionTitle()).isEqualTo("백엔드");
+        assertThat(result.positionCategoryName()).isEqualTo("백엔드");
         verifyExpectedInteractions();
     }
 
@@ -267,7 +290,7 @@ class RecommendationEntryServiceTest {
     private Proposal ownedProposalWithSinglePosition(ProposalStatus status, Long budgetMin, Long budgetMax) {
         Member owner = createMemberWithId(OWNER_ID);
         Proposal proposal = createProposalWithStatus(owner, PROPOSAL_ID, status);
-        addPosition(proposal, 100L, "포지션", 1L, budgetMin, budgetMax);
+        addPosition(proposal, 100L, "포지션", "포지션", 1L, budgetMin, budgetMax, null);
 
         stubProposalDetailLoad(proposal);
         given(memberRepository.findByEmail_Value(OWNER_EMAIL)).willReturn(owner);
@@ -326,12 +349,25 @@ class RecommendationEntryServiceTest {
     private ProposalPosition addPosition(
             Proposal proposal,
             Long proposalPositionId,
-            String positionName,
+            String positionCategoryName,
+            String positionTitle,
             Long headCount,
             Long budgetMin,
-            Long budgetMax
+            Long budgetMax,
+            Long expectedPeriod
     ) {
-        ProposalPosition position = proposal.addPosition(Position.create(positionName), headCount, budgetMin, budgetMax);
+        ProposalPosition position = proposal.addPosition(
+                Position.create(positionCategoryName),
+                positionTitle,
+                null,
+                headCount,
+                budgetMin,
+                budgetMax,
+                expectedPeriod,
+                null,
+                null,
+                null
+        );
         setId(position, proposalPositionId);
         return position;
     }

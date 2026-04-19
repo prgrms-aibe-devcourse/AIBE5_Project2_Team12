@@ -42,9 +42,9 @@ class RecommendationEntryServiceIntegrationTest {
     @DisplayName("저장된 recommendation aggregate를 조회해 entry ViewModel을 조립한다")
     void getEntry_assemblesViewModelFromPersistedAggregate() {
         Member owner = memberRepository.save(createMember("entry-owner@test.com", "pw", "제안자", "010-0000-1111"));
-        Position designer = persist(Position.create("디자이너"));
-        Position backend = persist(Position.create("백엔드 개발자"));
-        Position frontend = persist(Position.create("프론트엔드 개발자"));
+        Position designer = persist(Position.create("디자인"));
+        Position backend = persist(Position.create("백엔드"));
+        Position frontend = persist(Position.create("프론트엔드"));
         Skill figma = persist(Skill.create("Figma", null));
         Skill java = persist(Skill.create("Java", null));
         Skill react = persist(Skill.create("React", null));
@@ -60,11 +60,11 @@ class RecommendationEntryServiceIntegrationTest {
                 "서울",
                 6L
         );
-        ProposalPosition designerPosition = proposal.addPosition(designer, 1L, null, null);
+        ProposalPosition designerPosition = proposal.addPosition(designer, "프로덕트 디자이너", null, 1L, null, null, null, null, null, null);
         designerPosition.addSkill(figma, ProposalPositionSkillImportance.PREFERENCE);
-        ProposalPosition backendPosition = proposal.addPosition(backend, 2L, 1_000_000L, 2_000_000L);
+        ProposalPosition backendPosition = proposal.addPosition(backend, "Node.js 백엔드 개발자", null, 2L, 1_000_000L, 2_000_000L, 5L, null, null, null);
         backendPosition.addSkill(java, ProposalPositionSkillImportance.ESSENTIAL);
-        ProposalPosition frontendPosition = proposal.addPosition(frontend, 1L, 800_000L, 1_200_000L);
+        ProposalPosition frontendPosition = proposal.addPosition(frontend, "프론트엔드 개발자", null, 1L, 800_000L, 1_200_000L, 4L, null, null, null);
         frontendPosition.addSkill(react, ProposalPositionSkillImportance.PREFERENCE);
         proposal.startMatching();
         proposalRepository.saveAndFlush(proposal);
@@ -92,7 +92,8 @@ class RecommendationEntryServiceIntegrationTest {
                 .containsExactly(designerPositionId, backendPositionId, frontendPositionId);
 
         RecommendationEntryPositionItem first = result.positions().get(0);
-        assertThat(first.positionName()).isEqualTo("디자이너");
+        assertThat(first.positionTitle()).isEqualTo("프로덕트 디자이너");
+        assertThat(first.positionCategoryName()).isEqualTo("디자인");
         assertThat(first.budgetText()).isEqualTo("예산 미정");
         assertThat(first.skills())
                 .singleElement()
@@ -102,8 +103,10 @@ class RecommendationEntryServiceIntegrationTest {
                 });
 
         RecommendationEntryPositionItem second = result.positions().get(1);
-        assertThat(second.positionName()).isEqualTo("백엔드 개발자");
+        assertThat(second.positionTitle()).isEqualTo("Node.js 백엔드 개발자");
+        assertThat(second.positionCategoryName()).isEqualTo("백엔드");
         assertThat(second.budgetText()).isEqualTo("1,000,000 ~ 2,000,000");
+        assertThat(second.expectedPeriod()).isEqualTo(5L);
         assertThat(second.skills())
                 .singleElement()
                 .satisfies(skill -> {

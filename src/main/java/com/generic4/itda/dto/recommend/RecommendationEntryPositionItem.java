@@ -4,9 +4,11 @@ import java.util.List;
 
 public record RecommendationEntryPositionItem(
         Long proposalPositionId,
-        String positionName,
+        String positionTitle,
+        String positionCategoryName,
         Long headCount,
         String budgetText,
+        Long expectedPeriod,
         List<RecommendationEntrySkillItem> skills
 ) {
 
