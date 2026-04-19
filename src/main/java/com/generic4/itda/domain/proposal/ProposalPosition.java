@@ -121,12 +121,6 @@ public class ProposalPosition extends BaseEntity {
                 .build();
     }
 
-    public static ProposalPosition create(Proposal proposal, Position position, Long headCount,
-            Long unitBudgetMin, Long unitBudgetMax) {
-        return create(proposal, position, position == null ? null : position.getName(), null, headCount, unitBudgetMin, unitBudgetMax,
-                null, null, null, null);
-    }
-
     public void update(Position position, String title, ProposalWorkType workType, Long headCount, Long unitBudgetMin,
             Long unitBudgetMax, Long expectedPeriod, Integer careerMinYears, Integer careerMaxYears,
             String workPlace) {
@@ -150,11 +144,6 @@ public class ProposalPosition extends BaseEntity {
         this.careerMinYears = careerMinYears;
         this.careerMaxYears = careerMaxYears;
         this.workPlace = normalizeOptionalShortText(workPlace);
-    }
-
-    public void update(Position position, Long headCount, Long unitBudgetMin, Long unitBudgetMax) {
-        update(position, position == null ? null : position.getName(), null, headCount, unitBudgetMin, unitBudgetMax,
-                null, null, null, null);
     }
 
     public void changeStatus(ProposalPositionStatus status) {

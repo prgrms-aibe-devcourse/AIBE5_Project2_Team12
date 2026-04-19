@@ -46,7 +46,18 @@ class AiBriefProposalMapperTest {
         Proposal proposal = createProposal();
         Position oldPosition = Position.create("디자이너");
         Skill oldSkill = Skill.create("Figma", null);
-        ProposalPosition oldProposalPosition = proposal.addPosition(oldPosition, 1L, 1_000_000L, 2_000_000L);
+        ProposalPosition oldProposalPosition = proposal.addPosition(
+                oldPosition,
+                "기존 디자이너",
+                null,
+                1L,
+                1_000_000L,
+                2_000_000L,
+                null,
+                null,
+                null,
+                null
+        );
         oldProposalPosition.addSkill(oldSkill, ProposalPositionSkillImportance.ESSENTIAL);
 
         given(positionRepository.findByName("백엔드 개발자")).willReturn(Optional.empty());
@@ -124,7 +135,18 @@ class AiBriefProposalMapperTest {
         Proposal proposal = createProposal();
         Position oldPosition = Position.create("디자이너");
         Skill oldSkill = Skill.create("Figma", null);
-        ProposalPosition oldProposalPosition = proposal.addPosition(oldPosition, 1L, 1_000_000L, 2_000_000L);
+        ProposalPosition oldProposalPosition = proposal.addPosition(
+                oldPosition,
+                "기존 디자이너",
+                null,
+                1L,
+                1_000_000L,
+                2_000_000L,
+                null,
+                null,
+                null,
+                null
+        );
         oldProposalPosition.addSkill(oldSkill, ProposalPositionSkillImportance.ESSENTIAL);
 
         AiBriefResult aiBriefResult = AiBriefResult.of(

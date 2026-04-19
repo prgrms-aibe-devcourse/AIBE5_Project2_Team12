@@ -10,7 +10,6 @@ import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
 import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
-import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.domain.skill.Skill;
 import com.generic4.itda.dto.recommend.RecommendationEntryPositionItem;
 import com.generic4.itda.dto.recommend.RecommendationEntryViewModel;
@@ -56,8 +55,6 @@ class RecommendationEntryServiceIntegrationTest {
                 "최종 제안서 설명",
                 10_000_000L,
                 20_000_000L,
-                ProposalWorkType.HYBRID,
-                "서울",
                 6L
         );
         ProposalPosition designerPosition = proposal.addPosition(designer, "프로덕트 디자이너", null, 1L, null, null, null, null, null, null);
@@ -126,8 +123,6 @@ class RecommendationEntryServiceIntegrationTest {
                 null,
                 null,
                 null,
-                ProposalWorkType.REMOTE,
-                null,
                 null
         );
         proposal.startMatching();
@@ -158,11 +153,9 @@ class RecommendationEntryServiceIntegrationTest {
                 null,
                 null,
                 null,
-                ProposalWorkType.REMOTE,
-                null,
                 null
         );
-        proposal.addPosition(backend, 1L, null, null);
+        proposal.addPosition(backend, "통합 백엔드", null, 1L, null, null, null, null, null, null);
         proposal.startMatching();
         proposalRepository.saveAndFlush(proposal);
         entityManager.clear();

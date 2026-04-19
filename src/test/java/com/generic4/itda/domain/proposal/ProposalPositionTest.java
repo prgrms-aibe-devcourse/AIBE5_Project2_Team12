@@ -20,7 +20,19 @@ class ProposalPositionTest {
         Proposal proposal = createProposal();
         Position position = Position.create("백엔드 개발자");
 
-        ProposalPosition proposalPosition = ProposalPosition.create(proposal, position, 2L, 3_000_000L, 5_000_000L);
+        ProposalPosition proposalPosition = ProposalPosition.create(
+                proposal,
+                position,
+                "백엔드 개발자",
+                null,
+                2L,
+                3_000_000L,
+                5_000_000L,
+                null,
+                null,
+                null,
+                null
+        );
 
         assertThat(proposalPosition.getProposal()).isEqualTo(proposal);
         assertThat(proposalPosition.getPosition()).isEqualTo(position);
@@ -37,9 +49,15 @@ class ProposalPositionTest {
         assertThatThrownBy(() -> ProposalPosition.create(
                 null,
                 Position.create("백엔드 개발자"),
+                "백엔드 개발자",
+                null,
                 1L,
                 1_000_000L,
-                2_000_000L
+                2_000_000L,
+                null,
+                null,
+                null,
+                null
         ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("상위 제안서는 필수값입니다.");
@@ -51,9 +69,15 @@ class ProposalPositionTest {
         assertThatThrownBy(() -> ProposalPosition.create(
                 createProposal(),
                 null,
+                "백엔드 개발자",
+                null,
                 1L,
                 1_000_000L,
-                2_000_000L
+                2_000_000L,
+                null,
+                null,
+                null,
+                null
         ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("직무는 필수값입니다.");
@@ -66,9 +90,15 @@ class ProposalPositionTest {
         assertThatThrownBy(() -> ProposalPosition.create(
                 createProposal(),
                 Position.create("백엔드 개발자"),
+                "백엔드 개발자",
+                null,
                 headCount,
                 1_000_000L,
-                2_000_000L
+                2_000_000L,
+                null,
+                null,
+                null,
+                null
         ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("모집 인원은 양수여야 합니다.");
@@ -80,9 +110,15 @@ class ProposalPositionTest {
         assertThatThrownBy(() -> ProposalPosition.create(
                 createProposal(),
                 Position.create("백엔드 개발자"),
+                "백엔드 개발자",
+                null,
                 1L,
                 5_000_000L,
-                1_000_000L
+                1_000_000L,
+                null,
+                null,
+                null,
+                null
         ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("1인 기준 최소 예산은 최대 예산보다 클 수 없습니다.");
@@ -94,13 +130,20 @@ class ProposalPositionTest {
         ProposalPosition proposalPosition = ProposalPosition.create(
                 createProposal(),
                 Position.create("백엔드 개발자"),
+                "백엔드 개발자",
+                null,
                 1L,
                 2_000_000L,
-                3_000_000L
+                3_000_000L,
+                null,
+                null,
+                null,
+                null
         );
         Position updatedPosition = Position.create("프론트엔드 개발자");
 
-        proposalPosition.update(updatedPosition, 3L, 4_000_000L, 6_000_000L);
+        proposalPosition.update(updatedPosition, "프론트엔드 개발자", null, 3L, 4_000_000L, 6_000_000L,
+                null, null, null, null);
 
         assertThat(proposalPosition.getPosition()).isEqualTo(updatedPosition);
         assertThat(proposalPosition.getHeadCount()).isEqualTo(3L);
@@ -115,10 +158,12 @@ class ProposalPositionTest {
         Proposal proposal = createProposal();
         Position backend = Position.create("백엔드 개발자");
         Position frontend = Position.create("프론트엔드 개발자");
-        proposal.addPosition(backend, 1L, 2_000_000L, 3_000_000L);
-        ProposalPosition proposalPosition = proposal.addPosition(frontend, 1L, 2_000_000L, 3_000_000L);
+        proposal.addPosition(backend, "백엔드 개발자 A", null, 1L, 2_000_000L, 3_000_000L, null, null, null, null);
+        ProposalPosition proposalPosition = proposal.addPosition(frontend, "프론트엔드 개발자", null, 1L, 2_000_000L,
+                3_000_000L, null, null, null, null);
 
-        proposalPosition.update(backend, 2L, 3_000_000L, 4_000_000L);
+        proposalPosition.update(backend, "백엔드 개발자 B", null, 2L, 3_000_000L, 4_000_000L,
+                null, null, null, null);
 
         assertThat(proposalPosition.getPosition()).isEqualTo(backend);
         assertThat(proposal.getPositions()).hasSize(2);
@@ -130,9 +175,15 @@ class ProposalPositionTest {
         ProposalPosition proposalPosition = ProposalPosition.create(
                 createProposal(),
                 Position.create("백엔드 개발자"),
+                "백엔드 개발자",
+                null,
                 1L,
                 2_000_000L,
-                3_000_000L
+                3_000_000L,
+                null,
+                null,
+                null,
+                null
         );
 
         proposalPosition.changeStatus(ProposalPositionStatus.FULL);
@@ -148,9 +199,15 @@ class ProposalPositionTest {
         ProposalPosition proposalPosition = ProposalPosition.create(
                 createProposal(),
                 Position.create("백엔드 개발자"),
+                "백엔드 개발자",
+                null,
                 1L,
                 2_000_000L,
-                3_000_000L
+                3_000_000L,
+                null,
+                null,
+                null,
+                null
         );
         Skill skill = Skill.create("Java", "백엔드 언어");
 
@@ -172,9 +229,15 @@ class ProposalPositionTest {
         ProposalPosition proposalPosition = ProposalPosition.create(
                 createProposal(),
                 Position.create("백엔드 개발자"),
+                "백엔드 개발자",
+                null,
                 1L,
                 2_000_000L,
-                3_000_000L
+                3_000_000L,
+                null,
+                null,
+                null,
+                null
         );
         Skill skill = Skill.create("Java", "백엔드 언어");
         proposalPosition.addSkill(skill, ProposalPositionSkillImportance.ESSENTIAL);
@@ -190,9 +253,15 @@ class ProposalPositionTest {
         ProposalPosition proposalPosition = ProposalPosition.create(
                 createProposal(),
                 Position.create("백엔드 개발자"),
+                "백엔드 개발자",
+                null,
                 1L,
                 2_000_000L,
-                3_000_000L
+                3_000_000L,
+                null,
+                null,
+                null,
+                null
         );
 
         assertThatThrownBy(() -> proposalPosition.removeSkill(null))

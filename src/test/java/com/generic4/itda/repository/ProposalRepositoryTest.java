@@ -9,7 +9,6 @@ import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
 import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
-import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.domain.skill.Skill;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceUnitUtil;
@@ -44,11 +43,20 @@ class ProposalRepositoryTest {
                 "최종 제안서 본문",
                 10_000_000L,
                 20_000_000L,
-                ProposalWorkType.HYBRID,
-                "서울",
                 12L
         );
-        ProposalPosition proposalPosition = proposal.addPosition(backend, 2L, 4_000_000L, 6_000_000L);
+        ProposalPosition proposalPosition = proposal.addPosition(
+                backend,
+                "백엔드 개발자",
+                null,
+                2L,
+                4_000_000L,
+                6_000_000L,
+                null,
+                null,
+                null,
+                null
+        );
         proposalPosition.addSkill(java, ProposalPositionSkillImportance.ESSENTIAL);
         proposalPosition.addSkill(spring, ProposalPositionSkillImportance.PREFERENCE);
 
@@ -80,11 +88,20 @@ class ProposalRepositoryTest {
                 "최종 제안서 본문",
                 10_000_000L,
                 20_000_000L,
-                ProposalWorkType.HYBRID,
-                "서울",
                 12L
         );
-        ProposalPosition proposalPosition = proposal.addPosition(backend, 2L, 4_000_000L, 6_000_000L);
+        ProposalPosition proposalPosition = proposal.addPosition(
+                backend,
+                "백엔드 개발자",
+                null,
+                2L,
+                4_000_000L,
+                6_000_000L,
+                null,
+                null,
+                null,
+                null
+        );
         proposalPosition.addSkill(java, ProposalPositionSkillImportance.ESSENTIAL);
         proposalRepository.saveAndFlush(proposal);
 
@@ -114,11 +131,20 @@ class ProposalRepositoryTest {
                 "최종 제안서 본문",
                 10_000_000L,
                 20_000_000L,
-                ProposalWorkType.HYBRID,
-                "서울",
                 12L
         );
-        ProposalPosition proposalPosition = proposal.addPosition(backend, 2L, 4_000_000L, 6_000_000L);
+        ProposalPosition proposalPosition = proposal.addPosition(
+                backend,
+                "백엔드 개발자",
+                null,
+                2L,
+                4_000_000L,
+                6_000_000L,
+                null,
+                null,
+                null,
+                null
+        );
         proposalPosition.addSkill(java, ProposalPositionSkillImportance.ESSENTIAL);
         proposalPosition.addSkill(spring, ProposalPositionSkillImportance.PREFERENCE);
         proposalRepository.saveAndFlush(proposal);
@@ -148,12 +174,12 @@ class ProposalRepositoryTest {
                 "최종 제안서 본문",
                 10_000_000L,
                 20_000_000L,
-                ProposalWorkType.HYBRID,
-                "서울",
                 12L
         );
-        proposal.addPosition(backend, 1L, 3_000_000L, 4_000_000L);
-        proposal.addPosition(backend, 2L, 5_000_000L, 6_000_000L);
+        proposal.addPosition(backend, "백엔드 개발자 A", null, 1L, 3_000_000L, 4_000_000L,
+                null, null, null, null);
+        proposal.addPosition(backend, "백엔드 개발자 B", null, 2L, 5_000_000L, 6_000_000L,
+                null, null, null, null);
 
         proposalRepository.saveAndFlush(proposal);
         entityManager.clear();
@@ -175,8 +201,10 @@ class ProposalRepositoryTest {
 
         Proposal proposal = Proposal.create(
                 member, "AI 매칭 플랫폼", "원문", null,
-                null, null, ProposalWorkType.REMOTE, null, null);
-        proposal.addPosition(backend, 1L, 500_000L, 1_000_000L).addSkill(java, ProposalPositionSkillImportance.ESSENTIAL);
+                null, null, null);
+        proposal.addPosition(backend, "백엔드 개발자", null, 1L, 500_000L, 1_000_000L,
+                null, null, null, null)
+                .addSkill(java, ProposalPositionSkillImportance.ESSENTIAL);
         proposalRepository.saveAndFlush(proposal);
         entityManager.clear();
 
@@ -197,8 +225,19 @@ class ProposalRepositoryTest {
 
         Proposal proposal = Proposal.create(
                 member, "AI 매칭 플랫폼", "원문", null,
-                null, null, ProposalWorkType.REMOTE, null, null);
-        ProposalPosition pp = proposal.addPosition(backend, 1L, 500_000L, 1_000_000L);
+                null, null, null);
+        ProposalPosition pp = proposal.addPosition(
+                backend,
+                "백엔드 개발자",
+                null,
+                1L,
+                500_000L,
+                1_000_000L,
+                null,
+                null,
+                null,
+                null
+        );
         pp.addSkill(java, ProposalPositionSkillImportance.ESSENTIAL);
         pp.addSkill(spring, ProposalPositionSkillImportance.PREFERENCE);
         proposalRepository.saveAndFlush(proposal);
@@ -224,8 +263,19 @@ class ProposalRepositoryTest {
 
         Proposal proposal = Proposal.create(
                 member, "AI 매칭 플랫폼", "원문", null,
-                null, null, ProposalWorkType.REMOTE, null, null);
-        ProposalPosition pp = proposal.addPosition(backend, 1L, 500_000L, 1_000_000L);
+                null, null, null);
+        ProposalPosition pp = proposal.addPosition(
+                backend,
+                "백엔드 개발자",
+                null,
+                1L,
+                500_000L,
+                1_000_000L,
+                null,
+                null,
+                null,
+                null
+        );
         pp.addSkill(java, ProposalPositionSkillImportance.ESSENTIAL);
         pp.addSkill(spring, ProposalPositionSkillImportance.PREFERENCE);
         proposalRepository.saveAndFlush(proposal);
@@ -254,11 +304,33 @@ class ProposalRepositoryTest {
 
         Proposal proposal = Proposal.create(
                 member, "풀스택 프로젝트", "원문", null,
-                null, null, ProposalWorkType.HYBRID, null, null);
-        ProposalPosition pp1 = proposal.addPosition(backend, 1L, 500_000L, 1_000_000L);
+                null, null, null);
+        ProposalPosition pp1 = proposal.addPosition(
+                backend,
+                "백엔드 개발자",
+                null,
+                1L,
+                500_000L,
+                1_000_000L,
+                null,
+                null,
+                null,
+                null
+        );
         pp1.addSkill(java, ProposalPositionSkillImportance.ESSENTIAL);
         pp1.addSkill(spring, ProposalPositionSkillImportance.PREFERENCE);
-        ProposalPosition pp2 = proposal.addPosition(frontend, 1L, 400_000L, 800_000L);
+        ProposalPosition pp2 = proposal.addPosition(
+                frontend,
+                "프론트엔드 개발자",
+                null,
+                1L,
+                400_000L,
+                800_000L,
+                null,
+                null,
+                null,
+                null
+        );
         pp2.addSkill(react, ProposalPositionSkillImportance.ESSENTIAL);
         pp2.addSkill(ts, ProposalPositionSkillImportance.PREFERENCE);
         proposalRepository.saveAndFlush(proposal);

@@ -12,7 +12,6 @@ import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
-import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.domain.recommendation.RecommendationRun;
 import com.generic4.itda.domain.recommendation.constant.RecommendationAlgorithm;
 import com.generic4.itda.domain.recommendation.constant.RecommendationRunStatus;
@@ -144,11 +143,20 @@ class RecommendationRunProcessorTest {
                 null,
                 null,
                 null,
-                ProposalWorkType.REMOTE,
-                null,
                 null
         );
 
-        return proposal.addPosition(position, 2L, 500_000L, 1_000_000L);
+        return proposal.addPosition(
+                position,
+                "백엔드 개발자",
+                null,
+                2L,
+                500_000L,
+                1_000_000L,
+                null,
+                null,
+                null,
+                null
+        );
     }
 }
