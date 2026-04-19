@@ -133,8 +133,34 @@ public class Proposal extends BaseEntity {
     }
 
     public ProposalPosition addPosition(Position position, Long headCount, Long unitBudgetMin, Long unitBudgetMax) {
-        ProposalPosition proposalPosition = ProposalPosition.create(this, position, headCount, unitBudgetMin,
-                unitBudgetMax);
+        return addPosition(position, null, null, headCount, unitBudgetMin, unitBudgetMax, null, null, null, null);
+    }
+
+    public ProposalPosition addPosition(
+            Position position,
+            String title,
+            ProposalWorkType workType,
+            Long headCount,
+            Long unitBudgetMin,
+            Long unitBudgetMax,
+            Long expectedPeriod,
+            Integer careerMinYears,
+            Integer careerMaxYears,
+            String workPlace
+    ) {
+        ProposalPosition proposalPosition = ProposalPosition.create(
+                this,
+                position,
+                title,
+                workType,
+                headCount,
+                unitBudgetMin,
+                unitBudgetMax,
+                expectedPeriod,
+                careerMinYears,
+                careerMaxYears,
+                workPlace
+        );
         validatePositionChange(proposalPosition, proposalPosition.getPosition());
         this.positions.add(proposalPosition);
         return proposalPosition;

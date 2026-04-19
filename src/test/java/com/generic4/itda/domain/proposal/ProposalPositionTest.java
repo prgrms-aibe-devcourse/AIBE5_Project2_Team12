@@ -27,8 +27,42 @@ class ProposalPositionTest {
         assertThat(proposalPosition.getHeadCount()).isEqualTo(2L);
         assertThat(proposalPosition.getUnitBudgetMin()).isEqualTo(3_000_000L);
         assertThat(proposalPosition.getUnitBudgetMax()).isEqualTo(5_000_000L);
+        assertThat(proposalPosition.getTitle()).isNull();
+        assertThat(proposalPosition.getWorkType()).isNull();
+        assertThat(proposalPosition.getExpectedPeriod()).isNull();
+        assertThat(proposalPosition.getCareerMinYears()).isNull();
+        assertThat(proposalPosition.getCareerMaxYears()).isNull();
+        assertThat(proposalPosition.getWorkPlace()).isNull();
         assertThat(proposalPosition.getStatus()).isEqualTo(ProposalPositionStatus.OPEN);
         assertThat(proposal.getPositions()).isEmpty();
+    }
+
+    @DisplayName("상세 필드가 주어지면 모집 단위에 함께 저장한다")
+    @Test
+    void createWithDetailFields() {
+        Proposal proposal = createProposal();
+        Position position = Position.create("백엔드 개발자");
+
+        ProposalPosition proposalPosition = ProposalPosition.create(
+                proposal,
+                position,
+                "  Node.js 백엔드 개발자  ",
+                ProposalWorkType.HYBRID,
+                2L,
+                3_000_000L,
+                5_000_000L,
+                12L,
+                3,
+                7,
+                "  판교  "
+        );
+
+        assertThat(proposalPosition.getTitle()).isEqualTo("Node.js 백엔드 개발자");
+        assertThat(proposalPosition.getWorkType()).isEqualTo(ProposalWorkType.HYBRID);
+        assertThat(proposalPosition.getExpectedPeriod()).isEqualTo(12L);
+        assertThat(proposalPosition.getCareerMinYears()).isEqualTo(3);
+        assertThat(proposalPosition.getCareerMaxYears()).isEqualTo(7);
+        assertThat(proposalPosition.getWorkPlace()).isEqualTo("판교");
     }
 
     @DisplayName("상위 제안서가 없으면 생성에 실패한다")
@@ -88,6 +122,87 @@ class ProposalPositionTest {
                 .hasMessage("1인 기준 최소 예산은 최대 예산보다 클 수 없습니다.");
     }
 
+    @DisplayName("포지션 예상 기간이 0 이하이면 생성에 실패한다")
+    @ParameterizedTest
+    @ValueSource(longs = {0L, -1L})
+    void failWhenExpectedPeriodIsNotPositive(long expectedPeriod) {
+        assertThatThrownBy(() -> ProposalPosition.create(
+                createProposal(),
+                Position.create("백엔드 개발자"),
+                "백엔드 개발자",
+                ProposalWorkType.HYBRID,
+                1L,
+                1_000_000L,
+                2_000_000L,
+                expectedPeriod,
+                1,
+                3,
+                "판교"
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("포지션 예상 기간은 양수여야 합니다.");
+    }
+
+    @DisplayName("경력 연차는 음수일 수 없다")
+    @Test
+    void failWhenCareerYearsIsNegative() {
+        assertThatThrownBy(() -> ProposalPosition.create(
+                createProposal(),
+                Position.create("백엔드 개발자"),
+                "백엔드 개발자",
+                ProposalWorkType.HYBRID,
+                1L,
+                1_000_000L,
+                2_000_000L,
+                12L,
+                -1,
+                3,
+                "판교"
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("최소 경력 연차는 음수일 수 없습니다.");
+    }
+
+    @DisplayName("최소 경력 연차는 최대 경력 연차보다 클 수 없다")
+    @Test
+    void failWhenCareerRangeIsInvalid() {
+        assertThatThrownBy(() -> ProposalPosition.create(
+                createProposal(),
+                Position.create("백엔드 개발자"),
+                "백엔드 개발자",
+                ProposalWorkType.HYBRID,
+                1L,
+                1_000_000L,
+                2_000_000L,
+                12L,
+                5,
+                3,
+                "판교"
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("최소 경력 연차는 최대 경력 연차보다 클 수 없습니다.");
+    }
+
+    @DisplayName("원격 근무이면 근무지는 비워야 한다")
+    @Test
+    void failWhenRemoteHasWorkPlace() {
+        assertThatThrownBy(() -> ProposalPosition.create(
+                createProposal(),
+                Position.create("백엔드 개발자"),
+                "백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                1_000_000L,
+                2_000_000L,
+                12L,
+                1,
+                3,
+                "판교"
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("원격 근무이면 근무지는 비워야 합니다.");
+    }
+
     @DisplayName("유효한 입력이면 모집 단위를 수정한다")
     @Test
     void updateProposalPosition() {
@@ -107,6 +222,76 @@ class ProposalPositionTest {
         assertThat(proposalPosition.getUnitBudgetMin()).isEqualTo(4_000_000L);
         assertThat(proposalPosition.getUnitBudgetMax()).isEqualTo(6_000_000L);
         assertThat(proposalPosition.getStatus()).isEqualTo(ProposalPositionStatus.OPEN);
+    }
+
+    @DisplayName("상세 필드와 함께 모집 단위를 수정할 수 있다")
+    @Test
+    void updateProposalPositionWithDetailFields() {
+        ProposalPosition proposalPosition = ProposalPosition.create(
+                createProposal(),
+                Position.create("백엔드 개발자"),
+                "백엔드 개발자",
+                ProposalWorkType.SITE,
+                1L,
+                2_000_000L,
+                3_000_000L,
+                8L,
+                2,
+                5,
+                "강남"
+        );
+        Position updatedPosition = Position.create("프론트엔드 개발자");
+
+        proposalPosition.update(
+                updatedPosition,
+                "React 프론트엔드 개발자",
+                ProposalWorkType.REMOTE,
+                3L,
+                4_000_000L,
+                6_000_000L,
+                16L,
+                4,
+                8,
+                null
+        );
+
+        assertThat(proposalPosition.getPosition()).isEqualTo(updatedPosition);
+        assertThat(proposalPosition.getTitle()).isEqualTo("React 프론트엔드 개발자");
+        assertThat(proposalPosition.getWorkType()).isEqualTo(ProposalWorkType.REMOTE);
+        assertThat(proposalPosition.getHeadCount()).isEqualTo(3L);
+        assertThat(proposalPosition.getUnitBudgetMin()).isEqualTo(4_000_000L);
+        assertThat(proposalPosition.getUnitBudgetMax()).isEqualTo(6_000_000L);
+        assertThat(proposalPosition.getExpectedPeriod()).isEqualTo(16L);
+        assertThat(proposalPosition.getCareerMinYears()).isEqualTo(4);
+        assertThat(proposalPosition.getCareerMaxYears()).isEqualTo(8);
+        assertThat(proposalPosition.getWorkPlace()).isNull();
+    }
+
+    @DisplayName("기존 update 시그니처를 써도 새 상세 필드는 유지된다")
+    @Test
+    void updateWithLegacySignaturePreservesDetailFields() {
+        ProposalPosition proposalPosition = ProposalPosition.create(
+                createProposal(),
+                Position.create("백엔드 개발자"),
+                "Node.js 백엔드 개발자",
+                ProposalWorkType.HYBRID,
+                1L,
+                2_000_000L,
+                3_000_000L,
+                10L,
+                3,
+                6,
+                "판교"
+        );
+
+        proposalPosition.update(Position.create("서버 개발자"), 2L, 4_000_000L, 5_000_000L);
+
+        assertThat(proposalPosition.getTitle()).isEqualTo("Node.js 백엔드 개발자");
+        assertThat(proposalPosition.getWorkType()).isEqualTo(ProposalWorkType.HYBRID);
+        assertThat(proposalPosition.getExpectedPeriod()).isEqualTo(10L);
+        assertThat(proposalPosition.getCareerMinYears()).isEqualTo(3);
+        assertThat(proposalPosition.getCareerMaxYears()).isEqualTo(6);
+        assertThat(proposalPosition.getWorkPlace()).isEqualTo("판교");
     }
 
     @DisplayName("같은 제안서 안에 이미 존재하는 직무로 모집 단위를 수정할 수 없다")

@@ -235,6 +235,33 @@ class ProposalTest {
         assertThat(proposalPosition.getProposal()).isNull();
     }
 
+    @DisplayName("제안서에 상세 필드를 포함한 모집 단위를 추가할 수 있다")
+    @Test
+    void addPositionWithDetailFields() {
+        Proposal proposal = createProposal("원본 입력");
+
+        ProposalPosition proposalPosition = proposal.addPosition(
+                Position.create("백엔드 개발자"),
+                "Node.js 백엔드 개발자",
+                ProposalWorkType.HYBRID,
+                2L,
+                3_000_000L,
+                5_000_000L,
+                12L,
+                3,
+                7,
+                "판교"
+        );
+
+        assertThat(proposal.getPositions()).containsExactly(proposalPosition);
+        assertThat(proposalPosition.getTitle()).isEqualTo("Node.js 백엔드 개발자");
+        assertThat(proposalPosition.getWorkType()).isEqualTo(ProposalWorkType.HYBRID);
+        assertThat(proposalPosition.getExpectedPeriod()).isEqualTo(12L);
+        assertThat(proposalPosition.getCareerMinYears()).isEqualTo(3);
+        assertThat(proposalPosition.getCareerMaxYears()).isEqualTo(7);
+        assertThat(proposalPosition.getWorkPlace()).isEqualTo("판교");
+    }
+
     @DisplayName("같은 직무 마스터를 같은 제안서 안에 중복 등록할 수 없다")
     @Test
     void failWhenPositionMasterIsDuplicatedWithinProposal() {

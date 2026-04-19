@@ -26,6 +26,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 
 @Entity
 @Table(
@@ -53,6 +54,12 @@ public class ProposalPosition extends BaseEntity {
     @JoinColumn(name = "position_id", nullable = false)
     private Position position;
 
+    @Column(length = 200)
+    private String title;
+
+    @Enumerated(EnumType.STRING)
+    private ProposalWorkType workType;
+
     private Long headCount;
 
     @Enumerated(EnumType.STRING)
@@ -63,49 +70,127 @@ public class ProposalPosition extends BaseEntity {
 
     private Long unitBudgetMax;
 
+    private Long expectedPeriod;
+
+    private Integer careerMinYears;
+
+    private Integer careerMaxYears;
+
+    @Column(length = 255)
+    private String workPlace;
+
     @OneToMany(mappedBy = "proposalPosition", fetch = FetchType.LAZY, cascade = CascadeType.ALL,
             orphanRemoval = true)
     @OrderBy("id ASC")
     private final List<ProposalPositionSkill> skills = new ArrayList<>();
 
     @Builder(access = AccessLevel.PRIVATE)
-    private ProposalPosition(Proposal proposal, Position position, Long headCount, ProposalPositionStatus status,
-            Long unitBudgetMin, Long unitBudgetMax) {
+    private ProposalPosition(
+            Proposal proposal,
+            Position position,
+            String title,
+            ProposalWorkType workType,
+            Long headCount,
+            ProposalPositionStatus status,
+            Long unitBudgetMin,
+            Long unitBudgetMax,
+            Long expectedPeriod,
+            Integer careerMinYears,
+            Integer careerMaxYears,
+            String workPlace
+    ) {
         Assert.notNull(proposal, "상위 제안서는 필수값입니다.");
         Assert.notNull(position, "직무는 필수값입니다.");
         validateHeadCount(headCount);
         validateBudgetRange(unitBudgetMin, unitBudgetMax);
+        validateExpectedPeriod(expectedPeriod);
+        validateCareerRange(careerMinYears, careerMaxYears);
+        validateWorkPlace(workType, workPlace);
 
         this.proposal = proposal;
         this.position = position;
+        this.title = normalizeOptionalShortText(title);
+        this.workType = workType;
         this.headCount = headCount;
         this.status = status == null ? ProposalPositionStatus.OPEN : status;
         this.unitBudgetMin = unitBudgetMin;
         this.unitBudgetMax = unitBudgetMax;
+        this.expectedPeriod = expectedPeriod;
+        this.careerMinYears = careerMinYears;
+        this.careerMaxYears = careerMaxYears;
+        this.workPlace = normalizeOptionalShortText(workPlace);
     }
 
     public static ProposalPosition create(Proposal proposal, Position position, Long headCount,
             Long unitBudgetMin, Long unitBudgetMax) {
+        return create(proposal, position, null, null, headCount, unitBudgetMin, unitBudgetMax, null, null, null,
+                null);
+    }
+
+    public static ProposalPosition create(
+            Proposal proposal,
+            Position position,
+            String title,
+            ProposalWorkType workType,
+            Long headCount,
+            Long unitBudgetMin,
+            Long unitBudgetMax,
+            Long expectedPeriod,
+            Integer careerMinYears,
+            Integer careerMaxYears,
+            String workPlace
+    ) {
         return ProposalPosition.builder()
                 .proposal(proposal)
                 .position(position)
+                .title(title)
+                .workType(workType)
                 .headCount(headCount)
                 .status(ProposalPositionStatus.OPEN)
                 .unitBudgetMin(unitBudgetMin)
                 .unitBudgetMax(unitBudgetMax)
+                .expectedPeriod(expectedPeriod)
+                .careerMinYears(careerMinYears)
+                .careerMaxYears(careerMaxYears)
+                .workPlace(workPlace)
                 .build();
     }
 
     public void update(Position position, Long headCount, Long unitBudgetMin, Long unitBudgetMax) {
+        update(position, this.title, this.workType, headCount, unitBudgetMin, unitBudgetMax, this.expectedPeriod,
+                this.careerMinYears, this.careerMaxYears, this.workPlace);
+    }
+
+    public void update(
+            Position position,
+            String title,
+            ProposalWorkType workType,
+            Long headCount,
+            Long unitBudgetMin,
+            Long unitBudgetMax,
+            Long expectedPeriod,
+            Integer careerMinYears,
+            Integer careerMaxYears,
+            String workPlace
+    ) {
         Assert.notNull(position, "직무는 필수값입니다.");
         validateHeadCount(headCount);
         validateBudgetRange(unitBudgetMin, unitBudgetMax);
+        validateExpectedPeriod(expectedPeriod);
+        validateCareerRange(careerMinYears, careerMaxYears);
+        validateWorkPlace(workType, workPlace);
         this.proposal.validatePositionChange(this, position);
 
         this.position = position;
+        this.title = normalizeOptionalShortText(title);
+        this.workType = workType;
         this.headCount = headCount;
         this.unitBudgetMin = unitBudgetMin;
         this.unitBudgetMax = unitBudgetMax;
+        this.expectedPeriod = expectedPeriod;
+        this.careerMinYears = careerMinYears;
+        this.careerMaxYears = careerMaxYears;
+        this.workPlace = normalizeOptionalShortText(workPlace);
     }
 
     public void changeStatus(ProposalPositionStatus status) {
@@ -173,5 +258,33 @@ public class ProposalPosition extends BaseEntity {
         if (budgetMin != null && budgetMax != null) {
             Assert.isTrue(budgetMin <= budgetMax, "1인 기준 최소 예산은 최대 예산보다 클 수 없습니다.");
         }
+    }
+
+    private static void validateExpectedPeriod(Long expectedPeriod) {
+        if (expectedPeriod != null) {
+            Assert.isTrue(expectedPeriod > 0, "포지션 예상 기간은 양수여야 합니다.");
+        }
+    }
+
+    private static void validateCareerRange(Integer careerMinYears, Integer careerMaxYears) {
+        if (careerMinYears != null) {
+            Assert.isTrue(careerMinYears >= 0, "최소 경력 연차는 음수일 수 없습니다.");
+        }
+        if (careerMaxYears != null) {
+            Assert.isTrue(careerMaxYears >= 0, "최대 경력 연차는 음수일 수 없습니다.");
+        }
+        if (careerMinYears != null && careerMaxYears != null) {
+            Assert.isTrue(careerMinYears <= careerMaxYears, "최소 경력 연차는 최대 경력 연차보다 클 수 없습니다.");
+        }
+    }
+
+    private static void validateWorkPlace(ProposalWorkType workType, String workPlace) {
+        if (workType == ProposalWorkType.REMOTE) {
+            Assert.isTrue(!StringUtils.hasText(workPlace), "원격 근무이면 근무지는 비워야 합니다.");
+        }
+    }
+
+    private static String normalizeOptionalShortText(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
     }
 }
