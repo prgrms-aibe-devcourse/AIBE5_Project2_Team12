@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -19,6 +20,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.generic4.itda.annotation.ControllerTest;
 import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
+import com.generic4.itda.domain.proposal.ProposalStatus;
 import com.generic4.itda.dto.proposal.ProposalForm;
 import com.generic4.itda.dto.security.ItDaPrincipal;
 import com.generic4.itda.repository.MemberRepository;
@@ -171,13 +173,20 @@ class ProposalControllerTest {
     }
 
     @Test
-    @DisplayName("거절/취소 이력만 있는 MATCHING 제안서는 새 초안으로 복제한 뒤 편집 화면으로 이동한다")
-    void redirectToClonedDraftWhenEditRequiresCopy() throws Exception {
-        Proposal copied = org.mockito.Mockito.mock(Proposal.class);
-        given(copied.getId()).willReturn(7L);
+    @DisplayName("작성 중인 제안서는 GET /edit 에서 바로 편집기를 렌더링한다")
+    void renderEditFormWhenProposalIsWriting() throws Exception {
+        Proposal proposal = Proposal.create(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678"),
+                "기존 프로젝트",
+                "",
+                "설명",
+                null,
+                null,
+                6L
+        );
         given(positionRepository.findAll(any(Sort.class)))
                 .willReturn(List.of(Position.create("백엔드 개발자")));
-        given(proposalService.prepareForEdit(1L, "client@example.com")).willReturn(copied);
+        given(proposalService.findOwnedProposal(1L, "client@example.com")).willReturn(proposal);
 
         ItDaPrincipal principal = ItDaPrincipal.from(
                 createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
@@ -189,15 +198,77 @@ class ProposalControllerTest {
                                 null,
                                 List.of(new SimpleGrantedAuthority("ROLE_USER"))
                         ))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("client/proposalForm"))
+                .andExpect(model().attributeExists("proposalForm"))
+                .andExpect(model().attribute("isNew", false));
+    }
+
+    @Test
+    @DisplayName("MATCHING 제안서는 GET /edit 에서 수정 시작 안내 화면을 보여준다")
+    void renderEditStartWhenMatchingProposalNeedsDraft() throws Exception {
+        Proposal proposal = Proposal.create(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678"),
+                "기존 프로젝트",
+                "",
+                "설명",
+                3_000_000L,
+                4_000_000L,
+                8L
+        );
+        proposal.startMatching();
+
+        given(proposalService.findOwnedProposal(1L, "client@example.com")).willReturn(proposal);
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(get("/proposals/1/edit")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("client/proposalEditStart"))
+                .andExpect(model().attributeExists("proposal"))
+                .andExpect(model().attribute("proposalId", 1L));
+
+        then(proposalService).should().validateCanCreateEditDraft(1L, "client@example.com");
+    }
+
+    @Test
+    @DisplayName("수정 시작 POST는 새 draft를 만든 뒤 그 draft의 edit 화면으로 이동한다")
+    void redirectToClonedDraftAfterCreateEditDraft() throws Exception {
+        Proposal copied = org.mockito.Mockito.mock(Proposal.class);
+        given(copied.getId()).willReturn(7L);
+        given(proposalService.createEditDraft(1L, "client@example.com")).willReturn(copied);
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(post("/proposals/1/edit-draft")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        )))
+                        .with(csrf()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/proposals/7/edit"));
     }
 
     @Test
-    @DisplayName("진행 중 또는 완료된 매칭 이력이 있으면 수정 화면 대신 대시보드로 이동한다")
+    @DisplayName("진행 중 또는 완료된 매칭 이력이 있으면 수정 시작 화면 대신 대시보드로 이동한다")
     void redirectDashboardWhenEditBlocked() throws Exception {
-        given(proposalService.prepareForEdit(1L, "client@example.com"))
-                .willThrow(new IllegalStateException("진행 중이거나 완료된 매칭이 있는 제안서는 수정할 수 없습니다."));
+        Proposal proposal = org.mockito.Mockito.mock(Proposal.class);
+        given(proposal.getStatus()).willReturn(ProposalStatus.MATCHING);
+        given(proposalService.findOwnedProposal(1L, "client@example.com")).willReturn(proposal);
+        willThrow(new IllegalStateException("진행 중이거나 완료된 매칭이 있는 제안서는 수정할 수 없습니다."))
+                .given(proposalService)
+                .validateCanCreateEditDraft(1L, "client@example.com");
 
         ItDaPrincipal principal = ItDaPrincipal.from(
                 createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")

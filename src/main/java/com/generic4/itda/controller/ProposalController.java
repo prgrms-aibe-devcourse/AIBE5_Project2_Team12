@@ -1,6 +1,7 @@
 package com.generic4.itda.controller;
 
 import com.generic4.itda.domain.proposal.Proposal;
+import com.generic4.itda.domain.proposal.ProposalStatus;
 import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.dto.proposal.ProposalForm;
 import com.generic4.itda.dto.proposal.ProposalPositionForm;
@@ -95,28 +96,53 @@ public class ProposalController {
             Model model,
             RedirectAttributes redirectAttributes
     ) {
-        Proposal proposal;
         try {
-            proposal = proposalService.prepareForEdit(proposalId, principal.getEmail());
+            Proposal proposal = proposalService.findOwnedProposal(proposalId, principal.getEmail());
+
+            if (proposal.getStatus() == ProposalStatus.MATCHING) {
+                proposalService.validateCanCreateEditDraft(proposalId, principal.getEmail());
+                addMemberAttributes(model, principal);
+                model.addAttribute("proposal", proposal);
+                model.addAttribute("proposalId", proposalId);
+                return "client/proposalEditStart";
+            }
+
+            if (proposal.getStatus() == ProposalStatus.COMPLETE) {
+                redirectAttributes.addFlashAttribute("errorMessage", "종료된 제안서는 수정할 수 없습니다.");
+                return "redirect:/client/dashboard";
+            }
+
+            ProposalForm form = ProposalForm.from(proposal);
+
+            addCommonAttributes(model);
+            addMemberAttributes(model, principal);
+            model.addAttribute("proposalForm", form);
+            model.addAttribute("proposalId", proposalId);
+            model.addAttribute("isNew", false);
+
+            return "client/proposalForm";
         } catch (IllegalStateException e) {
             redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
             return "redirect:/client/dashboard";
         }
+    }
 
-        if (!proposal.getId().equals(proposalId)) {
-            redirectAttributes.addFlashAttribute("noticeMessage", "기존 매칭 이력을 보존하기 위해 새 초안으로 이동했습니다.");
+    @PostMapping("/{proposalId}/edit-draft")
+    public String createEditDraft(
+            @PathVariable Long proposalId,
+            @AuthenticationPrincipal ItDaPrincipal principal,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            Proposal proposal = proposalService.createEditDraft(proposalId, principal.getEmail());
+            if (!proposal.getId().equals(proposalId)) {
+                redirectAttributes.addFlashAttribute("noticeMessage", "기존 매칭 이력을 보존하기 위해 새 초안으로 이동했습니다.");
+            }
             return "redirect:/proposals/" + proposal.getId() + "/edit";
+        } catch (IllegalStateException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
+            return "redirect:/client/dashboard";
         }
-
-        ProposalForm form = ProposalForm.from(proposal);
-
-        addCommonAttributes(model);
-        addMemberAttributes(model, principal);
-        model.addAttribute("proposalForm", form);
-        model.addAttribute("proposalId", proposalId);
-        model.addAttribute("isNew", false);
-
-        return "client/proposalForm";
     }
 
     @PostMapping("/{proposalId}/edit")
@@ -126,8 +152,7 @@ public class ProposalController {
             @Valid @ModelAttribute("proposalForm") ProposalForm form,
             BindingResult bindingResult,
             @RequestParam(name = "submitAction", defaultValue = SAVE_ACTION) String submitAction,
-            Model model,
-            RedirectAttributes redirectAttributes
+            Model model
     ) {
         boolean registerAction = isRegisterAction(submitAction);
         sanitizeForSubmit(form);
@@ -145,10 +170,6 @@ public class ProposalController {
             Proposal proposal = registerAction
                     ? proposalService.register(proposalId, principal.getEmail(), form)
                     : proposalService.saveDraft(proposalId, principal.getEmail(), form);
-
-            if (!proposal.getId().equals(proposalId)) {
-                redirectAttributes.addFlashAttribute("noticeMessage", "기존 매칭 이력을 보존하기 위해 새 초안으로 저장했습니다.");
-            }
 
             return registerAction
                     ? "redirect:/proposals/" + proposal.getId() + "/recommendations"

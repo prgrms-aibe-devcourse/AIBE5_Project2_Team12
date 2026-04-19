@@ -15,8 +15,6 @@ import com.generic4.itda.repository.MatchingRepository;
 import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.PositionRepository;
 import com.generic4.itda.repository.ProposalRepository;
-import com.generic4.itda.repository.RecommendationResultRepository;
-import com.generic4.itda.repository.RecommendationRunRepository;
 import com.generic4.itda.repository.SkillRepository;
 import java.util.EnumSet;
 import java.util.ArrayList;
@@ -46,8 +44,6 @@ public class ProposalService {
     private final PositionRepository positionRepository;
     private final SkillRepository skillRepository;
     private final MatchingRepository matchingRepository;
-    private final RecommendationRunRepository recommendationRunRepository;
-    private final RecommendationResultRepository recommendationResultRepository;
 
     public Proposal saveDraft(String memberEmail, ProposalForm form) {
         Member member = getMemberByEmail(memberEmail);
@@ -73,13 +69,24 @@ public class ProposalService {
         return proposal;
     }
 
-    public Proposal prepareForEdit(Long proposalId, String memberEmail) {
+    public Proposal createEditDraft(Long proposalId, String memberEmail) {
         Proposal proposal = getOwnedProposal(proposalId, memberEmail);
-        return resolveEditableProposal(proposal);
+        validateCanCreateEditDraft(proposalId, proposal);
+
+        if (proposal.getStatus() == ProposalStatus.WRITING) {
+            return proposal;
+        }
+
+        return cloneAsDraft(proposalId, proposal.getMember());
+    }
+
+    public void validateCanCreateEditDraft(Long proposalId, String memberEmail) {
+        Proposal proposal = getOwnedProposal(proposalId, memberEmail);
+        validateCanCreateEditDraft(proposalId, proposal);
     }
 
     public Proposal saveDraft(Long proposalId, String memberEmail, ProposalForm form) {
-        Proposal proposal = resolveEditableProposal(getOwnedProposal(proposalId, memberEmail));
+        Proposal proposal = getWritableProposal(proposalId, memberEmail);
         List<ProposalPositionForm> positionForms = getPositionForms(form);
 
         proposal.update(
@@ -96,7 +103,7 @@ public class ProposalService {
     }
 
     public Proposal register(Long proposalId, String memberEmail, ProposalForm form) {
-        Proposal proposal = resolveEditableProposal(getOwnedProposal(proposalId, memberEmail));
+        Proposal proposal = getWritableProposal(proposalId, memberEmail);
         List<ProposalPositionForm> positionForms = getPositionForms(form);
 
         proposal.update(
@@ -126,27 +133,6 @@ public class ProposalService {
 
     public Long calculateTotalBudgetMax(ProposalForm form) {
         return calculateTotalBudgetMax(getPositionForms(form));
-    }
-
-    private Proposal resolveEditableProposal(Proposal proposal) {
-        validateEditable(proposal);
-
-        if (proposal.getStatus() != ProposalStatus.MATCHING) {
-            return proposal;
-        }
-
-        Long proposalId = proposal.getId();
-        if (!matchingRepository.existsByProposalPosition_Proposal_Id(proposalId)) {
-            clearRecommendationHistory(proposalId);
-            proposal.revertToWriting();
-            return proposal;
-        }
-
-        if (matchingRepository.existsByProposalPosition_Proposal_IdAndStatusIn(proposalId, BLOCKING_MATCHING_STATUSES)) {
-            throw new IllegalStateException("진행 중이거나 완료된 매칭이 있는 제안서는 수정할 수 없습니다.");
-        }
-
-        return cloneAsDraft(proposalId, proposal.getMember());
     }
 
     private void replacePositions(Proposal proposal, List<ProposalPositionForm> positionForms) {
@@ -226,15 +212,6 @@ public class ProposalService {
         return sum;
     }
 
-    private void clearRecommendationHistory(Long proposalId) {
-        if (!recommendationRunRepository.existsByProposalPosition_Proposal_Id(proposalId)) {
-            return;
-        }
-
-        recommendationResultRepository.deleteAllByRecommendationRun_ProposalPosition_Proposal_Id(proposalId);
-        recommendationRunRepository.deleteAllByProposalPosition_Proposal_Id(proposalId);
-    }
-
     private Proposal cloneAsDraft(Long proposalId, Member member) {
         Proposal source = proposalRepository.findWithPositionsById(proposalId)
                 .orElseThrow(() -> new ProposalNotFoundException("제안서를 찾을 수 없습니다. id=" + proposalId));
@@ -284,9 +261,33 @@ public class ProposalService {
         return member;
     }
 
-    private void validateEditable(Proposal proposal) {
+    private Proposal getWritableProposal(Long proposalId, String memberEmail) {
+        Proposal proposal = getOwnedProposal(proposalId, memberEmail);
+        validateWritable(proposal);
+        return proposal;
+    }
+
+    private void validateCanCreateEditDraft(Long proposalId, Proposal proposal) {
         if (proposal.getStatus() == ProposalStatus.COMPLETE) {
             throw new IllegalStateException("종료된 제안서는 수정할 수 없습니다.");
+        }
+
+        if (proposal.getStatus() != ProposalStatus.MATCHING) {
+            return;
+        }
+
+        if (matchingRepository.existsByProposalPosition_Proposal_IdAndStatusIn(proposalId, BLOCKING_MATCHING_STATUSES)) {
+            throw new IllegalStateException("진행 중이거나 완료된 매칭이 있는 제안서는 수정할 수 없습니다.");
+        }
+    }
+
+    private void validateWritable(Proposal proposal) {
+        if (proposal.getStatus() == ProposalStatus.COMPLETE) {
+            throw new IllegalStateException("종료된 제안서는 수정할 수 없습니다.");
+        }
+
+        if (proposal.getStatus() != ProposalStatus.WRITING) {
+            throw new IllegalStateException("매칭 중 제안서는 원본을 직접 수정할 수 없습니다. 수정 시작을 통해 새 초안을 만든 뒤 편집해주세요.");
         }
     }
 
