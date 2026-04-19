@@ -45,7 +45,6 @@ public class RecommendationRunService {
         validatePositionStatus(proposalPosition);
 
         String fingerprint = fingerprintGenerator.generate(
-                proposal,
                 proposalPosition,
                 DEFAULT_ALGORITHM,
                 DEFAULT_TOP_K

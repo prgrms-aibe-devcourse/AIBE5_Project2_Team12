@@ -94,7 +94,6 @@ class RecommendationRunServiceIntegrationTest {
         Proposal persistedProposal = loadProposalDetail(proposalId);
         ProposalPosition persistedPosition = findPosition(persistedProposal, proposalPositionId);
         String expectedFingerprint = fingerprintGenerator.generate(
-                persistedProposal,
                 persistedPosition,
                 DEFAULT_ALGORITHM,
                 DEFAULT_TOP_K
@@ -142,14 +141,19 @@ class RecommendationRunServiceIntegrationTest {
         entityManager.flush();
         entityManager.clear();
 
-        Proposal editableProposal = proposalRepository.findById(proposalId).orElseThrow();
-        editableProposal.update(
-                "수정된 제목",
-                editableProposal.getRawInputText(),
-                editableProposal.getDescription(),
-                editableProposal.getTotalBudgetMin(),
-                editableProposal.getTotalBudgetMax(),
-                editableProposal.getExpectedPeriod()
+        Proposal editableProposal = loadProposalDetail(proposalId);
+        ProposalPosition editablePosition = findPosition(editableProposal, proposalPositionId);
+        editablePosition.update(
+                editablePosition.getPosition(),
+                editablePosition.getTitle(),
+                editablePosition.getWorkType(),
+                editablePosition.getHeadCount(),
+                editablePosition.getUnitBudgetMin(),
+                2_200_000L,
+                editablePosition.getExpectedPeriod(),
+                editablePosition.getCareerMinYears(),
+                editablePosition.getCareerMaxYears(),
+                editablePosition.getWorkPlace()
         );
         proposalRepository.saveAndFlush(editableProposal);
         entityManager.clear();

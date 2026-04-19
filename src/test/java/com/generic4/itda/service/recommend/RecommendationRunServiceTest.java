@@ -90,7 +90,7 @@ class RecommendationRunServiceTest {
 
         stubProposalDetailLoad(proposal);
         given(memberRepository.findByEmail_Value(OWNER_EMAIL)).willReturn(owner);
-        given(fingerprintGenerator.generate(proposal, selectedPosition, DEFAULT_ALGORITHM, DEFAULT_TOP_K))
+        given(fingerprintGenerator.generate(selectedPosition, DEFAULT_ALGORITHM, DEFAULT_TOP_K))
                 .willReturn(FINGERPRINT);
         given(recommendationRunRepository.findByProposalPosition_IdAndRequestFingerprintAndAlgorithm(
                 SELECTED_POSITION_ID,
@@ -108,7 +108,7 @@ class RecommendationRunServiceTest {
         inOrder.verify(proposalRepository).findWithPositionsById(PROPOSAL_ID);
         inOrder.verify(proposalRepository).findPositionsWithSkillsByProposalId(PROPOSAL_ID);
         inOrder.verify(memberRepository).findByEmail_Value(OWNER_EMAIL);
-        inOrder.verify(fingerprintGenerator).generate(proposal, selectedPosition, DEFAULT_ALGORITHM, DEFAULT_TOP_K);
+        inOrder.verify(fingerprintGenerator).generate(selectedPosition, DEFAULT_ALGORITHM, DEFAULT_TOP_K);
         inOrder.verify(recommendationRunRepository)
                 .findByProposalPosition_IdAndRequestFingerprintAndAlgorithm(
                         SELECTED_POSITION_ID,
@@ -130,7 +130,7 @@ class RecommendationRunServiceTest {
 
         stubProposalDetailLoad(proposal);
         given(memberRepository.findByEmail_Value(OWNER_EMAIL)).willReturn(owner);
-        given(fingerprintGenerator.generate(proposal, selectedPosition, DEFAULT_ALGORITHM, DEFAULT_TOP_K))
+        given(fingerprintGenerator.generate(selectedPosition, DEFAULT_ALGORITHM, DEFAULT_TOP_K))
                 .willReturn(FINGERPRINT);
         given(recommendationRunRepository.findByProposalPosition_IdAndRequestFingerprintAndAlgorithm(
                 SELECTED_POSITION_ID,
@@ -155,7 +155,7 @@ class RecommendationRunServiceTest {
         inOrder.verify(proposalRepository).findWithPositionsById(PROPOSAL_ID);
         inOrder.verify(proposalRepository).findPositionsWithSkillsByProposalId(PROPOSAL_ID);
         inOrder.verify(memberRepository).findByEmail_Value(OWNER_EMAIL);
-        inOrder.verify(fingerprintGenerator).generate(proposal, selectedPosition, DEFAULT_ALGORITHM, DEFAULT_TOP_K);
+        inOrder.verify(fingerprintGenerator).generate(selectedPosition, DEFAULT_ALGORITHM, DEFAULT_TOP_K);
         inOrder.verify(recommendationRunRepository)
                 .findByProposalPosition_IdAndRequestFingerprintAndAlgorithm(
                         SELECTED_POSITION_ID,

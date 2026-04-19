@@ -1,6 +1,5 @@
 package com.generic4.itda.service.recommend;
 
-import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
 import com.generic4.itda.domain.proposal.ProposalPositionSkill;
 import com.generic4.itda.domain.recommendation.constant.RecommendationAlgorithm;
@@ -15,7 +14,6 @@ import org.springframework.stereotype.Component;
 public class RecommendationFingerprintGenerator {
 
     public String generate(
-            Proposal proposal,
             ProposalPosition proposalPosition,
             RecommendationAlgorithm algorithm,
             int topK
@@ -27,27 +25,14 @@ public class RecommendationFingerprintGenerator {
                 .collect(Collectors.joining("|"));
 
         String raw = String.join("::",
-                "proposal.id=" + proposal.getId(),
-                "proposal.title=" + nullSafe(proposal.getTitle()),
-                "proposal.description=" + nullSafe(proposal.getDescription()),
-                "proposal.totalBudgetMin=" + proposal.getTotalBudgetMin(),
-                "proposal.totalBudgetMax=" + proposal.getTotalBudgetMax(),
-                "proposal.expectedPeriod=" + proposal.getExpectedPeriod(),
-                "proposal.status=" + proposal.getStatus().name(),
-
-                "proposalPosition.id=" + proposalPosition.getId(),
-                "proposalPosition.positionId=" + proposalPosition.getPosition().getId(),
-                "proposalPosition.positionName=" + proposalPosition.getPosition().getName(),
-                "proposalPosition.title=" + nullSafe(proposalPosition.getTitle()),
+                "proposalPosition.id=" + number(proposalPosition.getId()),
+                "proposalPosition.positionId=" + number(proposalPosition.getPosition().getId()),
                 "proposalPosition.workType=" + enumName(proposalPosition.getWorkType()),
-                "proposalPosition.headCount=" + proposalPosition.getHeadCount(),
-                "proposalPosition.status=" + proposalPosition.getStatus().name(),
-                "proposalPosition.unitBudgetMin=" + proposalPosition.getUnitBudgetMin(),
-                "proposalPosition.unitBudgetMax=" + proposalPosition.getUnitBudgetMax(),
-                "proposalPosition.expectedPeriod=" + proposalPosition.getExpectedPeriod(),
-                "proposalPosition.workPlace=" + nullSafe(proposalPosition.getWorkPlace()),
-                "proposalPosition.careerMinYears=" + proposalPosition.getCareerMinYears(),
-                "proposalPosition.careerMaxYears=" + proposalPosition.getCareerMaxYears(),
+                "proposalPosition.careerMinYears=" + number(proposalPosition.getCareerMinYears()),
+                "proposalPosition.careerMaxYears=" + number(proposalPosition.getCareerMaxYears()),
+
+                "proposalPosition.unitBudgetMin=" + number(proposalPosition.getUnitBudgetMin()),
+                "proposalPosition.unitBudgetMax=" + number(proposalPosition.getUnitBudgetMax()),
 
                 "proposalPosition.skills=" + skillPart,
 
@@ -63,8 +48,8 @@ public class RecommendationFingerprintGenerator {
                 + ":" + skill.getImportance().name();
     }
 
-    private String nullSafe(String value) {
-        return value == null ? "" : value;
+    private String number(Number value) {
+        return value == null ? "null" : String.valueOf(value);
     }
 
     private String enumName(Enum<?> value) {
