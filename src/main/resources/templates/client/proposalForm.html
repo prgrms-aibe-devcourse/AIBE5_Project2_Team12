@@ -31,6 +31,7 @@
             <input type="hidden" name="status" :value="status">
             <input type="hidden" name="rawInputText" :value="rawInputText">
             <input type="hidden" name="submitAction" :value="submitAction">
+            <input type="hidden" name="aiBriefRequested" :value="aiBriefRequested">
 
             <template x-for="(position, index) in positions" :key="position.clientKey">
                 <div>
@@ -71,7 +72,7 @@
                                 <p class="text-xs font-black uppercase tracking-widest text-slate-400">AI Proposal Interview</p>
                                 <h1 class="mt-2 text-2xl font-black tracking-tight text-slate-950">AI 제안서 작성 도우미</h1>
                                 <p class="mt-2 text-sm leading-7 text-slate-500">
-                                    프로젝트 아이디어를 먼저 정리해두면, 다음 단계에서 AI 인터뷰 흐름과 폼 자동 채움 기능을 연결할 수 있습니다.
+                                    프로젝트 아이디어를 먼저 적어주세요. AI가 내용을 분석해 제안서 초안을 만들고, 오른쪽 폼에 자동으로 반영합니다.
                                 </p>
                             </div>
 
@@ -79,24 +80,29 @@
                                 <div class="space-y-5">
                                     <div class="max-w-[92%] rounded-[24px] border border-slate-200 bg-slate-50 px-5 py-4 text-sm leading-7 text-slate-600">
                                         안녕하세요! 만들고 싶은 IT 서비스나 프로젝트를 자유롭게 적어주세요.
-                                        이 입력은 다음 단계에서 AI 브리프와 후속 질문의 기준이 됩니다.
+                                        전송하면 입력 내용을 저장하고 AI 브리프 생성 흐름을 시작합니다.
                                     </div>
 
                                     <template x-if="rawInputText.trim().length > 0">
                                         <div class="space-y-5">
-                                            <div class="ml-auto max-w-[88%] rounded-[24px] bg-slate-950 px-5 py-4 text-sm leading-7 text-white shadow-sm shadow-slate-900/10"
+                                            <div class="ml-auto max-w-[88%] whitespace-pre-line rounded-[24px] bg-slate-950 px-5 py-4 text-sm leading-7 text-white shadow-sm shadow-slate-900/10"
                                                  x-text="rawInputText"></div>
 
                                             <div class="max-w-[92%] rounded-[24px] border border-blue-100 bg-blue-50 px-5 py-4 text-sm leading-7 text-blue-700">
-                                                프로젝트 원본 입력을 확인했습니다. 실제 후속 질문과 제안서 자동 채움 로직은 다음 단계에서 연결할 예정입니다.
+                                                프로젝트 원본 입력을 확인했습니다. AI 브리프를 생성하면 오른쪽 폼이 갱신될 수 있습니다.
                                             </div>
                                         </div>
                                     </template>
 
                                     <template x-if="rawInputText.trim().length === 0">
                                         <div class="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-6 py-8 text-sm leading-7 text-slate-500">
-                                            아직 입력된 프로젝트 아이디어가 없습니다. 아래 입력창에 원하는 서비스를 적어두면, 이후 AI 인터뷰 단계에서 이 내용을 바탕으로 질문을 이어갑니다.
+                                            아직 입력된 프로젝트 아이디어가 없습니다. 아래 입력창에 원하는 서비스를 적어두면, AI가 제안서 초안을 만들기 위한 원본 입력으로 저장합니다.
                                         </div>
+                                    </template>
+
+                                    <template x-if="aiBriefNoticeMessage">
+                                        <div class="max-w-[92%] rounded-[24px] border border-amber-100 bg-amber-50 px-5 py-4 text-sm leading-7 text-amber-700"
+                                             x-text="aiBriefNoticeMessage"></div>
                                     </template>
                                 </div>
                             </div>
@@ -594,6 +600,7 @@
             status: /*[[${proposalForm.status != null ? proposalForm.status.name() : 'WRITING'}]]*/ 'WRITING',
             title: /*[[${proposalForm.title}]]*/ '',
             rawInputText: /*[[${proposalForm.rawInputText}]]*/ '',
+            aiBriefRequested: /*[[${aiBriefRequested}]]*/ false,
             description: /*[[${proposalForm.description}]]*/ '',
             expectedPeriod: /*[[${proposalForm.expectedPeriod}]]*/ null,
             workTypes: [
@@ -647,9 +654,11 @@
                 loaded: false,
                 chatOpen: true,
                 submitAction: 'save',
+                aiBriefRequested: Boolean(bootstrap.aiBriefRequested),
+                aiBriefNoticeMessage: '',
                 title: bootstrap.title || '',
                 rawInputText: bootstrap.rawInputText || '',
-                draftInput: bootstrap.rawInputText || '',
+                draftInput: '',
                 description: bootstrap.description || '',
                 expectedPeriod: bootstrap.expectedPeriod ?? '',
                 status: bootstrap.status || 'WRITING',
@@ -680,8 +689,39 @@
                     if (!this.draftInput || !this.draftInput.trim()) {
                         return;
                     }
-                    this.rawInputText = this.draftInput.trim();
+
+                    this.rawInputText = this.appendRawInput(this.rawInputText, this.draftInput);
+                    this.draftInput = '';
+                    this.aiBriefNoticeMessage = '프로젝트 원본 입력을 저장했습니다. 기존 입력값은 AI 결과로 갱신될 수 있습니다.';
+
+                    if (!this.title || !this.title.trim()) {
+                        this.title = 'AI 브리프 작성 중';
+                    }
+
+                    if (bootstrap.isNew) {
+                        this.aiBriefRequested = true;
+                        this.submitAction = 'save';
+                        this.$nextTick(() => {
+                            this.$root.requestSubmit();
+                        });
+                        return;
+                    }
+
                     this.refreshIcons();
+                },
+
+                appendRawInput(current, input) {
+                    const trimmed = (input || '').trim();
+                    if (!trimmed) {
+                        return current || '';
+                    }
+
+                    const line = `- ${trimmed}`;
+                    if (!current || !current.trim()) {
+                        return line;
+                    }
+
+                    return `${current.trim()}\n${line}`;
                 },
 
                 openAddPosition() {
@@ -760,6 +800,7 @@
 
                 submitProposal(action) {
                     this.submitAction = action;
+                    this.aiBriefRequested = false;
                     this.$nextTick(() => {
                         this.$root.requestSubmit();
                     });
@@ -846,7 +887,7 @@
                         errors.push('모집 인원은 1명 이상이어야 합니다.');
                     }
                     if ((position.workType === 'SITE' || position.workType === 'HYBRID')
-                            && (!position.workPlace || !position.workPlace.trim())) {
+                        && (!position.workPlace || !position.workPlace.trim())) {
                         errors.push('상주 또는 하이브리드 근무 포지션은 근무지를 입력해야 합니다.');
                     }
                     if (position.workType === 'REMOTE' && position.workPlace && position.workPlace.trim()) {
