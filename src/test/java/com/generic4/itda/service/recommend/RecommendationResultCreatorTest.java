@@ -229,7 +229,7 @@ class RecommendationResultCreatorTest {
 
             // then
             List<String> highlights = results.get(0).getReasonFacts().highlights();
-            assertThat(highlights).contains("공토 스킬 2개 보유");
+            assertThat(highlights).contains("공통 스킬 2개 보유");
             assertThat(highlights).contains("관련 경력 5년");
             assertThat(highlights).contains("요구 조건과 높은 유사도");
         }
@@ -257,7 +257,7 @@ class RecommendationResultCreatorTest {
             ReasonFacts facts = results.get(0).getReasonFacts();
             assertThat(facts.matchedSkills()).isEmpty();
             assertThat(facts.highlights()).doesNotContainAnyElementsOf(
-                    List.of("공토 스킬 2개 보유")
+                    List.of("공통 스킬 2개 보유")
             );
         }
     }
