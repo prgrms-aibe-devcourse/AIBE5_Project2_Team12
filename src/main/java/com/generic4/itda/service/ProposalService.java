@@ -16,6 +16,7 @@ import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.PositionRepository;
 import com.generic4.itda.repository.ProposalRepository;
 import com.generic4.itda.repository.SkillRepository;
+import jakarta.persistence.EntityManager;
 import java.util.EnumSet;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -44,6 +45,7 @@ public class ProposalService {
     private final PositionRepository positionRepository;
     private final SkillRepository skillRepository;
     private final MatchingRepository matchingRepository;
+    private final EntityManager entityManager;
 
     public Proposal saveDraft(String memberEmail, ProposalForm form) {
         Member member = getMemberByEmail(memberEmail);
@@ -129,7 +131,17 @@ public class ProposalService {
 
     @Transactional(readOnly = true)
     public Proposal findOwnedProposal(Long proposalId, String memberEmail) {
-        return getOwnedProposal(proposalId, memberEmail);
+        Proposal proposal = proposalRepository.findWithPositionsById(proposalId)
+                .orElseThrow(() -> new ProposalNotFoundException("제안서를 찾을 수 없습니다. id=" + proposalId));
+
+        if (!proposal.getMember().getEmail().getValue().equals(memberEmail)) {
+            throw new AccessDeniedException("본인 제안서만 조회하거나 수정할 수 있습니다.");
+        }
+
+        // ProposalPosition.skills도 1차 캐시에 로드 (LazyInitializationException 방지)
+        proposalRepository.findPositionsWithSkillsByProposalId(proposalId);
+
+        return proposal;
     }
 
     public Long calculateTotalBudgetMin(ProposalForm form) {
@@ -145,6 +157,10 @@ public class ProposalService {
         for (ProposalPosition existingPosition : existingPositions) {
             proposal.removePosition(existingPosition);
         }
+
+        // DELETE가 INSERT보다 먼저 실행되도록 강제 flush
+        // (미실행 시 unique constraint 위반 발생)
+        entityManager.flush();
 
         for (ProposalPositionForm positionForm : positionForms) {
             Position position = getPosition(positionForm.getPositionId());
