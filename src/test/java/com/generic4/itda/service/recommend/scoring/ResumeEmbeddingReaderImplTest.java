@@ -126,4 +126,27 @@ class ResumeEmbeddingReaderImplTest {
         assertThat(result).containsKey(1L);
         assertThat(result).doesNotContainKey(2L);
     }
+
+    @Test
+    @DisplayName("모델명 앞뒤 공백은 제거한 뒤 조회한다")
+    void 모델명_앞뒤_공백은_제거한_뒤_조회한다() {
+        List<Long> resumeIds = List.of(1L);
+        String inputModel = " text-embedding-3-small ";
+        String normalizedModel = "text-embedding-3-small";
+
+        Resume resume = mock(Resume.class);
+        given(resume.getId()).willReturn(1L);
+
+        ResumeEmbedding embedding = mock(ResumeEmbedding.class);
+        given(embedding.getResume()).willReturn(resume);
+        given(embedding.getEmbeddingVector()).willReturn(new EmbeddingVector(List.of(0.1, 0.2)));
+
+        given(resumeEmbeddingRepository.findAllByResume_IdInAndEmbeddingModel(resumeIds, normalizedModel))
+                .willReturn(List.of(embedding));
+
+        Map<Long, List<Double>> result =
+                resumeEmbeddingReader.readEmbeddingsByResumeIds(resumeIds, inputModel);
+
+        assertThat(result).containsEntry(1L, List.of(0.1, 0.2));
+    }
 }
