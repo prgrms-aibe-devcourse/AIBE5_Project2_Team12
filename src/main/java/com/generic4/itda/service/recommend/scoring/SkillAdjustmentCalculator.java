@@ -8,8 +8,10 @@ import org.springframework.stereotype.Component;
 @Component
 public class SkillAdjustmentCalculator {
 
+    private static final double REQUIRED_SKILL_NEUTRAL_MATCH_RATIO = 0.5;
+    private static final double REQUIRED_SKILL_ADJUSTMENT_WEIGHT = 0.3;
     private static final double REQUIRED_MAX_BONUS = 0.15;
-    private static final double REQUIRED_MIN_BONUS = -0.15;
+    private static final double REQUIRED_MIN_PENALTY = -0.15;
     private static final double PREFERRED_MAX_BONUS = 0.05;
 
     public double calculate(
@@ -27,14 +29,6 @@ public class SkillAdjustmentCalculator {
         return requiredAdjustment + preferredAdjustment;
     }
 
-    private Set<String> normalizePreferredSkills(Set<String> requiredSkillNames, Set<String> preferredSkillNames) {
-        Set<String> preferred = safeSet(preferredSkillNames);
-
-        return preferred.stream()
-                .filter(skillName -> !requiredSkillNames.contains(skillName))
-                .collect(Collectors.toUnmodifiableSet());
-    }
-
     private double calculateRequiredAdjustment(Set<String> requiredSkillNames, Set<String> ownedSkillNames) {
         if (requiredSkillNames.isEmpty()) {
             return 0.0;
@@ -45,13 +39,13 @@ public class SkillAdjustmentCalculator {
                 .count();
 
         double matchRatio = (double) matchedCount / requiredSkillNames.size();
-        double adjustment = (matchRatio - 0.5) * 0.3;
+        double adjustment = (matchRatio - REQUIRED_SKILL_NEUTRAL_MATCH_RATIO) * REQUIRED_SKILL_ADJUSTMENT_WEIGHT;
 
         if (adjustment > REQUIRED_MAX_BONUS) {
-            return REQUIRED_MIN_BONUS;
-        }
-        if (adjustment < REQUIRED_MIN_BONUS) {
             return REQUIRED_MAX_BONUS;
+        }
+        if (adjustment < REQUIRED_MIN_PENALTY) {
+            return REQUIRED_MIN_PENALTY;
         }
         return adjustment;
     }
@@ -71,5 +65,13 @@ public class SkillAdjustmentCalculator {
 
     private Set<String> safeSet(Set<String> skills) {
         return skills == null ? Collections.emptySet() : skills;
+    }
+
+    private Set<String> normalizePreferredSkills(Set<String> requiredSkillNames, Set<String> preferredSkillNames) {
+        Set<String> preferred = safeSet(preferredSkillNames);
+
+        return preferred.stream()
+                .filter(skillName -> !requiredSkillNames.contains(skillName))
+                .collect(Collectors.toUnmodifiableSet());
     }
 }
