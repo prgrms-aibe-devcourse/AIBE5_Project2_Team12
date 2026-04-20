@@ -32,4 +32,19 @@ public class ClientDashboardController {
 
         return "client/dashboard";
     }
+
+    /** AJAX 탭 전환 — listSection fragment만 반환 */
+    @GetMapping("/client/dashboard/items")
+    public String dashboardItems(
+            @AuthenticationPrincipal ItDaPrincipal principal,
+            @RequestParam(name = "filter", required = false) String filter,
+            Model model
+    ) {
+        ClientDashboardFilter selectedFilter = ClientDashboardFilter.from(filter);
+        ClientDashboardViewModel dashboard = clientDashboardService.getDashboard(principal.getEmail(), selectedFilter);
+
+        model.addAttribute("dashboard", dashboard);
+
+        return "client/dashboard :: #listSection";
+    }
 }
