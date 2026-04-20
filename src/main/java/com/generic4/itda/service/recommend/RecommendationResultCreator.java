@@ -84,7 +84,7 @@ public class RecommendationResultCreator {
 
     private Comparator<ScoredCandidate> resultComparator() {
         return Comparator.comparing(ScoredCandidate::finalScore).reversed()
-                .thenComparing(ScoredCandidate::candidateId);
+                .thenComparingLong(ScoredCandidate::resumeId);
     }
 
     private Map<Long, Resume> loadResumeMap(List<ScoredCandidate> topCandidates) {

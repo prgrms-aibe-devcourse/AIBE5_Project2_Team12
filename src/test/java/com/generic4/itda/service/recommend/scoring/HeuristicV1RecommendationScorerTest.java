@@ -59,8 +59,8 @@ class HeuristicV1RecommendationScorerTest {
     // 공통 헬퍼
     // -------------------------------------------------------------------------
 
-    private RecommendationScorableCandidate candidateWith(long candidateId, long memberId, long resumeId) {
-        return new RecommendationScorableCandidate(candidateId, memberId, resumeId, 3, Set.of("Java"));
+    private RecommendationScorableCandidate candidateWith(long resumeId) {
+        return new RecommendationScorableCandidate(resumeId, 3, Set.of("Java"));
     }
 
     private List<Double> dummyQueryEmbedding() {
@@ -98,7 +98,7 @@ class HeuristicV1RecommendationScorerTest {
     @DisplayName("이력서 임베딩이 없는 후보는 결과에서 제외된다")
     void score_ExcludesCandidate_WhenResumeEmbeddingIsMissing() {
         // given
-        RecommendationScorableCandidate candidate = candidateWith(1L, 10L, 100L);
+        RecommendationScorableCandidate candidate = candidateWith(100L);
 
         given(recommendationQueryTextGenerator.generate(any(), any(), any(), any()))
                 .willReturn("query text");
@@ -124,8 +124,8 @@ class HeuristicV1RecommendationScorerTest {
     @DisplayName("최종 점수(finalScore) 내림차순으로 정렬한다")
     void score_ReturnsCandidatesSortedByFinalScoreDescending() {
         // given
-        RecommendationScorableCandidate candidateA = candidateWith(1L, 10L, 100L);
-        RecommendationScorableCandidate candidateB = candidateWith(2L, 20L, 200L);
+        RecommendationScorableCandidate candidateA = candidateWith(100L);
+        RecommendationScorableCandidate candidateB = candidateWith(200L);
 
         List<Double> queryEmbedding = dummyQueryEmbedding();
         List<Double> embeddingA = List.of(1.0, 0.0);
@@ -166,7 +166,7 @@ class HeuristicV1RecommendationScorerTest {
     @DisplayName("raw cosine -1.0은 embeddingScore 0.0으로 정규화된다")
     void score_NormalizesRawCosineMinusOne_ToZero() {
         // given
-        RecommendationScorableCandidate candidate = candidateWith(1L, 10L, 100L);
+        RecommendationScorableCandidate candidate = candidateWith(100L);
         List<Double> queryEmbedding = dummyQueryEmbedding();
         List<Double> resumeEmbedding = List.of(0.0, 1.0);
 
@@ -193,7 +193,7 @@ class HeuristicV1RecommendationScorerTest {
     @DisplayName("raw cosine 1.0은 embeddingScore 1.0으로 정규화된다")
     void score_NormalizesRawCosinePlusOne_ToOne() {
         // given
-        RecommendationScorableCandidate candidate = candidateWith(1L, 10L, 100L);
+        RecommendationScorableCandidate candidate = candidateWith(100L);
         List<Double> queryEmbedding = dummyQueryEmbedding();
         List<Double> resumeEmbedding = List.of(1.0, 0.0);
 
@@ -224,7 +224,7 @@ class HeuristicV1RecommendationScorerTest {
     @DisplayName("embeddingScore와 보정치의 합이 1.0을 초과하면 finalScore는 1.0으로 clamp된다")
     void score_ClampsFinalScore_ToOneWhenSumExceedsOne() {
         // given — rawCosine(0.8) + skill(0.15) + career(0.08) = 1.03 → clamp 1.0
-        RecommendationScorableCandidate candidate = candidateWith(1L, 10L, 100L);
+        RecommendationScorableCandidate candidate = candidateWith(100L);
         List<Double> queryEmbedding = dummyQueryEmbedding();
         List<Double> resumeEmbedding = List.of(0.8, 0.2);
 
@@ -255,7 +255,7 @@ class HeuristicV1RecommendationScorerTest {
     @DisplayName("embeddingScore와 보정치의 합이 0.0 미만이면 finalScore는 0.0으로 clamp된다")
     void score_ClampsFinalScore_ToZeroWhenSumBelowZero() {
         // given — rawCosine(-0.8) + skill(-0.15) + career(-0.12) = -1.07 → clamp 0.0
-        RecommendationScorableCandidate candidate = candidateWith(1L, 10L, 100L);
+        RecommendationScorableCandidate candidate = candidateWith(100L);
         List<Double> queryEmbedding = dummyQueryEmbedding();
         List<Double> resumeEmbedding = List.of(-0.8, 0.2);
 
