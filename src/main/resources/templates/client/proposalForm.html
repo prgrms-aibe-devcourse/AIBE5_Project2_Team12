@@ -810,6 +810,8 @@
                     this.refreshIcons();
 
                     try {
+                        await this.saveCurrentDraftBeforeInterview();
+
                         const response = await fetch(`/proposals/${bootstrap.proposalId}/ai-interview/messages`, {
                             method: 'POST',
                             headers: {
@@ -833,6 +835,38 @@
                     } finally {
                         this.aiBriefLoading = false;
                         this.refreshIcons();
+                    }
+                },
+
+                async saveCurrentDraftBeforeInterview() {
+                    const formData = new FormData(this.$root);
+                    formData.set('submitAction', 'save');
+                    formData.set('aiBriefRequested', 'false');
+                    formData.set('title', this.title || '');
+                    formData.set('rawInputText', this.rawInputText || '');
+                    formData.set('description', this.description || '');
+                    formData.set('expectedPeriod', this.expectedPeriod || '');
+
+                    const response = await fetch(this.$root.getAttribute('action'), {
+                        method: 'POST',
+                        headers: {
+                            ...this.csrfHeaders(),
+                            'Accept': 'text/html'
+                        },
+                        body: formData,
+                        redirect: 'manual'
+                    });
+
+                    if (response.type === 'opaqueredirect' || response.status === 0) {
+                        return;
+                    }
+
+                    if (response.status >= 300 && response.status < 400) {
+                        return;
+                    }
+
+                    if (!response.ok) {
+                        throw new Error('AI 인터뷰 전 현재 제안서 내용을 임시저장하지 못했습니다. 입력값을 확인해주세요.');
                     }
                 },
 
