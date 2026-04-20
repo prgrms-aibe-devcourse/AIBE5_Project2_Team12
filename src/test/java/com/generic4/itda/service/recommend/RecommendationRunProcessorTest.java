@@ -4,23 +4,39 @@ import static com.generic4.itda.fixture.MemberFixture.createMember;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.BDDMockito.willThrow;
-import static org.mockito.Mockito.spy;
+import static org.mockito.BDDMockito.then;
 
 import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
+import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
+import com.generic4.itda.domain.recommendation.RecommendationResult;
 import com.generic4.itda.domain.recommendation.RecommendationRun;
 import com.generic4.itda.domain.recommendation.constant.RecommendationAlgorithm;
 import com.generic4.itda.domain.recommendation.constant.RecommendationRunStatus;
+import com.generic4.itda.domain.recommendation.vo.HardFilterStat;
+import com.generic4.itda.domain.resume.Proficiency;
+import com.generic4.itda.domain.resume.ResumeStatus;
+import com.generic4.itda.domain.skill.Skill;
+import com.generic4.itda.repository.RecommendationResultRepository;
 import com.generic4.itda.repository.RecommendationRunRepository;
+import com.generic4.itda.service.recommend.scoring.HeuristicV1RecommendationScorer;
+import com.generic4.itda.service.recommend.scoring.model.RecommendationScorableCandidate;
+import com.generic4.itda.service.recommend.scoring.model.ScoredCandidate;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -30,6 +46,18 @@ class RecommendationRunProcessorTest {
 
     @Mock
     private RecommendationRunRepository recommendationRunRepository;
+
+    @Mock
+    private RecommendationResultRepository recommendationResultRepository;
+
+    @Mock
+    private RecommendationCandidateFinder recommendationCandidateFinder;
+
+    @Mock
+    private HeuristicV1RecommendationScorer recommendationScorer;
+
+    @Mock
+    private RecommendationResultCreator recommendationResultCreator;
 
     @InjectMocks
     private RecommendationRunProcessor recommendationRunProcessor;
@@ -63,62 +91,162 @@ class RecommendationRunProcessorTest {
         }
 
         @Test
-        @DisplayName("RUNNING 상태의 run이면 예외없이 처리한다")
+        @DisplayName("RUNNING 상태의 run이면 예외 없이 처리하고 COMPUTED 상태가 된다")
         void RUNNING_상태의_run이면_예외_없이_처리한다() {
-            RecommendationRun run = createRun(true);
+            ProposalPosition proposalPosition = createProposalPositionWithSkills();
+            RecommendationRun run = createRun(proposalPosition, true);
+
+            List<RecommendationCandidate> candidates = List.of(
+                    createCandidate(101L, 3,
+                            createCandidateSkill(1L, "Java", Proficiency.ADVANCED),
+                            createCandidateSkill(3L, "Kotlin", Proficiency.INTERMEDIATE)),
+                    createCandidate(202L, 1,
+                            createCandidateSkill(2L, "Spring", Proficiency.BEGINNER))
+            );
+            List<ScoredCandidate> scoredCandidates = List.of();
+            List<RecommendationResult> results = List.of(org.mockito.Mockito.mock(RecommendationResult.class));
 
             given(recommendationRunRepository.findById(1L))
                     .willReturn(Optional.of(run));
+            given(recommendationCandidateFinder.findCandidates(run.getProposalPosition(), run.getTopK()))
+                    .willReturn(candidates);
+            given(recommendationScorer.score(
+                    any(),
+                    any(),
+                    anySet(),
+                    anySet(),
+                    anyList()
+            )).willReturn(scoredCandidates);
+            given(recommendationResultCreator.create(
+                    run,
+                    scoredCandidates,
+                    run.getTopK(),
+                    Set.of("Java")
+            )).willReturn(results);
 
             assertThatCode(() -> recommendationRunProcessor.process(1L))
                     .doesNotThrowAnyException();
+
+            assertThat(run.getStatus()).isEqualTo(RecommendationRunStatus.COMPUTED);
+            assertThat(run.getCandidateCount()).isEqualTo(1);
+            assertThat(run.getHardFilterStats()).isEqualTo(new HardFilterStat(2, 1));
+            then(recommendationScorer).should().score(
+                    proposalPosition.getProposal(),
+                    proposalPosition,
+                    Set.of("Java"),
+                    Set.of("Spring"),
+                    List.of(
+                            new RecommendationScorableCandidate(101L, 3, Set.of("Java", "Kotlin")),
+                            new RecommendationScorableCandidate(202L, 1, Set.of("Spring"))
+                    )
+            );
+            then(recommendationResultCreator).should().create(
+                    run,
+                    scoredCandidates,
+                    run.getTopK(),
+                    Set.of("Java")
+            );
+            then(recommendationResultRepository).should().saveAll(results);
         }
     }
 
     @Test
-    @DisplayName("처리 중 예외가 발생하면 FAILED 상태로 전이하고 예외 메시지를 저장한다")
+    @DisplayName("finder 처리 중 예외가 발생하면 FAILED 상태로 전이하고 예외 메시지를 저장한다")
     void 처리_중_예외가_발생하면_FAILED_상태로_전이하고_예외_메시지를_저장한다() {
         RecommendationRun run = createRun(true);
-        RecommendationRunProcessor spyProcessor = spy(
-                new RecommendationRunProcessor(recommendationRunRepository)
-        );
 
         given(recommendationRunRepository.findById(1L))
                 .willReturn(Optional.of(run));
-        willThrow(new RuntimeException("하드 필터 계산 실패"))
-                .given(spyProcessor).doProcess(run);
+        given(recommendationCandidateFinder.findCandidates(run.getProposalPosition(), run.getTopK()))
+                .willThrow(new RuntimeException("하드 필터 계산 실패"));
 
-        assertThatCode(() -> spyProcessor.process(1L))
+        assertThatCode(() -> recommendationRunProcessor.process(1L))
                 .doesNotThrowAnyException();
 
         assertThat(run.getStatus()).isEqualTo(RecommendationRunStatus.FAILED);
         assertThat(run.getErrorMessage()).isEqualTo("하드 필터 계산 실패");
+        then(recommendationScorer).shouldHaveNoInteractions();
+        then(recommendationResultCreator).shouldHaveNoInteractions();
+        then(recommendationResultRepository).shouldHaveNoInteractions();
     }
 
     @Test
     @DisplayName("예외 메시지가 없으면 기본 실패 메시지로 FAILED 처리한다")
     void 예외_메시지가_없으면_기본_실패_메시지로_FAILED_처리한다() {
         RecommendationRun run = createRun(true);
-        RecommendationRunProcessor spyProcessor = org.mockito.Mockito.spy(
-                new RecommendationRunProcessor(recommendationRunRepository)
-        );
 
         given(recommendationRunRepository.findById(1L))
                 .willReturn(Optional.of(run));
-        org.mockito.BDDMockito.willThrow(new RuntimeException())
-                .given(spyProcessor).doProcess(run);
+        given(recommendationCandidateFinder.findCandidates(run.getProposalPosition(), run.getTopK()))
+                .willThrow(new RuntimeException());
 
-        assertThatCode(() -> spyProcessor.process(1L))
+        assertThatCode(() -> recommendationRunProcessor.process(1L))
                 .doesNotThrowAnyException();
 
-        assertThat(run.getStatus()).isEqualTo(
-                com.generic4.itda.domain.recommendation.constant.RecommendationRunStatus.FAILED);
+        assertThat(run.getStatus()).isEqualTo(RecommendationRunStatus.FAILED);
         assertThat(run.getErrorMessage()).isEqualTo("추천 실행 중 오류가 발생했습니다.");
     }
 
+    @Test
+    @DisplayName("예외 메시지가 공백이면 기본 실패 메시지로 FAILED 처리한다")
+    void 예외_메시지가_공백이면_기본_실패_메시지로_FAILED_처리한다() {
+        RecommendationRun run = createRun(true);
+
+        given(recommendationRunRepository.findById(1L))
+                .willReturn(Optional.of(run));
+        given(recommendationCandidateFinder.findCandidates(run.getProposalPosition(), run.getTopK()))
+                .willThrow(new RuntimeException("   "));
+
+        assertThatCode(() -> recommendationRunProcessor.process(1L))
+                .doesNotThrowAnyException();
+
+        assertThat(run.getStatus()).isEqualTo(RecommendationRunStatus.FAILED);
+        assertThat(run.getErrorMessage()).isEqualTo("추천 실행 중 오류가 발생했습니다.");
+    }
+
+    @Test
+    @DisplayName("result 저장 중 예외가 발생하면 FAILED 상태로 전이한다")
+    void 결과_저장_중_예외가_발생하면_FAILED_상태로_전이한다() {
+        RecommendationRun run = createRun(true);
+
+        List<RecommendationCandidate> candidates = List.of();
+        List<ScoredCandidate> scoredCandidates = List.of();
+        List<RecommendationResult> results = List.of();
+
+        given(recommendationRunRepository.findById(1L))
+                .willReturn(Optional.of(run));
+        given(recommendationCandidateFinder.findCandidates(run.getProposalPosition(), run.getTopK()))
+                .willReturn(candidates);
+        given(recommendationScorer.score(
+                any(),
+                any(),
+                anySet(),
+                anySet(),
+                anyList()
+        )).willReturn(scoredCandidates);
+        given(recommendationResultCreator.create(
+                run,
+                scoredCandidates,
+                run.getTopK(),
+                Set.of()
+        )).willReturn(results);
+        org.mockito.BDDMockito.willThrow(new RuntimeException("저장 실패"))
+                .given(recommendationResultRepository).saveAll(results);
+
+        assertThatCode(() -> recommendationRunProcessor.process(1L))
+                .doesNotThrowAnyException();
+
+        assertThat(run.getStatus()).isEqualTo(RecommendationRunStatus.FAILED);
+        assertThat(run.getErrorMessage()).isEqualTo("저장 실패");
+    }
+
     private RecommendationRun createRun(boolean running) {
+        return createRun(createProposalPosition(), running);
+    }
+
+    private RecommendationRun createRun(ProposalPosition proposalPosition, boolean running) {
         RecommendationRun run = RecommendationRun.create(
-                createProposalPosition(),
+                proposalPosition,
                 running ? "fp-running" : "fp-pending",
                 RecommendationAlgorithm.HEURISTIC_V1,
                 5
@@ -133,7 +261,6 @@ class RecommendationRunProcessorTest {
 
     private ProposalPosition createProposalPosition() {
         Member member = createMember();
-
         Position position = Position.create("백엔드 개발자");
 
         Proposal proposal = Proposal.create(
@@ -158,5 +285,97 @@ class RecommendationRunProcessorTest {
                 null,
                 null
         );
+    }
+
+    @Test
+    @DisplayName("후보를 scoring 입력 모델로 변환해 scorer에 전달한다")
+    void 후보를_scoring_입력_모델로_변환해_scorer에_전달한다() {
+        RecommendationRun run = createRun(true);
+
+        RecommendationCandidate candidate = new RecommendationCandidate(
+                10L,
+                ResumeStatus.ACTIVE,
+                true,
+                true,
+                (byte) 3,
+                List.of(
+                        new RecommendationCandidate.CandidateSkill(1L, "Java", Proficiency.ADVANCED),
+                        new RecommendationCandidate.CandidateSkill(2L, "Spring", Proficiency.INTERMEDIATE)
+                )
+        );
+
+        List<RecommendationCandidate> candidates = List.of(candidate);
+        List<ScoredCandidate> scoredCandidates = List.of();
+        List<RecommendationResult> results = List.of();
+
+        given(recommendationRunRepository.findById(1L))
+                .willReturn(Optional.of(run));
+        given(recommendationCandidateFinder.findCandidates(run.getProposalPosition(), run.getTopK()))
+                .willReturn(candidates);
+        given(recommendationScorer.score(
+                any(),
+                any(),
+                anySet(),
+                anySet(),
+                any(List.class)
+        )).willReturn(scoredCandidates);
+        given(recommendationResultCreator.create(
+                any(),
+                any(List.class),
+                anyInt(),
+                anySet()
+        )).willReturn(results);
+
+        recommendationRunProcessor.process(1L);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<RecommendationScorableCandidate>> captor =
+                ArgumentCaptor.forClass(List.class);
+
+        then(recommendationScorer).should().score(
+                any(),
+                any(),
+                anySet(),
+                anySet(),
+                captor.capture()
+        );
+
+        List<RecommendationScorableCandidate> actual = captor.getValue();
+        assertThat(actual).hasSize(1);
+
+        RecommendationScorableCandidate scorable = actual.get(0);
+        assertThat(scorable.resumeId()).isEqualTo(10L);
+        assertThat(scorable.careerYears()).isEqualTo(3);
+        assertThat(scorable.ownedSkillNames()).containsExactlyInAnyOrder("Java", "Spring");
+    }
+
+    private ProposalPosition createProposalPositionWithSkills() {
+        ProposalPosition proposalPosition = createProposalPosition();
+        proposalPosition.addSkill(Skill.create("Java", null), ProposalPositionSkillImportance.ESSENTIAL);
+        proposalPosition.addSkill(Skill.create("Spring", null), ProposalPositionSkillImportance.PREFERENCE);
+        return proposalPosition;
+    }
+
+    private RecommendationCandidate createCandidate(
+            long resumeId,
+            int careerYears,
+            RecommendationCandidate.CandidateSkill... skills
+    ) {
+        return new RecommendationCandidate(
+                resumeId,
+                ResumeStatus.ACTIVE,
+                true,
+                true,
+                (byte) careerYears,
+                List.of(skills)
+        );
+    }
+
+    private RecommendationCandidate.CandidateSkill createCandidateSkill(
+            long skillId,
+            String skillName,
+            Proficiency proficiency
+    ) {
+        return new RecommendationCandidate.CandidateSkill(skillId, skillName, proficiency);
     }
 }
