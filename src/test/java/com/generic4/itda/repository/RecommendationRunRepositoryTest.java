@@ -72,7 +72,7 @@ class RecommendationRunRepositoryTest {
         RecommendationRun run = recommendationRunRepository.saveAndFlush(
                 RecommendationRun.create(proposalPosition, "fp-abc123", RecommendationAlgorithm.HEURISTIC_V1, 5));
         run.markRunning();
-        HardFilterStat stat = new HardFilterStat(10, 8, 6, 3);
+        HardFilterStat stat = new HardFilterStat(10, 3);
 
         // when
         run.markCompleted(stat);
@@ -386,7 +386,7 @@ class RecommendationRunRepositoryTest {
             run.markRunning();
         }
         if (targetStatus == RecommendationRunStatus.COMPUTED) {
-            run.markCompleted(new HardFilterStat(10, 8, 6, 3));
+            run.markCompleted(new HardFilterStat(10, 3));
         } else if (targetStatus == RecommendationRunStatus.FAILED) {
             run.markFailed("의도된 실패");
         }

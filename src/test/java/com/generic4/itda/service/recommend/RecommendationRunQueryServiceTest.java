@@ -27,12 +27,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /**
- * RecommendationRunQueryService 단위 테스트:
- * - repository가 준비한 RecommendationRun 상세 aggregate를 바탕으로 접근 검증과 상태별 ViewModel 조립을 수행하는지 확인한다.
- *
- * 한계:
- * - 이 테스트는 Mockito 기반 단위 테스트라 findDetailById의 fetch join 범위나 lazy 초기화는 검증하지 않는다.
- * - proposal/member/proposalPosition 그래프 preload 계약은 RecommendationRunRepositoryTest가 보장해야 한다.
+ * RecommendationRunQueryService 단위 테스트: - repository가 준비한 RecommendationRun 상세 aggregate를 바탕으로 접근 검증과 상태별 ViewModel 조립을
+ * 수행하는지 확인한다.
+ * <p>
+ * 한계: - 이 테스트는 Mockito 기반 단위 테스트라 findDetailById의 fetch join 범위나 lazy 초기화는 검증하지 않는다. - proposal/member/proposalPosition
+ * 그래프 preload 계약은 RecommendationRunRepositoryTest가 보장해야 한다.
  */
 @ExtendWith(MockitoExtension.class)
 class RecommendationRunQueryServiceTest {
@@ -240,7 +239,7 @@ class RecommendationRunQueryServiceTest {
             case RUNNING -> run.markRunning();
             case COMPUTED -> {
                 run.markRunning();
-                run.markCompleted(new HardFilterStat(12, 8, 5, 3));
+                run.markCompleted(new HardFilterStat(12, 3));
             }
             case FAILED -> {
                 run.markRunning();

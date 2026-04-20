@@ -21,7 +21,7 @@ class RecommendationRunTest {
     @BeforeEach
     void setUp() {
         mockPosition = mock(ProposalPosition.class);
-        stat = new HardFilterStat(10, 8, 5, 3); // finalCount() == 3
+        stat = new HardFilterStat(10, 3); // finalCandidates() == 3
     }
 
     private RecommendationRun createPendingRun() {
@@ -147,7 +147,7 @@ class RecommendationRunTest {
 
             run.markCompleted(stat);
 
-            assertThat(run.getCandidateCount()).isEqualTo(stat.finalCount());
+            assertThat(run.getCandidateCount()).isEqualTo(stat.finalCandidates());
         }
 
         @Test
