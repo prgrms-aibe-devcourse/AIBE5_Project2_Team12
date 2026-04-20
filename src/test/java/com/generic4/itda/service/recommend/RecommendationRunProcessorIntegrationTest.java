@@ -1,0 +1,182 @@
+package com.generic4.itda.service.recommend;
+
+import static com.generic4.itda.fixture.MemberFixture.createMember;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.BDDMockito.given;
+
+import com.generic4.itda.annotation.IntegrationTest;
+import com.generic4.itda.domain.member.Member;
+import com.generic4.itda.domain.position.Position;
+import com.generic4.itda.domain.proposal.Proposal;
+import com.generic4.itda.domain.proposal.ProposalPosition;
+import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
+import com.generic4.itda.domain.recommendation.RecommendationResult;
+import com.generic4.itda.domain.recommendation.RecommendationRun;
+import com.generic4.itda.domain.recommendation.constant.RecommendationAlgorithm;
+import com.generic4.itda.domain.recommendation.constant.RecommendationRunStatus;
+import com.generic4.itda.domain.recommendation.vo.HardFilterStat;
+import com.generic4.itda.domain.recommendation.vo.ReasonFacts;
+import com.generic4.itda.domain.resume.CareerPayload;
+import com.generic4.itda.domain.resume.Resume;
+import com.generic4.itda.domain.resume.ResumeWritingStatus;
+import com.generic4.itda.domain.skill.Skill;
+import com.generic4.itda.repository.MemberRepository;
+import com.generic4.itda.repository.ProposalRepository;
+import com.generic4.itda.repository.RecommendationResultRepository;
+import com.generic4.itda.repository.RecommendationRunRepository;
+import com.generic4.itda.service.recommend.scoring.HeuristicV1RecommendationScorer;
+import com.generic4.itda.service.recommend.scoring.model.ScoredCandidate;
+import jakarta.persistence.EntityManager;
+import java.math.BigDecimal;
+import java.util.List;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.annotation.Transactional;
+
+@IntegrationTest
+@Transactional
+class RecommendationRunProcessorIntegrationTest {
+
+    private static final RecommendationAlgorithm DEFAULT_ALGORITHM = RecommendationAlgorithm.HEURISTIC_V1;
+    private static final int DEFAULT_TOP_K = 3;
+
+    @Autowired
+    private RecommendationRunProcessor recommendationRunProcessor;
+
+    @Autowired
+    private RecommendationRunRepository recommendationRunRepository;
+
+    @Autowired
+    private RecommendationResultRepository recommendationResultRepository;
+
+    @Autowired
+    private MemberRepository memberRepository;
+
+    @Autowired
+    private ProposalRepository proposalRepository;
+
+    @Autowired
+    private EntityManager entityManager;
+
+    @MockitoBean
+    private RecommendationCandidateFinder recommendationCandidateFinder;
+
+    @MockitoBean
+    private HeuristicV1RecommendationScorer recommendationScorer;
+
+    @MockitoBean
+    private RecommendationResultCreator recommendationResultCreator;
+
+    @Test
+    @DisplayName("RUNNING 상태 run 처리 완료 후 RecommendationResult가 DB에 저장되고 status가 COMPUTED로 변경된다")
+    void process_happyPath_savesResultsAndMarksComputed() {
+        // given
+        RunFixture fixture = createRunningRunFixture("proc-happy@test.com", "fp-happy");
+
+        Member resumeOwner = memberRepository.save(createMember("resume-owner-happy@test.com", "pw", "이력서소유자", "010-1111-2222"));
+        Resume resume = persist(Resume.create(resumeOwner, "백엔드 개발 경험", (byte) 3, new CareerPayload(), null, ResumeWritingStatus.DONE, null));
+
+        RecommendationResult stubbedResult = RecommendationResult.create(
+                fixture.run(),
+                resume,
+                1,
+                BigDecimal.valueOf(0.8500),
+                BigDecimal.valueOf(0.7000),
+                new ReasonFacts(List.of("Java"), List.of(), 3, List.of())
+        );
+
+        given(recommendationCandidateFinder.findCandidates(any(), anyInt())).willReturn(List.of());
+        given(recommendationScorer.score(any(), any(), anySet(), anySet(), anyList())).willReturn(List.of());
+        given(recommendationResultCreator.create(any(), anyList(), anyInt(), anySet())).willReturn(List.of(stubbedResult));
+
+        entityManager.flush();
+        entityManager.clear();
+
+        // when
+        assertThatCode(() -> recommendationRunProcessor.process(fixture.runId()))
+                .doesNotThrowAnyException();
+
+        entityManager.flush();
+        entityManager.clear();
+
+        // then: RecommendationRun 상태 검증
+        RecommendationRun persistedRun = recommendationRunRepository.findById(fixture.runId()).orElseThrow();
+        assertThat(persistedRun.getStatus()).isEqualTo(RecommendationRunStatus.COMPUTED);
+        assertThat(persistedRun.getErrorMessage()).isNull();
+
+        // then: HardFilterStat 반영 검증 (candidates=0개, results=1개)
+        HardFilterStat stat = persistedRun.getHardFilterStats();
+        assertThat(stat).isNotNull();
+        assertThat(stat.totalCandidates()).isZero();
+        assertThat(stat.finalCandidates()).isEqualTo(1);
+        assertThat(persistedRun.getCandidateCount()).isEqualTo(1);
+
+        // then: RecommendationResult DB 저장 검증
+        List<RecommendationResult> savedResults = recommendationResultRepository.findAll();
+        assertThat(savedResults).hasSize(1);
+        RecommendationResult savedResult = savedResults.get(0);
+        assertThat(savedResult.getRecommendationRun().getId()).isEqualTo(fixture.runId());
+        assertThat(savedResult.getResume().getId()).isEqualTo(resume.getId());
+        assertThat(savedResult.getRank()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("처리 중 예외 발생 시 process()가 예외를 전파하지 않고 status가 FAILED로 변경되며 errorMessage가 저장된다")
+    void process_exceptionDuringProcessing_doesNotPropagateAndMarksFailed() {
+        // given
+        RunFixture fixture = createRunningRunFixture("proc-fail@test.com", "fp-fail");
+
+        given(recommendationCandidateFinder.findCandidates(any(), anyInt()))
+                .willThrow(new RuntimeException("후보 조회 중 오류 발생"));
+
+        entityManager.flush();
+        entityManager.clear();
+
+        // when
+        assertThatCode(() -> recommendationRunProcessor.process(fixture.runId()))
+                .doesNotThrowAnyException();
+
+        entityManager.flush();
+        entityManager.clear();
+
+        // then: RecommendationRun 상태 검증
+        RecommendationRun persistedRun = recommendationRunRepository.findById(fixture.runId()).orElseThrow();
+        assertThat(persistedRun.getStatus()).isEqualTo(RecommendationRunStatus.FAILED);
+        assertThat(persistedRun.getErrorMessage()).isEqualTo("후보 조회 중 오류 발생");
+
+        // then: RecommendationResult가 저장되지 않았음을 검증
+        assertThat(recommendationResultRepository.count()).isZero();
+    }
+
+    private RunFixture createRunningRunFixture(String ownerEmail, String fingerprint) {
+        Member owner = memberRepository.save(createMember(ownerEmail, "pw", "제안자", "010-0000-0001"));
+        Position position = persist(Position.create("백엔드 개발자"));
+        Skill java = persist(Skill.create("Java", null));
+
+        Proposal proposal = Proposal.create(owner, "AI 추천 테스트 제안서", "원본 입력", "설명", 5_000_000L, 10_000_000L, 6L);
+        ProposalPosition proposalPosition = proposal.addPosition(position, "백엔드 개발자", null, 2L, 1_000_000L, 2_000_000L, null, null, null, null);
+        proposalPosition.addSkill(java, ProposalPositionSkillImportance.ESSENTIAL);
+        proposal.startMatching();
+        proposalRepository.saveAndFlush(proposal);
+
+        RecommendationRun run = RecommendationRun.create(proposalPosition, fingerprint, DEFAULT_ALGORITHM, DEFAULT_TOP_K);
+        run.markRunning();
+        persist(run);
+
+        return new RunFixture(run.getId(), run);
+    }
+
+    private <T> T persist(T entity) {
+        entityManager.persist(entity);
+        return entity;
+    }
+
+    private record RunFixture(Long runId, RecommendationRun run) {}
+}
