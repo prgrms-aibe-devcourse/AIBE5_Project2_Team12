@@ -1,6 +1,5 @@
 package com.generic4.itda.service.recommend.scoring;
 
-import com.generic4.itda.domain.recommendation.ResumeEmbedding;
 import com.generic4.itda.repository.ResumeEmbeddingRepository;
 import java.util.Collections;
 import java.util.List;
@@ -24,7 +23,10 @@ public class ResumeEmbeddingReaderImpl implements ResumeEmbeddingReader {
             return Collections.emptyMap();
         }
 
-        return resumeEmbeddingRepository.findAllByResume_IdInAndEmbeddingModel(resumeIds, embeddingModel).stream()
+        String normalizedEmbeddingModel = embeddingModel.trim();
+
+        return resumeEmbeddingRepository.findAllByResume_IdInAndEmbeddingModel(resumeIds, normalizedEmbeddingModel)
+                .stream()
                 .collect(Collectors.toMap(
                         embedding -> embedding.getResume().getId(),
                         embedding -> embedding.getEmbeddingVector().values()
