@@ -135,7 +135,9 @@
                         </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-200 bg-white">
-                        <tr th:each="project : ${dashboard.projects}" class="transition hover:bg-slate-50/70">
+                        <tr th:each="project : ${dashboard.projects}"
+                            th:attr="data-href=@{/proposals/{id}(id=${project.proposalId})}"
+                            class="project-row cursor-pointer transition hover:bg-slate-50/70">
                             <td class="px-8 py-7">
                                 <div class="max-w-[320px]">
                                     <p class="text-xl font-black tracking-tight text-slate-900" th:text="${project.title}">
@@ -166,34 +168,14 @@
                                     매칭 시작 전
                                 </span>
                             </td>
-                            <td class="relative px-6 py-7 text-right">
+                            <td class="px-6 py-7 text-right">
                                 <button type="button"
+                                        th:attr="data-proposal-id=${project.proposalId},
+                                                 data-status-key=${project.statusKey},
+                                                 data-proposal-title=${project.title}"
                                         class="menu-trigger inline-flex h-10 w-10 items-center justify-center rounded-full text-slate-300 transition hover:bg-slate-100 hover:text-slate-500">
                                     <i data-lucide="ellipsis" class="h-4 w-4"></i>
                                 </button>
-                                <div class="menu-dropdown hidden absolute right-6 top-14 z-20 w-52 rounded-2xl border border-slate-200 bg-white py-2 shadow-lg shadow-slate-200/80">
-                                    <a th:href="@{/proposals/{id}(id=${project.proposalId})}"
-                                       class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
-                                        <i data-lucide="file-text" class="h-4 w-4 text-slate-400"></i>제안서 상세 보기
-                                    </a>
-                                    <a th:if="${project.statusKey == 'WRITING' or project.statusKey == 'MATCHING'}"
-                                       th:href="@{/proposals/{id}/edit(id=${project.proposalId})}"
-                                       class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
-                                        <i data-lucide="pencil" class="h-4 w-4 text-slate-400"></i>제안서 수정
-                                    </a>
-                                    <a th:if="${project.statusKey == 'MATCHING' or project.statusKey == 'COMPLETE'}"
-                                       th:href="@{/proposals/{id}/recommendations(id=${project.proposalId})}"
-                                       class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
-                                        <i data-lucide="sparkles" class="h-4 w-4 text-slate-400"></i>추천 결과 보기
-                                    </a>
-                                    <div th:if="${project.statusKey == 'WRITING'}" class="my-1 border-t border-slate-100"></div>
-                                    <button th:if="${project.statusKey == 'WRITING'}"
-                                            type="button"
-                                            th:attr="data-proposal-id=${project.proposalId},data-proposal-title=${project.title}"
-                                            class="delete-btn flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium text-red-500 hover:bg-red-50">
-                                        <i data-lucide="trash-2" class="h-4 w-4"></i>프로젝트 삭제
-                                    </button>
-                                </div>
                             </td>
                         </tr>
                         </tbody>
@@ -202,6 +184,27 @@
             </section>
         </div>
     </main>
+
+    <!-- 공유 액션 메뉴 (position: fixed로 overflow-hidden 부모 탈출) -->
+    <div id="actionMenu" class="hidden fixed z-40 w-52 rounded-2xl border border-slate-200 bg-white py-2 shadow-lg shadow-slate-200/80">
+        <a id="menuDetail" href="#"
+           class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            <i data-lucide="file-text" class="h-4 w-4 text-slate-400"></i>제안서 상세 보기
+        </a>
+        <a id="menuEdit" href="#"
+           class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            <i data-lucide="pencil" class="h-4 w-4 text-slate-400"></i>제안서 수정
+        </a>
+        <a id="menuRecommend" href="#"
+           class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            <i data-lucide="sparkles" class="h-4 w-4 text-slate-400"></i>추천 결과 보기
+        </a>
+        <div id="menuDeleteDivider" class="my-1 border-t border-slate-100"></div>
+        <button id="menuDelete" type="button"
+                class="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium text-red-500 hover:bg-red-50">
+            <i data-lucide="trash-2" class="h-4 w-4"></i>프로젝트 삭제
+        </button>
+    </div>
 
     <!-- 삭제 확인 모달 -->
     <div id="deleteModal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
@@ -312,23 +315,74 @@
                 });
         }
 
-        // 탭 클릭 / 드롭다운 / 삭제 버튼 이벤트
-        var activeMenu = null;
+        // ── 공유 액션 메뉴 ──────────────────────────────────────
+        var actionMenu    = document.getElementById('actionMenu');
+        var menuDetail    = document.getElementById('menuDetail');
+        var menuEdit      = document.getElementById('menuEdit');
+        var menuRecommend = document.getElementById('menuRecommend');
+        var menuDeleteDiv = document.getElementById('menuDeleteDivider');
+        var menuDelete    = document.getElementById('menuDelete');
+        var menuOpen      = false;
 
-        function closeActiveMenu() {
-            if (activeMenu) {
-                activeMenu.classList.add('hidden');
-                activeMenu = null;
-            }
+        function closeActionMenu() {
+            if (!menuOpen) return;
+            actionMenu.classList.add('hidden');
+            menuOpen = false;
         }
 
+        function openActionMenu(trigger) {
+            var proposalId    = trigger.dataset.proposalId;
+            var statusKey     = trigger.dataset.statusKey;
+            var proposalTitle = trigger.dataset.proposalTitle;
+
+            // 링크 세팅
+            menuDetail.href    = '/proposals/' + proposalId;
+            menuEdit.href      = '/proposals/' + proposalId + '/edit';
+            menuRecommend.href = '/proposals/' + proposalId + '/recommendations';
+            menuDelete.dataset.proposalId    = proposalId;
+            menuDelete.dataset.proposalTitle = proposalTitle;
+
+            // 상태별 항목 표시/숨김
+            menuEdit.classList.toggle('hidden', statusKey === 'COMPLETE');
+            menuRecommend.classList.toggle('hidden', statusKey === 'WRITING');
+            var showDelete = statusKey === 'WRITING';
+            menuDeleteDiv.classList.toggle('hidden', !showDelete);
+            menuDelete.classList.toggle('hidden', !showDelete);
+
+            // 버튼 기준으로 위치 계산 (fixed)
+            actionMenu.classList.remove('hidden');
+            if (window.lucide) lucide.createIcons();
+
+            var rect       = trigger.getBoundingClientRect();
+            var menuHeight = actionMenu.offsetHeight;
+            var spaceBelow = window.innerHeight - rect.bottom;
+
+            actionMenu.style.left  = 'auto';
+            actionMenu.style.right = (window.innerWidth - rect.right) + 'px';
+
+            // 아래 공간이 부족하면 버튼 위로 열기
+            if (spaceBelow < menuHeight + 8) {
+                actionMenu.style.top    = 'auto';
+                actionMenu.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+            } else {
+                actionMenu.style.bottom = 'auto';
+                actionMenu.style.top    = (rect.bottom + 4) + 'px';
+            }
+
+            menuOpen = true;
+        }
+
+        // 스크롤 시 메뉴 닫기 (fixed 위치가 어긋나므로)
+        window.addEventListener('scroll', closeActionMenu, true);
+
+        // ── 이벤트 위임 ─────────────────────────────────────────
         document.addEventListener('click', function (e) {
             // 필터 탭
             var tab = e.target.closest('.filter-tab');
             if (tab) {
                 e.preventDefault();
                 if (tab.classList.contains('tab-active')) return;
-                closeActiveMenu();
+                closeActionMenu();
                 loadItems(tab.dataset.filter, true);
                 return;
             }
@@ -337,25 +391,33 @@
             var trigger = e.target.closest('.menu-trigger');
             if (trigger) {
                 e.stopPropagation();
-                var dropdown = trigger.parentElement.querySelector('.menu-dropdown');
-                if (activeMenu && activeMenu !== dropdown) closeActiveMenu();
-                dropdown.classList.toggle('hidden');
-                activeMenu = dropdown.classList.contains('hidden') ? null : dropdown;
+                if (menuOpen) { closeActionMenu(); return; }
+                openActionMenu(trigger);
                 return;
             }
 
-            // 삭제 버튼
-            var deleteBtn = e.target.closest('.delete-btn');
-            if (deleteBtn) {
-                closeActiveMenu();
-                document.getElementById('deleteModalTitle').textContent = deleteBtn.dataset.proposalTitle;
-                document.getElementById('deleteForm').action = '/proposals/' + deleteBtn.dataset.proposalId + '/delete';
+            // 액션 메뉴 내부 클릭은 닫기 처리하지 않음 (링크/버튼이 직접 처리)
+            if (actionMenu.contains(e.target)) return;
+
+            // 삭제 버튼 (공유 메뉴 안의 #menuDelete)
+            if (e.target.closest('#menuDelete')) {
+                closeActionMenu();
+                document.getElementById('deleteModalTitle').textContent = menuDelete.dataset.proposalTitle;
+                document.getElementById('deleteForm').action = '/proposals/' + menuDelete.dataset.proposalId + '/delete';
                 document.getElementById('deleteModal').classList.remove('hidden');
                 return;
             }
 
+            // 행 클릭 → 상세 페이지 이동
+            var row = e.target.closest('.project-row');
+            if (row && row.dataset.href) {
+                closeActionMenu();
+                window.location.href = row.dataset.href;
+                return;
+            }
+
             // 외부 클릭 시 메뉴 닫기
-            closeActiveMenu();
+            closeActionMenu();
         });
 
         // 모달 닫기
