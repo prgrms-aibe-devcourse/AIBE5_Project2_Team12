@@ -30,6 +30,7 @@ import com.generic4.itda.exception.ProposalNotFoundException;
 import org.springframework.security.access.AccessDeniedException;
 import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.PositionRepository;
+import com.generic4.itda.service.ProposalAiInterviewService;
 import com.generic4.itda.service.ProposalService;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -49,6 +50,9 @@ class ProposalControllerTest {
 
     @MockitoBean
     private ProposalService proposalService;
+
+    @MockitoBean
+    private ProposalAiInterviewService proposalAiInterviewService;
 
     @MockitoBean
     private PositionRepository positionRepository;
@@ -73,7 +77,7 @@ class ProposalControllerTest {
                         ))))
                 .andExpect(status().isOk())
                 .andExpect(view().name("client/proposalForm"))
-                .andExpect(model().attributeExists("proposalForm", "positionOptions", "workTypes"))
+                .andExpect(model().attributeExists("proposalForm", "positionOptions", "workTypes", "aiInterviewMessages"))
                 .andExpect(model().attribute("isNew", true))
                 .andExpect(model().attribute("aiBriefRequested", false));
     }
@@ -199,6 +203,7 @@ class ProposalControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(view().name("client/proposalForm"))
                 .andExpect(model().attributeHasErrors("proposalForm"))
+                .andExpect(model().attributeExists("aiInterviewMessages"))
                 .andExpect(model().attribute("aiBriefRequested", true));
 
         then(proposalService).should(never()).register(anyString(), any(ProposalForm.class));
@@ -229,6 +234,8 @@ class ProposalControllerTest {
         given(proposalService.findOwnedProposal(1L, "client@example.com")).willReturn(proposal);
         given(proposalService.findOwnedProposalForm(1L, "client@example.com"))
                 .willReturn(ProposalForm.from(proposal));
+        given(proposalAiInterviewService.findMessageResponses(1L, "client@example.com"))
+                .willReturn(List.of());
 
         ItDaPrincipal principal = ItDaPrincipal.from(
                 createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
@@ -242,7 +249,7 @@ class ProposalControllerTest {
                         ))))
                 .andExpect(status().isOk())
                 .andExpect(view().name("client/proposalForm"))
-                .andExpect(model().attributeExists("proposalForm"))
+                .andExpect(model().attributeExists("proposalForm", "aiInterviewMessages"))
                 .andExpect(model().attribute("isNew", false))
                 .andExpect(model().attribute("aiBriefRequested", false));
     }
@@ -264,6 +271,8 @@ class ProposalControllerTest {
         given(proposalService.findOwnedProposal(1L, "client@example.com")).willReturn(proposal);
         given(proposalService.findOwnedProposalForm(1L, "client@example.com"))
                 .willReturn(ProposalForm.from(proposal));
+        given(proposalAiInterviewService.findMessageResponses(1L, "client@example.com"))
+                .willReturn(List.of());
 
         ItDaPrincipal principal = ItDaPrincipal.from(
                 createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
@@ -278,7 +287,7 @@ class ProposalControllerTest {
                         ))))
                 .andExpect(status().isOk())
                 .andExpect(view().name("client/proposalForm"))
-                .andExpect(model().attributeExists("proposalForm"))
+                .andExpect(model().attributeExists("proposalForm", "aiInterviewMessages"))
                 .andExpect(model().attribute("proposalId", 1L))
                 .andExpect(model().attribute("isNew", false))
                 .andExpect(model().attribute("aiBriefRequested", true));

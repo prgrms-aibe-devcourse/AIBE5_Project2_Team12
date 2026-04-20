@@ -3,11 +3,13 @@ package com.generic4.itda.controller;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalStatus;
 import com.generic4.itda.domain.proposal.ProposalWorkType;
+import com.generic4.itda.dto.proposal.AiInterviewMessageResponse;
 import com.generic4.itda.dto.proposal.ProposalForm;
 import com.generic4.itda.dto.proposal.ProposalPositionForm;
 import com.generic4.itda.dto.security.ItDaPrincipal;
 import com.generic4.itda.exception.ProposalNotFoundException;
 import com.generic4.itda.repository.PositionRepository;
+import com.generic4.itda.service.ProposalAiInterviewService;
 import com.generic4.itda.service.ProposalService;
 import jakarta.validation.Valid;
 import java.util.HashSet;
@@ -38,6 +40,7 @@ public class ProposalController {
     private static final String REGISTER_ACTION = "register";
 
     private final ProposalService proposalService;
+    private final ProposalAiInterviewService proposalAiInterviewService;
     private final PositionRepository positionRepository;
 
     @GetMapping("/new")
@@ -50,6 +53,7 @@ public class ProposalController {
         model.addAttribute("proposalId", null);
         model.addAttribute("isNew", true);
         model.addAttribute("aiBriefRequested", false);
+        model.addAttribute("aiInterviewMessages", List.of());
 
         return "client/proposalForm";
     }
@@ -73,6 +77,7 @@ public class ProposalController {
             model.addAttribute("proposalId", null);
             model.addAttribute("isNew", true);
             model.addAttribute("aiBriefRequested", aiBriefRequested);
+            model.addAttribute("aiInterviewMessages", List.of());
             return "client/proposalForm";
         }
 
@@ -89,6 +94,7 @@ public class ProposalController {
             model.addAttribute("proposalId", null);
             model.addAttribute("isNew", true);
             model.addAttribute("aiBriefRequested", aiBriefRequested);
+            model.addAttribute("aiInterviewMessages", List.of());
             return "client/proposalForm";
         }
     }
@@ -139,6 +145,8 @@ public class ProposalController {
             }
 
             ProposalForm form = proposalService.findOwnedProposalForm(proposalId, principal.getEmail());
+            List<AiInterviewMessageResponse> aiInterviewMessages =
+                    proposalAiInterviewService.findMessageResponses(proposalId, principal.getEmail());
 
             addCommonAttributes(model);
             addMemberAttributes(model, principal);
@@ -146,6 +154,7 @@ public class ProposalController {
             model.addAttribute("proposalId", proposalId);
             model.addAttribute("isNew", false);
             model.addAttribute("aiBriefRequested", aiBriefRequested);
+            model.addAttribute("aiInterviewMessages", aiInterviewMessages);
 
             return "client/proposalForm";
         } catch (ProposalNotFoundException e) {
@@ -224,6 +233,7 @@ public class ProposalController {
             model.addAttribute("proposalId", proposalId);
             model.addAttribute("isNew", false);
             model.addAttribute("aiBriefRequested", aiBriefRequested);
+            model.addAttribute("aiInterviewMessages", findAiInterviewMessagesOrEmpty(proposalId, principal));
             return "client/proposalForm";
         }
 
@@ -246,6 +256,7 @@ public class ProposalController {
             model.addAttribute("proposalId", proposalId);
             model.addAttribute("isNew", false);
             model.addAttribute("aiBriefRequested", aiBriefRequested);
+            model.addAttribute("aiInterviewMessages", findAiInterviewMessagesOrEmpty(proposalId, principal));
             return "client/proposalForm";
         }
     }
@@ -258,6 +269,18 @@ public class ProposalController {
     private void addMemberAttributes(Model model, ItDaPrincipal principal) {
         model.addAttribute("memberName", principal.getName());
         model.addAttribute("memberEmail", principal.getEmail());
+    }
+
+    private List<AiInterviewMessageResponse> findAiInterviewMessagesOrEmpty(Long proposalId, ItDaPrincipal principal) {
+        if (proposalId == null || principal == null) {
+            return List.of();
+        }
+
+        try {
+            return proposalAiInterviewService.findMessageResponses(proposalId, principal.getEmail());
+        } catch (ProposalNotFoundException | AccessDeniedException e) {
+            return List.of();
+        }
     }
 
     private String redirectAfterSave(Proposal proposal, boolean registerAction, boolean aiBriefRequested) {
