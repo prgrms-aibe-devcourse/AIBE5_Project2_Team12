@@ -44,10 +44,10 @@ public class ClientDashboardService {
 
     private List<Proposal> loadProjects(String memberEmail, ClientDashboardFilter filter) {
         if (filter.isAll()) {
-            return proposalRepository.findAllByMember_Email_ValueOrderByModifiedAtDesc(memberEmail);
+            return proposalRepository.findAllWithPositionsByMemberEmail(memberEmail);
         }
 
-        return proposalRepository.findAllByMember_Email_ValueAndStatusOrderByModifiedAtDesc(
+        return proposalRepository.findAllWithPositionsByMemberEmailAndStatus(
                 memberEmail,
                 filter.toProposalStatus()
         );
