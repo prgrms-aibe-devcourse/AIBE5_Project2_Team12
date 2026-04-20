@@ -31,7 +31,7 @@ public class CosineSimilarityCalculator {
 
     private void validate(List<Double> queryEmbedding, List<Double> targetEmbedding) {
         if (queryEmbedding == null || targetEmbedding == null) {
-            throw new IllegalArgumentException("embedding 은 null 일 수 업습니다.");
+            throw new IllegalArgumentException("embedding 은 null 일 수 없습니다.");
         }
         if (queryEmbedding.isEmpty() || targetEmbedding.isEmpty()) {
             throw new IllegalArgumentException("embedding 은 비어 있을 수 없습니다.");
