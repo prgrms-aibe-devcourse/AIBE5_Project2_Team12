@@ -32,7 +32,8 @@ class AiBriefGeneratorConfigurationTest {
                     assertThat(context).hasSingleBean(AiBriefGenerator.class);
                     assertThat(context).hasSingleBean(DisabledAiBriefGenerator.class);
                     assertThat(context).doesNotHaveBean(OpenAiAiBriefGenerator.class);
-                    assertThat(context).doesNotHaveBean(AiInterviewGenerator.class);
+                    assertThat(context).hasSingleBean(AiInterviewGenerator.class);
+                    assertThat(context).hasSingleBean(DisabledAiInterviewGenerator.class);
                     assertThat(context).doesNotHaveBean(OpenAiAiInterviewGenerator.class);
                     assertThat(context).hasSingleBean(ProposalAiBriefService.class);
                 });
@@ -53,6 +54,7 @@ class AiBriefGeneratorConfigurationTest {
                     assertThat(context).hasSingleBean(AiInterviewGenerator.class);
                     assertThat(context).hasSingleBean(OpenAiAiInterviewGenerator.class);
                     assertThat(context).doesNotHaveBean(DisabledAiBriefGenerator.class);
+                    assertThat(context).doesNotHaveBean(DisabledAiInterviewGenerator.class);
                     assertThat(context).hasSingleBean(ProposalAiBriefService.class);
                 });
     }
@@ -73,6 +75,7 @@ class AiBriefGeneratorConfigurationTest {
     @EnableConfigurationProperties(AiBriefProperties.class)
     @Import({
             DisabledAiBriefGenerator.class,
+            DisabledAiInterviewGenerator.class,
             OpenAiAiBriefGenerator.class,
             OpenAiAiInterviewGenerator.class,
             AiBriefProposalMapper.class,
