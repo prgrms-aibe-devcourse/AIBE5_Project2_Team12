@@ -41,7 +41,12 @@ public class ResumeController {
 
     @GetMapping("/me")
     public String viewFrom (@AuthenticationPrincipal ItDaPrincipal principal, Model model){
-        Resume resume = resumeService.findByEmail(principal.getEmail());
+        Resume resume;
+        try {
+            resume = resumeService.findByEmail(principal.getEmail());
+        } catch (IllegalStateException ignored) {
+            return "redirect:/resumes/new";
+        }
         ResumeForm form = ResumeForm.from(resume);
 
         addCommonAttributes(model);
@@ -105,7 +110,12 @@ public class ResumeController {
 
     @GetMapping("/edit")
     public String editForm(@AuthenticationPrincipal ItDaPrincipal principal, Model model) {
-        Resume resume = resumeService.findByEmail(principal.getEmail());
+        Resume resume;
+        try {
+            resume = resumeService.findByEmail(principal.getEmail());
+        } catch (IllegalStateException ignored) {
+            return "redirect:/resumes/new";
+        }
         ResumeForm form = ResumeForm.from(resume);
 
         addCommonAttributes(model);
