@@ -112,7 +112,7 @@ public class RecommendationRun extends BaseEntity {
 
         this.status = RecommendationRunStatus.COMPUTED;
         this.hardFilterStats = stat;
-        this.candidateCount = stat.finalCount();
+        this.candidateCount = stat.finalCandidates();
         this.errorMessage = null;
     }
 
