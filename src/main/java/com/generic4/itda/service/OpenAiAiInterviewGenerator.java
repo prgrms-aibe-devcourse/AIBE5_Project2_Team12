@@ -1,0 +1,504 @@
+package com.generic4.itda.service;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.generic4.itda.config.ai.AiBriefProperties;
+import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
+import com.generic4.itda.domain.proposal.ProposalWorkType;
+import com.generic4.itda.dto.proposal.AiBriefPositionResult;
+import com.generic4.itda.dto.proposal.AiBriefResult;
+import com.generic4.itda.dto.proposal.AiBriefSkillResult;
+import com.generic4.itda.dto.proposal.AiInterviewGenerateRequest;
+import com.generic4.itda.dto.proposal.AiInterviewResult;
+import com.generic4.itda.dto.proposal.ProposalForm;
+import com.generic4.itda.dto.proposal.ProposalPositionForm;
+import com.generic4.itda.exception.AiBriefGenerationException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Component;
+import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+
+@Slf4j
+@Component
+@ConditionalOnProperty(prefix = "ai.brief", name = "enabled", havingValue = "true")
+public class OpenAiAiInterviewGenerator implements AiInterviewGenerator {
+
+    private static final String INTERVIEW_GENERATION_INSTRUCTIONS = """
+            당신은 IT 외주/프로젝트 제안서를 완성하기 위한 AI 인터뷰 도우미다.
+            사용자의 현재 제안서 폼 상태, 이전 대화 히스토리, 방금 사용자 메시지를 바탕으로
+            제안서 폼을 점진적으로 갱신할 JSON과 다음에 물어볼 후속 질문을 생성한다.
+
+            반드시 지킬 규칙:
+            - 반드시 JSON만 반환한다.
+            - 마크다운 코드블록, 설명문, 주석, 추가 텍스트를 절대 포함하지 않는다.
+            - aiBriefResult에는 현재까지 확인된 정보를 반영한 제안서 초안을 반환한다.
+            - assistantMessage에는 사용자에게 보여줄 다음 AI 메시지를 한국어로 자연스럽게 작성한다.
+            - 근거가 부족한 값은 추측하지 말고 null로 반환한다.
+            - 기존 폼에 이미 있는 값은 사용자가 바꾸거나 삭제하라고 하지 않았다면 최대한 유지한다.
+            - 사용자가 정정한 값은 최신 사용자 메시지를 우선한다.
+            - 사용자가 제거/삭제/빼달라고 한 포지션은 positions에서 제외한다.
+            - totalBudgetMin, totalBudgetMax, unitBudgetMin, unitBudgetMax는 원화 기준 정수로 반환한다.
+            - expectedPeriod는 주 단위 기준 정수로 반환한다.
+            - position별 workType은 SITE, REMOTE, HYBRID 중 하나만 사용한다.
+            - REMOTE인 경우 workPlace는 null로 둔다.
+            - SITE 또는 HYBRID인데 근무지를 알 수 없으면 workPlace는 "협의"로 둔다.
+            - headCount가 명확하지 않으면 1로 둔다.
+            - skills.importance는 ESSENTIAL 또는 PREFERENCE만 사용한다.
+            - importance를 확신할 수 없으면 PREFERENCE를 사용한다.
+            - skillName은 짧고 일반적인 명칭으로 정리한다.
+            - position별 skills는 최대 4개까지만 반환한다.
+            - 같은 positionCategoryName을 중복 생성하지 않는다.
+            - 같은 직무 안에서 역할이 나뉘는 경우 하나의 모집 단위 title/description에 통합해서 표현한다.
+            - positionCategoryName은 공용 직무 마스터에 대응하는 큰 분류명이다. 예: 백엔드 개발자, 프론트엔드 개발자, 앱 개발자
+            - title은 사용자가 화면에서 보게 될 구체 포지션 제목이다. 예: Java Spring 백엔드 개발자, React 프론트엔드 개발자
+
+            질문 방식:
+            - 폼에 비어 있는 필드를 전부 한 번에 나열해서 묻지 않는다.
+            - 한 번에 1~2개의 주제만 묻는다.
+            - 포지션이 여러 개면 하나의 포지션을 먼저 구체화한 뒤 다음 포지션으로 넘어간다.
+            - 예: 백엔드 개발자 → 인원/근무형태 → 기간/예산 → 기술스택/경력 → 프론트엔드 개발자 순서
+            - assistantMessage에는 방금 반영한 내용이 있으면 짧게 요약하고, 다음 질문을 이어서 작성한다.
+            - 이미 충분히 구체화된 항목은 반복해서 묻지 않는다.
+            """;
+
+    private final RestClient restClient;
+    private final ObjectMapper objectMapper;
+    private final AiBriefProperties properties;
+
+    public OpenAiAiInterviewGenerator(
+            RestClient.Builder restClientBuilder,
+            ObjectMapper objectMapper,
+            AiBriefProperties properties
+    ) {
+        Assert.hasText(properties.getApiKey(), "AI 브리프 API 키는 필수값입니다.");
+
+        this.restClient = restClientBuilder.build();
+        this.objectMapper = objectMapper;
+        this.properties = properties;
+    }
+
+    @Override
+    public AiInterviewResult generate(AiInterviewGenerateRequest request) {
+        Assert.notNull(request, "AI 인터뷰 요청은 필수값입니다.");
+
+        try {
+            JsonNode responseBody = restClient.post()
+                    .uri(properties.getApiUrl())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .headers(headers -> headers.setBearerAuth(properties.getApiKey()))
+                    .body(buildRequestBody(request))
+                    .retrieve()
+                    .body(JsonNode.class);
+
+            String responseText = extractResponseText(responseBody);
+            try {
+                return toAiInterviewResult(responseText);
+            } catch (JsonProcessingException exception) {
+                log.warn("AI 인터뷰 응답 JSON 파싱 실패. responseText={}", abbreviate(responseText, 2000), exception);
+                throw exception;
+            }
+        } catch (AiBriefGenerationException exception) {
+            throw exception;
+        } catch (RestClientException exception) {
+            throw new AiBriefGenerationException("OpenAI AI 인터뷰 호출에 실패했습니다.", exception);
+        } catch (JsonProcessingException exception) {
+            throw new AiBriefGenerationException("AI 인터뷰 응답 파싱에 실패했습니다.", exception);
+        } catch (RuntimeException exception) {
+            throw new AiBriefGenerationException("AI 인터뷰 생성에 실패했습니다.", exception);
+        }
+    }
+
+    private Map<String, Object> buildRequestBody(AiInterviewGenerateRequest request) {
+        Map<String, Object> requestBody = new LinkedHashMap<>();
+        requestBody.put("model", properties.getModel());
+        requestBody.put("instructions", INTERVIEW_GENERATION_INSTRUCTIONS);
+        requestBody.put("input", buildInput(request));
+        requestBody.put("max_output_tokens", properties.getMaxOutputTokens());
+
+        Map<String, Object> text = new LinkedHashMap<>();
+        text.put("format", buildJsonSchemaFormat());
+        requestBody.put("text", text);
+
+        return requestBody;
+    }
+
+    private String buildInput(AiInterviewGenerateRequest request) {
+        return """
+                [현재 제안서 폼 상태]
+                %s
+
+                [이전 대화 히스토리]
+                %s
+
+                [방금 사용자 메시지]
+                %s
+                """.formatted(
+                toJson(request.getProposalForm()),
+                blankToNone(request.getConversationText()),
+                request.getUserMessage()
+        );
+    }
+
+    private String toJson(ProposalForm proposalForm) {
+        try {
+            return objectMapper.writeValueAsString(proposalForm);
+        } catch (JsonProcessingException exception) {
+            throw new AiBriefGenerationException("AI 인터뷰 제안서 폼 직렬화에 실패했습니다.", exception);
+        }
+    }
+
+    private String blankToNone(String value) {
+        return StringUtils.hasText(value) ? value : "(없음)";
+    }
+
+    private Map<String, Object> buildJsonSchemaFormat() {
+        Map<String, Object> format = new LinkedHashMap<>();
+        format.put("type", "json_schema");
+        format.put("name", "proposal_ai_interview");
+        format.put("strict", true);
+        format.put("schema", buildSchema());
+        return format;
+    }
+
+    private Map<String, Object> buildSchema() {
+        Map<String, Object> schema = objectSchema();
+        schema.put("required", List.of("aiBriefResult", "assistantMessage"));
+
+        Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("aiBriefResult", buildAiBriefResultSchema());
+        properties.put("assistantMessage", Map.of("type", "string"));
+
+        schema.put("properties", properties);
+        return schema;
+    }
+
+    private Map<String, Object> buildAiBriefResultSchema() {
+        Map<String, Object> schema = objectSchema();
+
+        schema.put("required", List.of(
+                "title",
+                "description",
+                "totalBudgetMin",
+                "totalBudgetMax",
+                "expectedPeriod",
+                "positions"
+        ));
+
+        Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("title", nullableStringSchema());
+        properties.put("description", nullableStringSchema());
+        properties.put("totalBudgetMin", nullableIntegerSchema());
+        properties.put("totalBudgetMax", nullableIntegerSchema());
+        properties.put("expectedPeriod", nullableIntegerSchema());
+        properties.put("positions", Map.of(
+                "type", "array",
+                "items", buildPositionSchema()
+        ));
+
+        schema.put("properties", properties);
+        return schema;
+    }
+
+    private Map<String, Object> buildPositionSchema() {
+        Map<String, Object> schema = objectSchema();
+
+        schema.put("required", List.of(
+                "positionCategoryName",
+                "title",
+                "workType",
+                "headCount",
+                "unitBudgetMin",
+                "unitBudgetMax",
+                "expectedPeriod",
+                "careerMinYears",
+                "careerMaxYears",
+                "workPlace",
+                "skills"
+        ));
+
+        Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("positionCategoryName", Map.of("type", "string"));
+        properties.put("title", Map.of("type", "string"));
+        properties.put("workType", nullableEnumSchema("SITE", "REMOTE", "HYBRID"));
+        properties.put("headCount", nullableIntegerSchema());
+        properties.put("unitBudgetMin", nullableIntegerSchema());
+        properties.put("unitBudgetMax", nullableIntegerSchema());
+        properties.put("expectedPeriod", nullableIntegerSchema());
+        properties.put("careerMinYears", nullableIntegerSchema());
+        properties.put("careerMaxYears", nullableIntegerSchema());
+        properties.put("workPlace", nullableStringSchema());
+        properties.put("skills", Map.of(
+                "type", "array",
+                "items", buildSkillSchema()
+        ));
+
+        schema.put("properties", properties);
+        return schema;
+    }
+
+    private Map<String, Object> buildSkillSchema() {
+        Map<String, Object> schema = objectSchema();
+        schema.put("required", List.of("skillName", "importance"));
+        schema.put("properties", Map.of(
+                "skillName", Map.of("type", "string"),
+                "importance", nullableEnumSchema("ESSENTIAL", "PREFERENCE")
+        ));
+        return schema;
+    }
+
+    private Map<String, Object> objectSchema() {
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("type", "object");
+        schema.put("additionalProperties", false);
+        return schema;
+    }
+
+    private Map<String, Object> nullableStringSchema() {
+        return Map.of("type", List.of("string", "null"));
+    }
+
+    private Map<String, Object> nullableIntegerSchema() {
+        return Map.of("type", List.of("integer", "null"));
+    }
+
+    private Map<String, Object> nullableEnumSchema(String... values) {
+        List<Object> enumValues = new ArrayList<>(List.of(values));
+        enumValues.add(null);
+        return Map.of(
+                "type", List.of("string", "null"),
+                "enum", enumValues
+        );
+    }
+
+    private String extractResponseText(JsonNode responseBody) {
+        if (responseBody == null || responseBody.isNull()) {
+            throw new AiBriefGenerationException("AI 인터뷰 응답이 비어 있습니다.");
+        }
+
+        String directOutput = readText(responseBody.get("output_text"));
+        if (StringUtils.hasText(directOutput)) {
+            return directOutput;
+        }
+
+        String refusalMessage = null;
+        JsonNode output = responseBody.get("output");
+        if (output != null && output.isArray()) {
+            for (JsonNode item : output) {
+                JsonNode content = item.get("content");
+                if (content == null || !content.isArray()) {
+                    continue;
+                }
+                for (JsonNode contentItem : content) {
+                    String text = readText(contentItem.get("text"));
+                    if (StringUtils.hasText(text)) {
+                        return text;
+                    }
+                    String refusal = readText(contentItem.get("refusal"));
+                    if (StringUtils.hasText(refusal)) {
+                        refusalMessage = refusal;
+                    }
+                }
+            }
+        }
+
+        if (StringUtils.hasText(refusalMessage)) {
+            throw new AiBriefGenerationException("AI 인터뷰 생성을 거부했습니다. " + refusalMessage);
+        }
+        throw new AiBriefGenerationException("AI 인터뷰 응답에서 본문을 찾을 수 없습니다.");
+    }
+
+    private String readText(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        if (node.isTextual()) {
+            return node.asText();
+        }
+        JsonNode valueNode = node.get("value");
+        if (valueNode != null && valueNode.isTextual()) {
+            return valueNode.asText();
+        }
+        return null;
+    }
+
+    private AiInterviewResult toAiInterviewResult(String responseText) throws JsonProcessingException {
+        JsonNode root = objectMapper.readTree(extractJsonObject(responseText));
+
+        return AiInterviewResult.of(
+                parseAiBriefResult(root.get("aiBriefResult")),
+                normalizeRequiredText(root.get("assistantMessage"), "AI 인터뷰 후속 질문은 필수값입니다.")
+        );
+    }
+
+    private AiBriefResult parseAiBriefResult(JsonNode node) {
+        if (node == null || node.isNull() || !node.isObject()) {
+            throw new AiBriefGenerationException("AI 인터뷰 브리프 결과가 비어 있습니다.");
+        }
+
+        return AiBriefResult.of(
+                normalizeText(node.get("title")),
+                normalizeText(node.get("description")),
+                asLong(node.get("totalBudgetMin")),
+                asLong(node.get("totalBudgetMax")),
+                asLong(node.get("expectedPeriod")),
+                parsePositions(node.get("positions"))
+        );
+    }
+
+    private String extractJsonObject(String responseText) throws JsonProcessingException {
+        if (!StringUtils.hasText(responseText)) {
+            throw new JsonProcessingException("AI 인터뷰 응답 본문이 비어 있습니다.") {
+            };
+        }
+
+        String text = stripCodeFence(responseText.trim());
+        int start = text.indexOf('{');
+        int end = text.lastIndexOf('}');
+
+        if (start < 0 || end < start) {
+            throw new JsonProcessingException("AI 인터뷰 응답에서 JSON 객체를 찾을 수 없습니다. responseText="
+                    + abbreviate(text, 500)) {
+            };
+        }
+
+        return text.substring(start, end + 1);
+    }
+
+    private String stripCodeFence(String responseText) {
+        String text = responseText.trim();
+
+        if (text.startsWith("```")) {
+            int firstLineEnd = text.indexOf('\n');
+            int lastFenceStart = text.lastIndexOf("```");
+
+            if (firstLineEnd >= 0 && lastFenceStart > firstLineEnd) {
+                return text.substring(firstLineEnd + 1, lastFenceStart).trim();
+            }
+        }
+
+        return text;
+    }
+
+    private String abbreviate(String value, int maxLength) {
+        if (value == null) {
+            return null;
+        }
+        if (value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength) + "...";
+    }
+
+    private List<AiBriefPositionResult> parsePositions(JsonNode positionsNode) {
+        if (positionsNode == null || positionsNode.isNull() || !positionsNode.isArray()) {
+            return List.of();
+        }
+
+        List<AiBriefPositionResult> positions = new ArrayList<>();
+        for (JsonNode positionNode : positionsNode) {
+            positions.add(AiBriefPositionResult.of(
+                    normalizeRequiredText(positionNode.get("positionCategoryName"), "AI 인터뷰 포지션 카테고리는 필수값입니다."),
+                    normalizeRequiredText(positionNode.get("title"), "AI 인터뷰 포지션 제목은 필수값입니다."),
+                    parseWorkType(positionNode.get("workType")),
+                    asLong(positionNode.get("headCount")),
+                    asLong(positionNode.get("unitBudgetMin")),
+                    asLong(positionNode.get("unitBudgetMax")),
+                    asLong(positionNode.get("expectedPeriod")),
+                    asInteger(positionNode.get("careerMinYears")),
+                    asInteger(positionNode.get("careerMaxYears")),
+                    normalizeText(positionNode.get("workPlace")),
+                    parseSkills(positionNode.get("skills"))
+            ));
+        }
+        return positions;
+    }
+
+    private List<AiBriefSkillResult> parseSkills(JsonNode skillsNode) {
+        if (skillsNode == null || skillsNode.isNull() || !skillsNode.isArray()) {
+            return List.of();
+        }
+
+        List<AiBriefSkillResult> skills = new ArrayList<>();
+        for (JsonNode skillNode : skillsNode) {
+            skills.add(AiBriefSkillResult.of(
+                    normalizeRequiredText(skillNode.get("skillName"), "AI 인터뷰 스킬명은 필수값입니다."),
+                    parseImportance(skillNode.get("importance"))
+            ));
+        }
+        return skills;
+    }
+
+    private ProposalWorkType parseWorkType(JsonNode node) {
+        String value = normalizeText(node);
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            return ProposalWorkType.valueOf(value.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            throw new AiBriefGenerationException("지원하지 않는 근무 형태입니다. value=" + value, exception);
+        }
+    }
+
+    private ProposalPositionSkillImportance parseImportance(JsonNode node) {
+        String value = normalizeText(node);
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            return ProposalPositionSkillImportance.valueOf(value.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            throw new AiBriefGenerationException("지원하지 않는 스킬 중요도입니다. value=" + value, exception);
+        }
+    }
+
+    private Long asLong(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        if (node.isIntegralNumber()) {
+            return node.longValue();
+        }
+        String value = normalizeText(node);
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException exception) {
+            throw new AiBriefGenerationException("숫자 필드 파싱에 실패했습니다. value=" + value, exception);
+        }
+    }
+
+    private Integer asInteger(JsonNode node) {
+        Long value = asLong(node);
+        if (value == null) {
+            return null;
+        }
+        if (value < Integer.MIN_VALUE || value > Integer.MAX_VALUE) {
+            throw new AiBriefGenerationException("정수 범위를 벗어났습니다. value=" + value);
+        }
+        return value.intValue();
+    }
+
+    private String normalizeRequiredText(JsonNode node, String message) {
+        String value = normalizeText(node);
+        Assert.hasText(value, message);
+        return value;
+    }
+
+    private String normalizeText(JsonNode node) {
+        String value = readText(node);
+        return StringUtils.hasText(value) ? value.trim() : null;
+    }
+}
