@@ -47,6 +47,8 @@ public class ProposalAiInterviewService {
         );
 
         ProposalForm proposalFormBeforeAi = ProposalForm.from(proposal);
+        proposalFormBeforeAi.setRawInputText("");
+
         AiInterviewResult aiInterviewResult = generateAiInterview(
                 proposalFormBeforeAi,
                 previousConversationText,
