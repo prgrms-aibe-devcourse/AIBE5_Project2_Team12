@@ -16,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -24,6 +25,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+@Slf4j
 @Component
 @ConditionalOnProperty(prefix = "ai.brief", name = "enabled", havingValue = "true")
 public class OpenAiAiBriefGenerator implements AiBriefGenerator {
@@ -34,6 +36,7 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
 
             규칙:
             - 반드시 JSON만 반환한다.
+            - 마크다운 코드블록, 설명문, 주석, 추가 텍스트를 절대 포함하지 않는다.
             - title, description은 한국어로 자연스럽게 작성한다.
             - 근거가 부족한 값은 추측하지 말고 null로 반환한다.
             - totalBudgetMin, totalBudgetMax, unitBudgetMin, unitBudgetMax는 원화 기준 정수로 반환한다.
@@ -47,6 +50,11 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
             - skills.importance는 ESSENTIAL 또는 PREFERENCE만 사용한다.
             - importance를 확신할 수 없으면 PREFERENCE를 사용한다.
             - skillName은 짧고 일반적인 명칭으로 정리한다.
+            - 정보가 부족하면 positions는 1~3개 이내로 생성한다.
+            - position별 skills는 최대 4개까지만 반환한다.
+            - 사용자가 명시하지 않은 포지션은 과도하게 늘리지 않는다.
+            - 입력은 시간순 요청 목록이다.
+            - 사용자가 제거/삭제/빼달라고 한 포지션은 positions에서 제외한다.
             """;
 
     private final RestClient restClient;
@@ -54,7 +62,7 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
     private final AiBriefProperties properties;
 
     public OpenAiAiBriefGenerator(RestClient.Builder restClientBuilder, ObjectMapper objectMapper,
-            AiBriefProperties properties) {
+                                  AiBriefProperties properties) {
         Assert.hasText(properties.getApiKey(), "AI 브리프 API 키는 필수값입니다.");
 
         this.restClient = restClientBuilder.build();
@@ -76,7 +84,12 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
                     .body(JsonNode.class);
 
             String responseText = extractResponseText(responseBody);
-            return toAiBriefResult(responseText);
+            try {
+                return toAiBriefResult(responseText);
+            } catch (JsonProcessingException exception) {
+                log.warn("AI 브리프 응답 JSON 파싱 실패. responseText={}", abbreviate(responseText, 2000), exception);
+                throw exception;
+            }
         } catch (AiBriefGenerationException exception) {
             throw exception;
         } catch (RestClientException exception) {
@@ -257,7 +270,7 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
     }
 
     private AiBriefResult toAiBriefResult(String responseText) throws JsonProcessingException {
-        JsonNode root = objectMapper.readTree(responseText);
+        JsonNode root = objectMapper.readTree(extractJsonObject(responseText));
 
         return AiBriefResult.of(
                 normalizeText(root.get("title")),
@@ -267,6 +280,50 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
                 asLong(root.get("expectedPeriod")),
                 parsePositions(root.get("positions"))
         );
+    }
+
+    private String extractJsonObject(String responseText) throws JsonProcessingException {
+        if (!StringUtils.hasText(responseText)) {
+            throw new JsonProcessingException("AI 브리프 응답 본문이 비어 있습니다.") {
+            };
+        }
+
+        String text = stripCodeFence(responseText.trim());
+        int start = text.indexOf('{');
+        int end = text.lastIndexOf('}');
+
+        if (start < 0 || end < start) {
+            throw new JsonProcessingException("AI 브리프 응답에서 JSON 객체를 찾을 수 없습니다. responseText="
+                    + abbreviate(text, 500)) {
+            };
+        }
+
+        return text.substring(start, end + 1);
+    }
+
+    private String stripCodeFence(String responseText) {
+        String text = responseText.trim();
+
+        if (text.startsWith("```")) {
+            int firstLineEnd = text.indexOf('\n');
+            int lastFenceStart = text.lastIndexOf("```");
+
+            if (firstLineEnd >= 0 && lastFenceStart > firstLineEnd) {
+                return text.substring(firstLineEnd + 1, lastFenceStart).trim();
+            }
+        }
+
+        return text;
+    }
+
+    private String abbreviate(String value, int maxLength) {
+        if (value == null) {
+            return null;
+        }
+        if (value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength) + "...";
     }
 
     private List<AiBriefPositionResult> parsePositions(JsonNode positionsNode) {

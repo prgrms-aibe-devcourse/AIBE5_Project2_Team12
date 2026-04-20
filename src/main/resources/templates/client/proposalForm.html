@@ -31,6 +31,7 @@
             <input type="hidden" name="status" :value="status">
             <input type="hidden" name="rawInputText" :value="rawInputText">
             <input type="hidden" name="submitAction" :value="submitAction">
+            <input type="hidden" name="aiBriefRequested" :value="aiBriefRequested">
 
             <template x-for="(position, index) in positions" :key="position.clientKey">
                 <div>
@@ -71,7 +72,7 @@
                                 <p class="text-xs font-black uppercase tracking-widest text-slate-400">AI Proposal Interview</p>
                                 <h1 class="mt-2 text-2xl font-black tracking-tight text-slate-950">AI 제안서 작성 도우미</h1>
                                 <p class="mt-2 text-sm leading-7 text-slate-500">
-                                    프로젝트 아이디어를 먼저 정리해두면, 다음 단계에서 AI 인터뷰 흐름과 폼 자동 채움 기능을 연결할 수 있습니다.
+                                    프로젝트 아이디어를 먼저 적어주세요. AI가 내용을 분석해 제안서 초안을 만들고, 오른쪽 폼에 자동으로 반영합니다.
                                 </p>
                             </div>
 
@@ -79,24 +80,40 @@
                                 <div class="space-y-5">
                                     <div class="max-w-[92%] rounded-[24px] border border-slate-200 bg-slate-50 px-5 py-4 text-sm leading-7 text-slate-600">
                                         안녕하세요! 만들고 싶은 IT 서비스나 프로젝트를 자유롭게 적어주세요.
-                                        이 입력은 다음 단계에서 AI 브리프와 후속 질문의 기준이 됩니다.
+                                        전송하면 입력 내용을 저장하고 AI 브리프 생성 흐름을 시작합니다.
                                     </div>
 
                                     <template x-if="rawInputText.trim().length > 0">
                                         <div class="space-y-5">
-                                            <div class="ml-auto max-w-[88%] rounded-[24px] bg-slate-950 px-5 py-4 text-sm leading-7 text-white shadow-sm shadow-slate-900/10"
+                                            <div class="ml-auto max-w-[88%] whitespace-pre-line rounded-[24px] bg-slate-950 px-5 py-4 text-sm leading-7 text-white shadow-sm shadow-slate-900/10"
                                                  x-text="rawInputText"></div>
 
                                             <div class="max-w-[92%] rounded-[24px] border border-blue-100 bg-blue-50 px-5 py-4 text-sm leading-7 text-blue-700">
-                                                프로젝트 원본 입력을 확인했습니다. 실제 후속 질문과 제안서 자동 채움 로직은 다음 단계에서 연결할 예정입니다.
+                                                프로젝트 원본 입력을 확인했습니다. AI 브리프를 생성하면 오른쪽 폼이 갱신될 수 있습니다.
                                             </div>
                                         </div>
                                     </template>
 
                                     <template x-if="rawInputText.trim().length === 0">
                                         <div class="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-6 py-8 text-sm leading-7 text-slate-500">
-                                            아직 입력된 프로젝트 아이디어가 없습니다. 아래 입력창에 원하는 서비스를 적어두면, 이후 AI 인터뷰 단계에서 이 내용을 바탕으로 질문을 이어갑니다.
+                                            아직 입력된 프로젝트 아이디어가 없습니다. 아래 입력창에 원하는 서비스를 적어두면, AI가 제안서 초안을 만들기 위한 원본 입력으로 저장합니다.
                                         </div>
+                                    </template>
+
+                                    <template x-if="aiBriefNoticeMessage">
+                                        <div class="max-w-[92%] rounded-[24px] border border-amber-100 bg-amber-50 px-5 py-4 text-sm leading-7 text-amber-700"
+                                             x-text="aiBriefNoticeMessage"></div>
+                                    </template>
+
+                                    <template x-if="aiBriefLoading">
+                                        <div class="max-w-[92%] rounded-[24px] border border-blue-100 bg-blue-50 px-5 py-4 text-sm leading-7 text-blue-700">
+                                            AI가 프로젝트 내용을 분석하고 제안서 초안을 작성하고 있습니다. 잠시만 기다려주세요.
+                                        </div>
+                                    </template>
+
+                                    <template x-if="aiBriefErrorMessage">
+                                        <div class="max-w-[92%] rounded-[24px] border border-red-100 bg-red-50 px-5 py-4 text-sm leading-7 text-red-700"
+                                             x-text="aiBriefErrorMessage"></div>
                                     </template>
                                 </div>
                             </div>
@@ -107,12 +124,25 @@
                                     <textarea id="draftInput"
                                               x-model="draftInput"
                                               rows="2"
+                                              :disabled="aiBriefLoading"
                                               placeholder="예: 온라인 쇼핑몰 앱을 만들고 싶어요. 결제와 관리자 화면이 필요합니다."
-                                              class="min-h-[72px] flex-1 rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"></textarea>
+                                              class="min-h-[72px] flex-1 rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"></textarea>
                                     <button type="button"
                                             @click="sendPrompt()"
-                                            class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white transition hover:bg-slate-800">
-                                        <i data-lucide="send" class="h-4 w-4"></i>
+                                            :disabled="aiBriefLoading"
+                                            aria-label="프로젝트 아이디어 전송"
+                                            class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-sm shadow-slate-900/10 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400">
+                                        <svg xmlns="http://www.w3.org/2000/svg"
+                                             viewBox="0 0 24 24"
+                                             fill="none"
+                                             stroke="currentColor"
+                                             stroke-width="2"
+                                             stroke-linecap="round"
+                                             stroke-linejoin="round"
+                                             class="h-5 w-5 text-white">
+                                            <path d="m22 2-7 20-4-9-9-4Z"></path>
+                                            <path d="M22 2 11 13"></path>
+                                        </svg>
                                     </button>
                                 </div>
                                 <p th:if="${#fields.hasErrors('rawInputText')}"
@@ -132,58 +162,54 @@
 
                         <div class="h-full overflow-y-auto">
                             <div class="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-6 py-5 backdrop-blur lg:px-8">
-                                <div class="flex flex-wrap items-start justify-between gap-5">
-                                    <div>
-                                        <p class="text-xs font-black uppercase tracking-widest text-slate-400">Proposal Editor</p>
-                                        <h2 class="mt-2 text-3xl font-black tracking-tight text-slate-950">제안서 작성</h2>
-                                        <p class="mt-2 text-sm leading-7 text-slate-500">
-                                            AI가 자동으로 작성하거나 직접 수정할 수 있습니다. 현재 단계에서는 편집기 구조와 포지션 편집 흐름을 먼저 맞춥니다.
-                                        </p>
-                                        <div class="mt-4 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-400">
-                                            <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">
-                                                <i data-lucide="user-round" class="h-3.5 w-3.5"></i>
-                                                <span th:text="${memberName}">클라이언트</span>
-                                            </span>
-                                            <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">
-                                                <i data-lucide="mail" class="h-3.5 w-3.5"></i>
-                                                <span th:text="${memberEmail}">seed.client@itda.local</span>
-                                            </span>
-                                            <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">
-                                                <i data-lucide="badge-check" class="h-3.5 w-3.5"></i>
-                                                <span th:text="${proposalForm.status != null ? proposalForm.status.description : '작성 중'}">작성 중</span>
-                                            </span>
-                                            <span th:if="${proposalId != null}"
-                                                  class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">
-                                                <i data-lucide="hash" class="h-3.5 w-3.5"></i>
-                                                <span th:text="'Proposal #' + ${proposalId}">Proposal #1</span>
-                                            </span>
-                                        </div>
+                                <div class="max-w-5xl">
+                                    <p class="text-xs font-black uppercase tracking-widest text-slate-400">Proposal Editor</p>
+                                    <h2 class="mt-2 text-3xl font-black tracking-tight text-slate-950">제안서 작성</h2>
+                                    <p class="mt-2 text-sm leading-7 text-slate-500">
+                                        AI가 자동으로 작성하거나 직접 수정할 수 있습니다. 현재 단계에서는 편집기 구조와 포지션 편집 흐름을 먼저 맞춥니다.
+                                    </p>
+                                    <div class="mt-4 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-400">
+                                        <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">
+                                            <i data-lucide="user-round" class="h-3.5 w-3.5"></i>
+                                            <span th:text="${memberName}">클라이언트</span>
+                                        </span>
+                                        <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">
+                                            <i data-lucide="mail" class="h-3.5 w-3.5"></i>
+                                            <span th:text="${memberEmail}">seed.client@itda.local</span>
+                                        </span>
+                                        <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">
+                                            <i data-lucide="badge-check" class="h-3.5 w-3.5"></i>
+                                            <span th:text="${proposalForm.status != null ? proposalForm.status.description : '작성 중'}">작성 중</span>
+                                        </span>
+                                        <span th:if="${proposalId != null}"
+                                              class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">
+                                            <i data-lucide="hash" class="h-3.5 w-3.5"></i>
+                                            <span th:text="'Proposal #' + ${proposalId}">Proposal #1</span>
+                                        </span>
                                     </div>
 
-                                    <div class="flex flex-col items-start gap-3 sm:items-end">
-                                        <div class="flex flex-wrap items-center gap-3">
-                                            <a th:href="@{/client/dashboard}"
-                                               class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600">
-                                                <i data-lucide="arrow-left" class="h-4 w-4"></i>
-                                                대시보드로
-                                            </a>
-                                            <button type="button"
-                                                    @click="submitProposal('save')"
-                                                    class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600">
-                                                <i data-lucide="save" class="h-4 w-4"></i>
-                                                임시저장
-                                            </button>
-                                            <button type="button"
-                                                    @click="submitProposal('register')"
-                                                    class="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-slate-900/10 transition hover:bg-slate-800">
-                                                <i data-lucide="rocket" class="h-4 w-4"></i>
-                                                제안서 등록
-                                            </button>
-                                        </div>
-                                        <p class="text-xs font-semibold text-slate-400">
-                                            임시저장은 작성 중 상태로 저장되고, 제안서 등록은 검증을 통과하면 MATCHING 상태로 전환됩니다.
-                                        </p>
+                                    <div class="mt-5 flex flex-wrap items-center gap-3">
+                                        <a th:href="@{/client/dashboard}"
+                                           class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600">
+                                            <i data-lucide="arrow-left" class="h-4 w-4"></i>
+                                            대시보드로
+                                        </a>
+                                        <button type="button"
+                                                @click="submitProposal('save')"
+                                                class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600">
+                                            <i data-lucide="save" class="h-4 w-4"></i>
+                                            임시저장
+                                        </button>
+                                        <button type="button"
+                                                @click="submitProposal('register')"
+                                                class="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-slate-900/10 transition hover:bg-slate-800">
+                                            <i data-lucide="rocket" class="h-4 w-4"></i>
+                                            제안서 등록
+                                        </button>
                                     </div>
+                                    <p class="mt-3 text-xs font-semibold text-slate-400">
+                                        임시저장은 작성 중 상태로 저장되고, 제안서 등록은 검증을 통과하면 MATCHING 상태로 전환됩니다.
+                                    </p>
                                 </div>
                             </div>
 
@@ -594,6 +620,7 @@
             status: /*[[${proposalForm.status != null ? proposalForm.status.name() : 'WRITING'}]]*/ 'WRITING',
             title: /*[[${proposalForm.title}]]*/ '',
             rawInputText: /*[[${proposalForm.rawInputText}]]*/ '',
+            aiBriefRequested: /*[[${aiBriefRequested}]]*/ false,
             description: /*[[${proposalForm.description}]]*/ '',
             expectedPeriod: /*[[${proposalForm.expectedPeriod}]]*/ null,
             workTypes: [
@@ -647,9 +674,13 @@
                 loaded: false,
                 chatOpen: true,
                 submitAction: 'save',
+                aiBriefRequested: Boolean(bootstrap.aiBriefRequested),
+                aiBriefNoticeMessage: '',
+                aiBriefLoading: false,
+                aiBriefErrorMessage: '',
                 title: bootstrap.title || '',
                 rawInputText: bootstrap.rawInputText || '',
-                draftInput: bootstrap.rawInputText || '',
+                draftInput: '',
                 description: bootstrap.description || '',
                 expectedPeriod: bootstrap.expectedPeriod ?? '',
                 status: bootstrap.status || 'WRITING',
@@ -669,6 +700,12 @@
                     this.currentPosition = this.blankPosition();
                     this.loaded = true;
                     this.refreshIcons();
+
+                    if (this.aiBriefRequested && bootstrap.proposalId) {
+                        this.$nextTick(() => {
+                            this.generateAiBrief();
+                        });
+                    }
                 },
 
                 toggleChat() {
@@ -680,8 +717,90 @@
                     if (!this.draftInput || !this.draftInput.trim()) {
                         return;
                     }
-                    this.rawInputText = this.draftInput.trim();
+
+                    this.rawInputText = this.appendRawInput(this.rawInputText, this.draftInput);
+                    this.draftInput = '';
+                    this.aiBriefNoticeMessage = '프로젝트 원본 입력을 저장했습니다. 기존 입력값은 AI 결과로 갱신될 수 있습니다.';
+                    this.aiBriefErrorMessage = '';
+
+                    if (!this.title || !this.title.trim()) {
+                        this.title = 'AI 브리프 작성 중';
+                    }
+
+                    this.aiBriefRequested = true;
+                    this.submitAction = 'save';
+                    this.$nextTick(() => {
+                        this.$root.requestSubmit();
+                    });
+                },
+
+                appendRawInput(current, input) {
+                    const trimmed = (input || '').trim();
+                    if (!trimmed) {
+                        return current || '';
+                    }
+
+                    const line = `- ${trimmed}`;
+                    if (!current || !current.trim()) {
+                        return line;
+                    }
+
+                    return `${current.trim()}\n${line}`;
+                },
+
+                async generateAiBrief() {
+                    if (!bootstrap.proposalId || this.aiBriefLoading) {
+                        return;
+                    }
+
+                    this.aiBriefLoading = true;
+                    this.aiBriefErrorMessage = '';
+                    this.aiBriefNoticeMessage = 'AI가 제안서 초안을 생성하고 있습니다. 기존 입력값은 AI 결과로 갱신될 수 있습니다.';
                     this.refreshIcons();
+
+                    try {
+                        const response = await fetch(`/proposals/${bootstrap.proposalId}/ai-brief`, {
+                            method: 'POST',
+                            headers: {
+                                ...this.csrfHeaders(),
+                                'Accept': 'application/json'
+                            }
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(await this.extractErrorMessage(response));
+                        }
+
+                        this.aiBriefNoticeMessage = 'AI 브리프가 제안서에 반영되었습니다. 자동 채움 결과를 불러옵니다.';
+                        window.location.replace(`/proposals/${bootstrap.proposalId}/edit`);
+                    } catch (error) {
+                        this.aiBriefErrorMessage = error.message || 'AI 브리프 생성에 실패했습니다. 잠시 후 다시 시도하거나 오른쪽 폼을 직접 작성해주세요.';
+                        this.aiBriefNoticeMessage = '';
+                        this.aiBriefRequested = false;
+                    } finally {
+                        this.aiBriefLoading = false;
+                        this.refreshIcons();
+                    }
+                },
+
+                csrfHeaders() {
+                    const token = document.querySelector('meta[name="_csrf"]')?.getAttribute('content');
+                    const header = document.querySelector('meta[name="_csrf_header"]')?.getAttribute('content') || 'X-CSRF-TOKEN';
+
+                    if (!token) {
+                        return {};
+                    }
+
+                    return { [header]: token };
+                },
+
+                async extractErrorMessage(response) {
+                    try {
+                        const data = await response.json();
+                        return data.message || data.error || 'AI 브리프 생성에 실패했습니다. 잠시 후 다시 시도하거나 오른쪽 폼을 직접 작성해주세요.';
+                    } catch (error) {
+                        return 'AI 브리프 생성에 실패했습니다. 잠시 후 다시 시도하거나 오른쪽 폼을 직접 작성해주세요.';
+                    }
                 },
 
                 openAddPosition() {
@@ -760,6 +879,7 @@
 
                 submitProposal(action) {
                     this.submitAction = action;
+                    this.aiBriefRequested = false;
                     this.$nextTick(() => {
                         this.$root.requestSubmit();
                     });
@@ -846,7 +966,7 @@
                         errors.push('모집 인원은 1명 이상이어야 합니다.');
                     }
                     if ((position.workType === 'SITE' || position.workType === 'HYBRID')
-                            && (!position.workPlace || !position.workPlace.trim())) {
+                        && (!position.workPlace || !position.workPlace.trim())) {
                         errors.push('상주 또는 하이브리드 근무 포지션은 근무지를 입력해야 합니다.');
                     }
                     if (position.workType === 'REMOTE' && position.workPlace && position.workPlace.trim()) {

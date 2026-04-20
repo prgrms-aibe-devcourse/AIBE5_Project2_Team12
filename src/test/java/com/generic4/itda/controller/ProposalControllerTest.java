@@ -70,7 +70,8 @@ class ProposalControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(view().name("client/proposalForm"))
                 .andExpect(model().attributeExists("proposalForm", "positionOptions", "workTypes"))
-                .andExpect(model().attribute("isNew", true));
+                .andExpect(model().attribute("isNew", true))
+                .andExpect(model().attribute("aiBriefRequested", false));
     }
 
     @Test
@@ -97,6 +98,35 @@ class ProposalControllerTest {
                         .param("rawInputText", ""))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/proposals/1/edit"));
+
+        then(proposalService).should().saveDraft(anyString(), any(ProposalForm.class));
+    }
+
+    @Test
+    @DisplayName("AI 브리프 요청과 함께 임시저장하면 수정 화면에서 자동 생성을 요청한다")
+    void saveDraftAndRedirectToEditWithAiBriefRequested() throws Exception {
+        Proposal proposal = org.mockito.Mockito.mock(Proposal.class);
+        given(proposal.getId()).willReturn(1L);
+        given(positionRepository.findAll(any(Sort.class))).willReturn(List.of());
+        given(proposalService.saveDraft(anyString(), any(ProposalForm.class))).willReturn(proposal);
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(post("/proposals/new")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        )))
+                        .with(csrf())
+                        .param("submitAction", "save")
+                        .param("aiBriefRequested", "true")
+                        .param("title", "AI 브리프 작성 중")
+                        .param("rawInputText", "- 온라인 쇼핑몰 앱을 만들고 싶습니다."))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/proposals/1/edit?aiBriefRequested=true"));
 
         then(proposalService).should().saveDraft(anyString(), any(ProposalForm.class));
     }
@@ -157,10 +187,12 @@ class ProposalControllerTest {
                         .with(csrf())
                         .param("submitAction", "register")
                         .param("title", "쇼핑몰 앱 개발")
-                        .param("rawInputText", ""))
+                        .param("rawInputText", "")
+                        .param("aiBriefRequested", "true"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("client/proposalForm"))
-                .andExpect(model().attributeHasErrors("proposalForm"));
+                .andExpect(model().attributeHasErrors("proposalForm"))
+                .andExpect(model().attribute("aiBriefRequested", true));
 
         then(proposalService).should(never()).register(anyString(), any(ProposalForm.class));
     }
@@ -188,6 +220,8 @@ class ProposalControllerTest {
         given(positionRepository.findAll(any(Sort.class)))
                 .willReturn(List.of(Position.create("백엔드 개발자")));
         given(proposalService.findOwnedProposal(1L, "client@example.com")).willReturn(proposal);
+        given(proposalService.findOwnedProposalForm(1L, "client@example.com"))
+                .willReturn(ProposalForm.from(proposal));
 
         ItDaPrincipal principal = ItDaPrincipal.from(
                 createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
@@ -202,7 +236,74 @@ class ProposalControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(view().name("client/proposalForm"))
                 .andExpect(model().attributeExists("proposalForm"))
-                .andExpect(model().attribute("isNew", false));
+                .andExpect(model().attribute("isNew", false))
+                .andExpect(model().attribute("aiBriefRequested", false));
+    }
+
+    @Test
+    @DisplayName("AI 브리프 요청 파라미터가 있으면 수정 화면 모델에 전달한다")
+    void renderEditFormWithAiBriefRequested() throws Exception {
+        Proposal proposal = Proposal.create(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678"),
+                "AI 브리프 작성 중",
+                "- 온라인 쇼핑몰 앱을 만들고 싶습니다.",
+                "",
+                null,
+                null,
+                null
+        );
+        given(positionRepository.findAll(any(Sort.class)))
+                .willReturn(List.of(Position.create("백엔드 개발자")));
+        given(proposalService.findOwnedProposal(1L, "client@example.com")).willReturn(proposal);
+        given(proposalService.findOwnedProposalForm(1L, "client@example.com"))
+                .willReturn(ProposalForm.from(proposal));
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(get("/proposals/1/edit")
+                        .param("aiBriefRequested", "true")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("client/proposalForm"))
+                .andExpect(model().attributeExists("proposalForm"))
+                .andExpect(model().attribute("proposalId", 1L))
+                .andExpect(model().attribute("isNew", false))
+                .andExpect(model().attribute("aiBriefRequested", true));
+    }
+
+    @Test
+    @DisplayName("수정 화면에서 AI 브리프 요청과 함께 임시저장하면 자동 생성 요청 파라미터를 유지한다")
+    void updateDraftAndRedirectToEditWithAiBriefRequested() throws Exception {
+        Proposal proposal = org.mockito.Mockito.mock(Proposal.class);
+        given(proposal.getId()).willReturn(1L);
+        given(positionRepository.findAll(any(Sort.class))).willReturn(List.of());
+        given(proposalService.saveDraft(any(Long.class), anyString(), any(ProposalForm.class))).willReturn(proposal);
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(post("/proposals/1/edit")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        )))
+                        .with(csrf())
+                        .param("submitAction", "save")
+                        .param("aiBriefRequested", "true")
+                        .param("title", "AI 브리프 작성 중")
+                        .param("rawInputText", "- 온라인 쇼핑몰 앱을 만들고 싶습니다."))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/proposals/1/edit?aiBriefRequested=true"));
+
+        then(proposalService).should().saveDraft(any(Long.class), anyString(), any(ProposalForm.class));
     }
 
     @Test

@@ -5,6 +5,7 @@ import com.generic4.itda.domain.matching.constant.MatchingStatus;
 import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
+import com.generic4.itda.domain.proposal.ProposalPositionSkill;
 import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
 import com.generic4.itda.domain.proposal.ProposalStatus;
 import com.generic4.itda.domain.skill.Skill;
@@ -16,11 +17,14 @@ import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.PositionRepository;
 import com.generic4.itda.repository.ProposalRepository;
 import com.generic4.itda.repository.SkillRepository;
-import jakarta.persistence.EntityManager;
-import java.util.EnumSet;
 import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
@@ -45,7 +49,6 @@ public class ProposalService {
     private final PositionRepository positionRepository;
     private final SkillRepository skillRepository;
     private final MatchingRepository matchingRepository;
-    private final EntityManager entityManager;
 
     public Proposal saveDraft(String memberEmail, ProposalForm form) {
         Member member = getMemberByEmail(memberEmail);
@@ -138,10 +141,14 @@ public class ProposalService {
             throw new AccessDeniedException("본인 제안서만 조회하거나 수정할 수 있습니다.");
         }
 
-        // ProposalPosition.skills도 1차 캐시에 로드 (LazyInitializationException 방지)
         proposalRepository.findPositionsWithSkillsByProposalId(proposalId);
-
         return proposal;
+    }
+
+    @Transactional(readOnly = true)
+    public ProposalForm findOwnedProposalForm(Long proposalId, String memberEmail) {
+        Proposal proposal = findOwnedProposal(proposalId, memberEmail);
+        return ProposalForm.from(proposal);
     }
 
     public Long calculateTotalBudgetMin(ProposalForm form) {
@@ -153,45 +160,150 @@ public class ProposalService {
     }
 
     private void replacePositions(Proposal proposal, List<ProposalPositionForm> positionForms) {
-        List<ProposalPosition> existingPositions = new ArrayList<>(proposal.getPositions());
-        for (ProposalPosition existingPosition : existingPositions) {
-            proposal.removePosition(existingPosition);
-        }
+        List<ProposalPositionForm> mergedPositionForms = mergePositionFormsByPositionId(positionForms);
+        Map<Long, ProposalPosition> existingById = existingPositionsById(proposal);
+        Map<Long, ProposalPosition> existingByPositionId = existingPositionsByPositionId(proposal);
+        Set<ProposalPosition> appliedPositions = new HashSet<>();
 
-        // DELETE가 INSERT보다 먼저 실행되도록 강제 flush
-        // (미실행 시 unique constraint 위반 발생)
-        entityManager.flush();
-
-        for (ProposalPositionForm positionForm : positionForms) {
+        for (ProposalPositionForm positionForm : mergedPositionForms) {
             Position position = getPosition(positionForm.getPositionId());
-            ProposalPosition proposalPosition = proposal.addPosition(
-                    position,
-                    positionForm.getTitle(),
-                    positionForm.getWorkType(),
-                    positionForm.getHeadCount(),
-                    positionForm.getUnitBudgetMin(),
-                    positionForm.getUnitBudgetMax(),
-                    positionForm.getExpectedPeriod(),
-                    positionForm.getCareerMinYears(),
-                    positionForm.getCareerMaxYears(),
-                    positionForm.getWorkPlace()
-            );
+            ProposalPosition proposalPosition = findExistingPosition(positionForm, position, existingById, existingByPositionId);
+
+            if (proposalPosition == null) {
+                proposalPosition = proposal.addPosition(
+                        position,
+                        positionForm.getTitle(),
+                        positionForm.getWorkType(),
+                        positionForm.getHeadCount(),
+                        positionForm.getUnitBudgetMin(),
+                        positionForm.getUnitBudgetMax(),
+                        positionForm.getExpectedPeriod(),
+                        positionForm.getCareerMinYears(),
+                        positionForm.getCareerMaxYears(),
+                        positionForm.getWorkPlace()
+                );
+            } else {
+                proposalPosition.update(
+                        position,
+                        positionForm.getTitle(),
+                        positionForm.getWorkType(),
+                        positionForm.getHeadCount(),
+                        positionForm.getUnitBudgetMin(),
+                        positionForm.getUnitBudgetMax(),
+                        positionForm.getExpectedPeriod(),
+                        positionForm.getCareerMinYears(),
+                        positionForm.getCareerMaxYears(),
+                        positionForm.getWorkPlace()
+                );
+            }
 
             if (positionForm.getStatus() != null) {
                 proposalPosition.changeStatus(positionForm.getStatus());
             }
 
-            addSkills(proposalPosition, positionForm.getEssentialSkillNames(), ProposalPositionSkillImportance.ESSENTIAL);
-            addSkills(proposalPosition, positionForm.getPreferredSkillNames(), ProposalPositionSkillImportance.PREFERENCE);
+            replaceSkills(proposalPosition, positionForm.getEssentialSkillNames(), positionForm.getPreferredSkillNames());
+            appliedPositions.add(proposalPosition);
+        }
+
+        removeMissingPositions(proposal, appliedPositions);
+    }
+
+    private List<ProposalPositionForm> mergePositionFormsByPositionId(List<ProposalPositionForm> positionForms) {
+        Map<Long, ProposalPositionForm> merged = new LinkedHashMap<>();
+        for (ProposalPositionForm positionForm : positionForms) {
+            if (positionForm.getPositionId() == null) {
+                continue;
+            }
+            merged.put(positionForm.getPositionId(), positionForm);
+        }
+        return new ArrayList<>(merged.values());
+    }
+
+    private Map<Long, ProposalPosition> existingPositionsById(Proposal proposal) {
+        Map<Long, ProposalPosition> existingPositions = new LinkedHashMap<>();
+        for (ProposalPosition proposalPosition : proposal.getPositions()) {
+            if (proposalPosition.getId() != null) {
+                existingPositions.put(proposalPosition.getId(), proposalPosition);
+            }
+        }
+        return existingPositions;
+    }
+
+    private Map<Long, ProposalPosition> existingPositionsByPositionId(Proposal proposal) {
+        Map<Long, ProposalPosition> existingPositions = new LinkedHashMap<>();
+        for (ProposalPosition proposalPosition : proposal.getPositions()) {
+            if (proposalPosition.getPosition() != null && proposalPosition.getPosition().getId() != null) {
+                existingPositions.put(proposalPosition.getPosition().getId(), proposalPosition);
+            }
+        }
+        return existingPositions;
+    }
+
+    private ProposalPosition findExistingPosition(
+            ProposalPositionForm positionForm,
+            Position position,
+            Map<Long, ProposalPosition> existingById,
+            Map<Long, ProposalPosition> existingByPositionId
+    ) {
+        if (positionForm.getId() != null && existingById.containsKey(positionForm.getId())) {
+            return existingById.get(positionForm.getId());
+        }
+        return existingByPositionId.get(position.getId());
+    }
+
+    private void removeMissingPositions(Proposal proposal, Set<ProposalPosition> appliedPositions) {
+        List<ProposalPosition> existingPositions = new ArrayList<>(proposal.getPositions());
+        for (ProposalPosition existingPosition : existingPositions) {
+            if (!appliedPositions.contains(existingPosition)) {
+                proposal.removePosition(existingPosition);
+            }
         }
     }
 
-    private void addSkills(ProposalPosition proposalPosition, List<String> skillNames,
-            ProposalPositionSkillImportance importance) {
+    private void replaceSkills(
+            ProposalPosition proposalPosition,
+            List<String> essentialSkillNames,
+            List<String> preferredSkillNames
+    ) {
+        Map<String, SkillApplication> desiredSkills = buildDesiredSkills(essentialSkillNames, preferredSkillNames);
+
+        List<ProposalPositionSkill> existingSkills = new ArrayList<>(proposalPosition.getSkills());
+        for (ProposalPositionSkill existingSkill : existingSkills) {
+            String key = normalizeKey(existingSkill.getSkill().getName());
+            SkillApplication desiredSkill = desiredSkills.remove(key);
+
+            if (desiredSkill == null) {
+                proposalPosition.removeSkill(existingSkill.getSkill());
+                continue;
+            }
+
+            existingSkill.changeImportance(desiredSkill.importance());
+        }
+
+        for (SkillApplication desiredSkill : desiredSkills.values()) {
+            proposalPosition.addSkill(desiredSkill.skill(), desiredSkill.importance());
+        }
+    }
+
+    private Map<String, SkillApplication> buildDesiredSkills(
+            List<String> essentialSkillNames,
+            List<String> preferredSkillNames
+    ) {
+        Map<String, SkillApplication> desiredSkills = new LinkedHashMap<>();
+        addDesiredSkills(desiredSkills, essentialSkillNames, ProposalPositionSkillImportance.ESSENTIAL);
+        addDesiredSkills(desiredSkills, preferredSkillNames, ProposalPositionSkillImportance.PREFERENCE);
+        return desiredSkills;
+    }
+
+    private void addDesiredSkills(
+            Map<String, SkillApplication> desiredSkills,
+            List<String> skillNames,
+            ProposalPositionSkillImportance importance
+    ) {
         for (String skillName : normalizeSkillNames(skillNames)) {
             Skill skill = skillRepository.findByName(skillName)
                     .orElseGet(() -> skillRepository.save(Skill.create(skillName, null)));
-            proposalPosition.addSkill(skill, importance);
+            desiredSkills.putIfAbsent(normalizeKey(skill.getName()), new SkillApplication(skill, importance));
         }
     }
 
@@ -206,6 +318,10 @@ public class ProposalService {
                 .collect(Collectors.toCollection(LinkedHashSet::new))
                 .stream()
                 .toList();
+    }
+
+    private String normalizeKey(String value) {
+        return value == null ? "" : value.trim();
     }
 
     private Long calculateTotalBudgetMin(List<ProposalPositionForm> positions) {
@@ -334,5 +450,8 @@ public class ProposalService {
             throw new AccessDeniedException("본인 제안서만 조회하거나 수정할 수 있습니다.");
         }
         return proposal;
+    }
+
+    private record SkillApplication(Skill skill, ProposalPositionSkillImportance importance) {
     }
 }

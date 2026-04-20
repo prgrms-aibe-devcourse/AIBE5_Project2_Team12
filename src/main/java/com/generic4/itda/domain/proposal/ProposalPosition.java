@@ -170,6 +170,14 @@ public class ProposalPosition extends BaseEntity {
         });
     }
 
+    public void clearSkills() {
+        List<ProposalPositionSkill> existingSkills = new ArrayList<>(this.skills);
+        for (ProposalPositionSkill existingSkill : existingSkills) {
+            existingSkill.detachFromProposalPosition();
+            this.skills.remove(existingSkill);
+        }
+    }
+
     void detachFromProposal() {
         this.proposal = null;
     }
