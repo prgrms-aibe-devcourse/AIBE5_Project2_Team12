@@ -102,7 +102,11 @@ class ProposalAiInterviewServiceTest {
         assertThat(generateRequestCaptor.getValue().getConversationText()).isEmpty();
         assertThat(generateRequestCaptor.getValue().getUserMessage()).isEqualTo("온라인 쇼핑몰 웹사이트를 만들고 싶어요.");
 
-        then(aiBriefProposalMapper).should().apply(proposal, aiBriefResult);
+        then(aiBriefProposalMapper).should().applyForInterview(
+                proposal,
+                aiBriefResult,
+                "온라인 쇼핑몰 웹사이트를 만들고 싶어요."
+        );
 
         assertThat(response.getProposalForm().getRawInputText()).isEqualTo(
                 "[USER] 온라인 쇼핑몰 웹사이트를 만들고 싶어요." + System.lineSeparator()
@@ -168,6 +172,12 @@ class ProposalAiInterviewServiceTest {
         );
         assertThat(generateRequestCaptor.getValue().getUserMessage()).isEqualTo("백엔드 개발자 2명, 프론트엔드 개발자 1명으로 갈게요.");
 
+        then(aiBriefProposalMapper).should().applyForInterview(
+                proposal,
+                aiBriefResult,
+                "백엔드 개발자 2명, 프론트엔드 개발자 1명으로 갈게요."
+        );
+
         assertThat(response.getMessages()).hasSize(4);
     }
 
@@ -212,7 +222,7 @@ class ProposalAiInterviewServiceTest {
 
         then(messageRepository).should(never()).save(any());
         then(aiInterviewGenerator).should(never()).generate(any());
-        then(aiBriefProposalMapper).should(never()).apply(any(), any());
+        then(aiBriefProposalMapper).should(never()).applyForInterview(any(), any(), any());
     }
 
     @Test
@@ -227,7 +237,7 @@ class ProposalAiInterviewServiceTest {
 
         then(messageRepository).should(never()).save(any());
         then(aiInterviewGenerator).should(never()).generate(any());
-        then(aiBriefProposalMapper).should(never()).apply(any(), any());
+        then(aiBriefProposalMapper).should(never()).applyForInterview(any(), any(), any());
     }
 
     @Test
@@ -243,7 +253,7 @@ class ProposalAiInterviewServiceTest {
 
         then(messageRepository).should(never()).save(any());
         then(aiInterviewGenerator).should(never()).generate(any());
-        then(aiBriefProposalMapper).should(never()).apply(any(), any());
+        then(aiBriefProposalMapper).should(never()).applyForInterview(any(), any(), any());
     }
 
     private Proposal createProposal() {

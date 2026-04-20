@@ -53,7 +53,11 @@ public class ProposalAiInterviewService {
                 savedUserMessage.getContent()
         );
 
-        aiBriefProposalMapper.apply(proposal, aiInterviewResult.getAiBriefResult());
+        aiBriefProposalMapper.applyForInterview(
+                proposal,
+                aiInterviewResult.getAiBriefResult(),
+                savedUserMessage.getContent()
+        );
 
         ProposalAiInterviewMessage savedAssistantMessage = saveAssistantMessage(
                 proposal,

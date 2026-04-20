@@ -38,6 +38,20 @@ public class AiBriefProposalMapper {
         Assert.notNull(proposal, "제안서는 필수값입니다.");
         Assert.notNull(aiBriefResult, "AI 브리프 결과는 필수값입니다.");
 
+        applyProposalFields(proposal, aiBriefResult);
+        mergePositions(proposal, aiBriefResult.getPositions(), true, Set.of());
+    }
+
+    public void applyForInterview(Proposal proposal, AiBriefResult aiBriefResult, String userMessage) {
+        Assert.notNull(proposal, "제안서는 필수값입니다.");
+        Assert.notNull(aiBriefResult, "AI 브리프 결과는 필수값입니다.");
+
+        Set<String> deletedPositionKeys = removeExplicitlyDeletedPositions(proposal, userMessage);
+        applyProposalFields(proposal, aiBriefResult);
+        mergePositions(proposal, aiBriefResult.getPositions(), false, deletedPositionKeys);
+    }
+
+    private void applyProposalFields(Proposal proposal, AiBriefResult aiBriefResult) {
         proposal.update(
                 resolveTitle(proposal, aiBriefResult),
                 proposal.getRawInputText(),
@@ -46,11 +60,14 @@ public class AiBriefProposalMapper {
                 resolveTotalBudgetMax(proposal, aiBriefResult),
                 resolveExpectedPeriod(proposal, aiBriefResult)
         );
-
-        mergePositions(proposal, aiBriefResult.getPositions());
     }
 
-    private void mergePositions(Proposal proposal, List<AiBriefPositionResult> positionResults) {
+    private void mergePositions(
+            Proposal proposal,
+            List<AiBriefPositionResult> positionResults,
+            boolean removePositionsNotInAiResult,
+            Set<String> ignoredPositionKeys
+    ) {
         if (positionResults == null || positionResults.isEmpty()) {
             return;
         }
@@ -60,7 +77,12 @@ public class AiBriefProposalMapper {
         Set<ProposalPosition> appliedPositions = new HashSet<>();
 
         for (PositionApplication application : applications) {
-            ProposalPosition proposalPosition = existingByPositionName.get(normalizeKey(application.position().getName()));
+            String positionKey = normalizeKey(application.position().getName());
+            if (ignoredPositionKeys.contains(positionKey)) {
+                continue;
+            }
+
+            ProposalPosition proposalPosition = existingByPositionName.get(positionKey);
             AiBriefPositionResult result = application.result();
             ProposalWorkType workType = resolveWorkType(result);
             String workPlace = resolveWorkPlace(workType, result.getWorkPlace());
@@ -97,7 +119,91 @@ public class AiBriefProposalMapper {
             appliedPositions.add(proposalPosition);
         }
 
-        removePositionsNotInAiResult(proposal, appliedPositions);
+        if (removePositionsNotInAiResult) {
+            removePositionsNotInAiResult(proposal, appliedPositions);
+        }
+    }
+
+    private Set<String> removeExplicitlyDeletedPositions(Proposal proposal, String userMessage) {
+        Set<String> deletedPositionKeys = new HashSet<>();
+        if (!StringUtils.hasText(userMessage)) {
+            return deletedPositionKeys;
+        }
+
+        List<String> messageParts = splitMessageParts(userMessage);
+        List<ProposalPosition> existingPositions = new ArrayList<>(proposal.getPositions());
+
+        for (ProposalPosition existingPosition : existingPositions) {
+            if (isExplicitlyDeleted(existingPosition, messageParts)) {
+                if (existingPosition.getPosition() != null) {
+                    deletedPositionKeys.add(normalizeKey(existingPosition.getPosition().getName()));
+                }
+                proposal.removePosition(existingPosition);
+            }
+        }
+
+        return deletedPositionKeys;
+    }
+
+    private boolean isExplicitlyDeleted(ProposalPosition existingPosition, List<String> messageParts) {
+        String positionName = existingPosition.getPosition() == null ? "" : existingPosition.getPosition().getName();
+        String title = existingPosition.getTitle();
+
+        for (String messagePart : messageParts) {
+            if (!hasDeleteIntent(messagePart)) {
+                continue;
+            }
+
+            String normalizedMessagePart = normalizeForContains(messagePart);
+            boolean positionNameMatched = containsNormalized(normalizedMessagePart, positionName);
+            boolean titleMatched = containsNormalized(normalizedMessagePart, title);
+
+            if (positionNameMatched || titleMatched) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private List<String> splitMessageParts(String userMessage) {
+        return List.of(userMessage.split("[,，.。!?！？\\n]|그리고|또|및|\\s+하고\\s+|\\s+가고\\s+|\\s+으로\\s+가고\\s+"))
+                .stream()
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .toList();
+    }
+
+    private boolean hasDeleteIntent(String messagePart) {
+        if (!StringUtils.hasText(messagePart)) {
+            return false;
+        }
+
+        String normalized = normalizeForContains(messagePart);
+        return normalized.contains("빼")
+                || normalized.contains("제외")
+                || normalized.contains("삭제")
+                || normalized.contains("제거")
+                || normalized.contains("필요없")
+                || normalized.contains("안뽑")
+                || normalized.contains("안구")
+                || normalized.contains("없애");
+    }
+
+    private boolean containsNormalized(String normalizedSource, String target) {
+        if (!StringUtils.hasText(normalizedSource) || !StringUtils.hasText(target)) {
+            return false;
+        }
+        return normalizedSource.contains(normalizeForContains(target));
+    }
+
+    private String normalizeForContains(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.toLowerCase()
+                .replaceAll("\\s+", "")
+                .trim();
     }
 
     private void removePositionsNotInAiResult(Proposal proposal, Set<ProposalPosition> appliedPositions) {
