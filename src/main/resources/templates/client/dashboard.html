@@ -4,6 +4,9 @@
       layout:decorate="~{layout/base}">
 <head>
     <title>클라이언트 대시보드</title>
+    <style>
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
 </head>
 <body>
 <div layout:fragment="content">
@@ -53,10 +56,11 @@
                      style="transition-delay: 80ms;">
                 <a th:each="summary : ${dashboard.summaries}"
                    th:href="@{/client/dashboard(filter=${summary.filterKey})}"
+                   th:attr="data-filter=${summary.filterKey}"
                    th:classappend="${summary.selected}
-                                   ? 'border-blue-200 bg-blue-50/50 shadow-lg shadow-blue-100/60'
+                                   ? 'border-blue-200 bg-blue-50/50 shadow-lg shadow-blue-100/60 tab-active'
                                    : 'border-slate-200 bg-white hover:-translate-y-0.5 hover:border-slate-300'"
-                   class="rounded-[28px] border p-6 transition-all">
+                   class="filter-tab rounded-[28px] border p-6 transition-all">
                     <div class="flex h-14 w-14 items-center justify-center rounded-3xl"
                          th:classappend="${summary.selected} ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'">
                         <i th:attr="data-lucide=${
@@ -76,7 +80,8 @@
                 </a>
             </section>
 
-            <section class="fade-up overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm shadow-slate-200/70"
+            <section id="listSection"
+                     class="fade-up overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm shadow-slate-200/70"
                      x-show="loaded"
                      x-transition.enter
                      style="transition-delay: 140ms;">
@@ -174,6 +179,106 @@
             </section>
         </div>
     </main>
+
+    <script th:fragment="dashboardScript">
+    (function () {
+        var isLoading = false;
+
+        function setTabActive(filterKey) {
+            document.querySelectorAll('.filter-tab').forEach(function (tab) {
+                var isActive = tab.dataset.filter === filterKey;
+                tab.classList.toggle('border-blue-200', isActive);
+                tab.classList.toggle('bg-blue-50/50', isActive);
+                tab.classList.toggle('shadow-lg', isActive);
+                tab.classList.toggle('shadow-blue-100/60', isActive);
+                tab.classList.toggle('tab-active', isActive);
+                tab.classList.toggle('border-slate-200', !isActive);
+                tab.classList.toggle('bg-white', !isActive);
+                tab.classList.toggle('hover:-translate-y-0.5', !isActive);
+                tab.classList.toggle('hover:border-slate-300', !isActive);
+
+                var icon = tab.querySelector('div:first-child');
+                if (icon) {
+                    icon.classList.toggle('bg-blue-600', isActive);
+                    icon.classList.toggle('text-white', isActive);
+                    icon.classList.toggle('bg-slate-100', !isActive);
+                    icon.classList.toggle('text-slate-400', !isActive);
+                }
+            });
+        }
+
+        function showSpinner(listSection) {
+            listSection.style.pointerEvents = 'none';
+            listSection.style.position = 'relative';
+
+            var overlay = document.createElement('div');
+            overlay.id = 'listSectionSpinner';
+            overlay.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:10;background:rgba(255,255,255,0.6);border-radius:inherit;';
+            overlay.innerHTML = '<div style="width:40px;height:40px;border-radius:50%;border:4px solid #e2e8f0;border-top-color:#2563eb;animation:spin 0.7s linear infinite;"></div>';
+            listSection.appendChild(overlay);
+        }
+
+        function loadItems(filterKey, pushState) {
+            if (isLoading) return;
+            var listSection = document.getElementById('listSection');
+            if (!listSection) return;
+
+            isLoading = true;
+
+            // 200ms 안에 응답이 오면 스피너를 띄우지 않음
+            var spinnerTimer = setTimeout(function () {
+                var section = document.getElementById('listSection');
+                if (section) showSpinner(section);
+            }, 200);
+
+            var url = '/client/dashboard/items' + (filterKey && filterKey !== 'all' ? '?filter=' + filterKey : '');
+
+            fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(function (r) { return r.text(); })
+                .then(function (html) {
+                    var tmp = document.createElement('div');
+                    tmp.innerHTML = html;
+                    var next = tmp.querySelector('#listSection') || tmp.firstElementChild;
+                    if (next) {
+                        listSection.replaceWith(next);
+                        if (window.lucide) lucide.createIcons();
+                    }
+                    setTabActive(filterKey || 'all');
+
+                    if (pushState) {
+                        var stateUrl = '/client/dashboard' + (filterKey && filterKey !== 'all' ? '?filter=' + filterKey : '');
+                        history.pushState({ filter: filterKey }, '', stateUrl);
+                    }
+                })
+                .catch(function (err) { console.error('대시보드 로드 오류', err); })
+                .finally(function () {
+                    clearTimeout(spinnerTimer);
+                    isLoading = false;
+                    var section = document.getElementById('listSection');
+                    if (section) {
+                        section.style.pointerEvents = '';
+                        section.style.position = '';
+                    }
+                });
+        }
+
+        // 탭 클릭 이벤트
+        document.addEventListener('click', function (e) {
+            var tab = e.target.closest('.filter-tab');
+            if (!tab) return;
+            e.preventDefault();
+            if (tab.classList.contains('tab-active')) return; // 이미 선택된 탭은 재요청 안 함
+            loadItems(tab.dataset.filter, true);
+        });
+
+        // 브라우저 뒤로가기/앞으로가기
+        window.addEventListener('popstate', function (e) {
+            var filter = (e.state && e.state.filter) || 'all';
+            loadItems(filter, false);
+            setTabActive(filter);
+        });
+    })();
+    </script>
 </div>
 </body>
 </html>
