@@ -16,6 +16,8 @@ import com.generic4.itda.domain.proposal.ProposalStatus;
 import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.dto.proposal.ProposalForm;
 import com.generic4.itda.dto.proposal.ProposalPositionForm;
+import com.generic4.itda.exception.ProposalNotFoundException;
+import org.springframework.security.access.AccessDeniedException;
 import com.generic4.itda.repository.MatchingRepository;
 import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.PositionRepository;
@@ -36,6 +38,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 class ProposalServiceTest {
 
     private static final String EMAIL = "client@example.com";
+    private static final String OTHER_EMAIL = "other@example.com";
 
     @InjectMocks
     private ProposalService proposalService;
@@ -247,5 +250,67 @@ class ProposalServiceTest {
         assertThatThrownBy(() -> proposalService.delete(1L, EMAIL))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("작성 중인 제안서만 삭제할 수 있습니다.");
+    }
+
+    @Test
+    @DisplayName("본인 제안서가 아니면 삭제할 수 없다")
+    void delete_othersProposal_throws() {
+        Proposal proposal = Proposal.create(member, "다른 사람 프로젝트", "", "설명", null, null, 6L);
+        ReflectionTestUtils.setField(proposal, "id", 1L);
+        when(proposalRepository.findById(1L)).thenReturn(Optional.of(proposal));
+
+        assertThatThrownBy(() -> proposalService.delete(1L, OTHER_EMAIL))
+                .isInstanceOf(AccessDeniedException.class);
+        then(proposalRepository).should().findById(1L);
+        then(proposalRepository).shouldHaveNoMoreInteractions();
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 제안서는 삭제할 수 없다")
+    void delete_throws_whenNotFound() {
+        when(proposalRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> proposalService.delete(99L, EMAIL))
+                .isInstanceOf(ProposalNotFoundException.class);
+        then(proposalRepository).should().findById(99L);
+        then(proposalRepository).should(never()).delete(any(Proposal.class));
+    }
+
+    @Test
+    @DisplayName("소유자는 findOwnedProposal로 제안서를 조회할 수 있다")
+    void findOwnedProposal_returnsProposal_whenOwner() {
+        Proposal proposal = Proposal.create(member, "내 프로젝트", "원본", "설명", null, null, 6L);
+        ReflectionTestUtils.setField(proposal, "id", 1L);
+        when(proposalRepository.findWithPositionsById(1L)).thenReturn(Optional.of(proposal));
+
+        Proposal result = proposalService.findOwnedProposal(1L, EMAIL);
+
+        assertThat(result).isSameAs(proposal);
+        then(proposalRepository).should().findWithPositionsById(1L);
+        then(proposalRepository).should().findPositionsWithSkillsByProposalId(1L);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 제안서는 findOwnedProposal에서 예외가 발생한다")
+    void findOwnedProposal_throws_whenNotFound() {
+        when(proposalRepository.findWithPositionsById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> proposalService.findOwnedProposal(99L, EMAIL))
+                .isInstanceOf(ProposalNotFoundException.class);
+        then(proposalRepository).should().findWithPositionsById(99L);
+        then(proposalRepository).should(never()).findPositionsWithSkillsByProposalId(99L);
+    }
+
+    @Test
+    @DisplayName("타인 제안서는 findOwnedProposal에서 접근 거부 예외가 발생한다")
+    void findOwnedProposal_throws_whenNotOwner() {
+        Proposal proposal = Proposal.create(member, "내 프로젝트", "원본", "설명", null, null, 6L);
+        ReflectionTestUtils.setField(proposal, "id", 1L);
+        when(proposalRepository.findWithPositionsById(1L)).thenReturn(Optional.of(proposal));
+
+        assertThatThrownBy(() -> proposalService.findOwnedProposal(1L, OTHER_EMAIL))
+                .isInstanceOf(AccessDeniedException.class);
+        then(proposalRepository).should().findWithPositionsById(1L);
+        then(proposalRepository).should(never()).findPositionsWithSkillsByProposalId(1L);
     }
 }
