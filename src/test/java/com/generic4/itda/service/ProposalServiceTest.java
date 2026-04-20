@@ -8,31 +8,36 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
+import com.generic4.itda.domain.proposal.ProposalAiInterviewMessage;
 import com.generic4.itda.domain.proposal.ProposalStatus;
 import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.dto.proposal.ProposalForm;
 import com.generic4.itda.dto.proposal.ProposalPositionForm;
 import com.generic4.itda.exception.ProposalNotFoundException;
-import org.springframework.security.access.AccessDeniedException;
 import com.generic4.itda.repository.MatchingRepository;
 import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.PositionRepository;
+import com.generic4.itda.repository.ProposalAiInterviewMessageRepository;
 import com.generic4.itda.repository.ProposalRepository;
 import com.generic4.itda.repository.SkillRepository;
 import jakarta.persistence.EntityManager;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -60,6 +65,9 @@ class ProposalServiceTest {
     private MatchingRepository matchingRepository;
 
     @Mock
+    private ProposalAiInterviewMessageRepository aiInterviewMessageRepository;
+
+    @Mock
     private EntityManager entityManager;
 
     private Member member;
@@ -74,6 +82,10 @@ class ProposalServiceTest {
                 .thenReturn(false);
         lenient().when(proposalRepository.findFirstBySourceProposal_IdAndStatusOrderByModifiedAtDescIdDesc(any(Long.class), any()))
                 .thenReturn(Optional.empty());
+        lenient().when(aiInterviewMessageRepository.findAllByProposalIdOrderBySequenceAsc(any(Long.class)))
+                .thenReturn(List.of());
+        lenient().when(aiInterviewMessageRepository.saveAll(any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
@@ -182,6 +194,49 @@ class ProposalServiceTest {
         assertThat(copied.getTitle()).isEqualTo(source.getTitle());
         assertThat(copied.getPositions()).hasSize(1);
         assertThat(copied.getPositions().get(0).getTitle()).isEqualTo("Node.js 백엔드 개발자");
+    }
+
+    @Test
+    @DisplayName("MATCHING 제안서를 수정 초안으로 복제할 때 AI 인터뷰 메시지도 함께 복제한다")
+    void createEditDraft_copiesAiInterviewMessages() {
+        Proposal source = Proposal.create(member, "기존 프로젝트", "원본", "설명", 3_000_000L, 4_000_000L, 8L);
+        ReflectionTestUtils.setField(source, "id", 1L);
+        source.startMatching();
+
+        ProposalAiInterviewMessage userMessage = ProposalAiInterviewMessage.createUserMessage(
+                source,
+                "온라인 쇼핑몰 웹사이트를 만들고 싶어요.",
+                1
+        );
+        ProposalAiInterviewMessage assistantMessage = ProposalAiInterviewMessage.createAssistantMessage(
+                source,
+                "필요한 포지션을 알려주세요.",
+                2
+        );
+
+        when(proposalRepository.findById(1L)).thenReturn(Optional.of(source));
+        when(matchingRepository.existsByProposalPosition_Proposal_IdAndStatusIn(eq(1L), any()))
+                .thenReturn(false);
+        when(proposalRepository.findWithPositionsById(1L)).thenReturn(Optional.of(source));
+        when(proposalRepository.findPositionsWithSkillsByProposalId(1L)).thenReturn(source.getPositions());
+        when(aiInterviewMessageRepository.findAllByProposalIdOrderBySequenceAsc(1L))
+                .thenReturn(List.of(userMessage, assistantMessage));
+
+        Proposal copied = proposalService.createEditDraft(1L, EMAIL);
+
+        ArgumentCaptor<List<ProposalAiInterviewMessage>> captor = ArgumentCaptor.forClass(List.class);
+        verify(aiInterviewMessageRepository).saveAll(captor.capture());
+
+        List<ProposalAiInterviewMessage> copiedMessages = captor.getValue();
+        assertThat(copiedMessages).hasSize(2);
+        assertThat(copiedMessages.get(0).getProposal()).isSameAs(copied);
+        assertThat(copiedMessages.get(0).getRole()).isEqualTo(userMessage.getRole());
+        assertThat(copiedMessages.get(0).getContent()).isEqualTo(userMessage.getContent());
+        assertThat(copiedMessages.get(0).getSequence()).isEqualTo(userMessage.getSequence());
+        assertThat(copiedMessages.get(1).getProposal()).isSameAs(copied);
+        assertThat(copiedMessages.get(1).getRole()).isEqualTo(assistantMessage.getRole());
+        assertThat(copiedMessages.get(1).getContent()).isEqualTo(assistantMessage.getContent());
+        assertThat(copiedMessages.get(1).getSequence()).isEqualTo(assistantMessage.getSequence());
     }
 
     @Test

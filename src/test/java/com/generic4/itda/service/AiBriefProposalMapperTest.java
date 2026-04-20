@@ -381,6 +381,168 @@ class AiBriefProposalMapperTest {
         then(skillRepository).should(never()).save(any(Skill.class));
     }
 
+    @Test
+    @DisplayName("AI 인터뷰 적용은 응답에 없는 기존 모집 단위를 삭제하지 않는다")
+    void applyForInterview_preservesExistingPositionsMissingFromAiResult() {
+        Proposal proposal = createProposal();
+        Position backend = Position.create("백엔드 개발자");
+        Position frontend = Position.create("프론트엔드 개발자");
+
+        ProposalPosition backendPosition = proposal.addPosition(
+                backend,
+                "기존 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                1_000_000L,
+                2_000_000L,
+                3L,
+                null,
+                null,
+                null
+        );
+        ProposalPosition frontendPosition = proposal.addPosition(
+                frontend,
+                "기존 프론트엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                1_000_000L,
+                2_000_000L,
+                3L,
+                null,
+                null,
+                null
+        );
+
+        given(positionRepository.findByName("백엔드 개발자")).willReturn(Optional.of(backend));
+
+        AiBriefResult aiBriefResult = AiBriefResult.of(
+                "새 제목",
+                "새 설명",
+                null,
+                null,
+                null,
+                List.of(
+                        AiBriefPositionResult.of(
+                                "백엔드 개발자",
+                                "플랫폼 백엔드 개발자",
+                                ProposalWorkType.REMOTE,
+                                2L,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                List.of()
+                        )
+                )
+        );
+
+        aiBriefProposalMapper.applyForInterview(proposal, aiBriefResult, "백엔드 개발자는 2명으로 하자.");
+
+        assertThat(proposal.getPositions()).hasSize(2);
+        assertThat(findProposalPosition(proposal, "백엔드 개발자")).isSameAs(backendPosition);
+        assertThat(findProposalPosition(proposal, "백엔드 개발자").getHeadCount()).isEqualTo(2L);
+        assertThat(findProposalPosition(proposal, "프론트엔드 개발자")).isSameAs(frontendPosition);
+    }
+
+    @Test
+    @DisplayName("AI 인터뷰 적용은 사용자 메시지에 명시적으로 삭제 의도가 있는 모집 단위만 삭제한다")
+    void applyForInterview_removesExplicitlyDeletedPositionOnly() {
+        Proposal proposal = createProposal();
+        Position backend = Position.create("백엔드 개발자");
+        Position frontend = Position.create("프론트엔드 개발자");
+        Position designer = Position.create("UI/UX 디자이너");
+
+        proposal.addPosition(
+                backend,
+                "기존 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                1_000_000L,
+                2_000_000L,
+                3L,
+                null,
+                null,
+                null
+        );
+        proposal.addPosition(
+                frontend,
+                "기존 프론트엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                1_000_000L,
+                2_000_000L,
+                3L,
+                null,
+                null,
+                null
+        );
+        proposal.addPosition(
+                designer,
+                "UI/UX 디자이너",
+                ProposalWorkType.REMOTE,
+                1L,
+                1_000_000L,
+                2_000_000L,
+                3L,
+                null,
+                null,
+                null
+        );
+
+        given(positionRepository.findByName("백엔드 개발자")).willReturn(Optional.of(backend));
+        given(positionRepository.findByName("프론트엔드 개발자")).willReturn(Optional.of(frontend));
+
+        AiBriefResult aiBriefResult = AiBriefResult.of(
+                "새 제목",
+                "새 설명",
+                null,
+                null,
+                null,
+                List.of(
+                        AiBriefPositionResult.of(
+                                "백엔드 개발자",
+                                "백엔드 개발자",
+                                ProposalWorkType.REMOTE,
+                                2L,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                List.of()
+                        ),
+                        AiBriefPositionResult.of(
+                                "프론트엔드 개발자",
+                                "프론트엔드 개발자",
+                                ProposalWorkType.REMOTE,
+                                1L,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                List.of()
+                        )
+                )
+        );
+
+        aiBriefProposalMapper.applyForInterview(
+                proposal,
+                aiBriefResult,
+                "백엔드 개발자 2명, 프론트엔드 개발자 1명으로 가고 UI/UX 디자이너는 빼자."
+        );
+
+        assertThat(proposal.getPositions()).hasSize(2);
+        assertThat(findProposalPosition(proposal, "백엔드 개발자").getHeadCount()).isEqualTo(2L);
+        assertThat(findProposalPosition(proposal, "프론트엔드 개발자").getHeadCount()).isEqualTo(1L);
+        assertThat(proposal.getPositions())
+                .noneMatch(position -> position.getPosition().getName().equals("UI/UX 디자이너"));
+    }
+
     private ProposalPosition findProposalPosition(Proposal proposal, String positionName) {
         return proposal.getPositions().stream()
                 .filter(proposalPosition -> proposalPosition.getPosition().getName().equals(positionName))

@@ -3,7 +3,9 @@ package com.generic4.itda.service;
 import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.matching.constant.MatchingStatus;
 import com.generic4.itda.domain.position.Position;
+import com.generic4.itda.domain.proposal.AiInterviewMessageRole;
 import com.generic4.itda.domain.proposal.Proposal;
+import com.generic4.itda.domain.proposal.ProposalAiInterviewMessage;
 import com.generic4.itda.domain.proposal.ProposalPosition;
 import com.generic4.itda.domain.proposal.ProposalPositionSkill;
 import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
@@ -15,6 +17,7 @@ import com.generic4.itda.exception.ProposalNotFoundException;
 import com.generic4.itda.repository.MatchingRepository;
 import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.PositionRepository;
+import com.generic4.itda.repository.ProposalAiInterviewMessageRepository;
 import com.generic4.itda.repository.ProposalRepository;
 import com.generic4.itda.repository.SkillRepository;
 import java.util.ArrayList;
@@ -49,6 +52,7 @@ public class ProposalService {
     private final PositionRepository positionRepository;
     private final SkillRepository skillRepository;
     private final MatchingRepository matchingRepository;
+    private final ProposalAiInterviewMessageRepository aiInterviewMessageRepository;
 
     public Proposal saveDraft(String memberEmail, ProposalForm form) {
         Member member = getMemberByEmail(memberEmail);
@@ -392,7 +396,40 @@ public class ProposalService {
             );
         }
 
-        return proposalRepository.save(draftCopy);
+        Proposal savedDraft = proposalRepository.save(draftCopy);
+        copyAiInterviewMessages(proposalId, savedDraft);
+        return savedDraft;
+    }
+
+    private void copyAiInterviewMessages(Long sourceProposalId, Proposal draftCopy) {
+        List<ProposalAiInterviewMessage> sourceMessages =
+                aiInterviewMessageRepository.findAllByProposalIdOrderBySequenceAsc(sourceProposalId);
+
+        if (sourceMessages == null || sourceMessages.isEmpty()) {
+            return;
+        }
+
+        List<ProposalAiInterviewMessage> copiedMessages = sourceMessages.stream()
+                .map(message -> copyAiInterviewMessage(draftCopy, message))
+                .toList();
+
+        aiInterviewMessageRepository.saveAll(copiedMessages);
+    }
+
+    private ProposalAiInterviewMessage copyAiInterviewMessage(Proposal draftCopy, ProposalAiInterviewMessage sourceMessage) {
+        if (sourceMessage.getRole() == AiInterviewMessageRole.USER) {
+            return ProposalAiInterviewMessage.createUserMessage(
+                    draftCopy,
+                    sourceMessage.getContent(),
+                    sourceMessage.getSequence()
+            );
+        }
+
+        return ProposalAiInterviewMessage.createAssistantMessage(
+                draftCopy,
+                sourceMessage.getContent(),
+                sourceMessage.getSequence()
+        );
     }
 
     private Proposal findReusableDraft(Long proposalId) {
