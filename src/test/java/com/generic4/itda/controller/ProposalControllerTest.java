@@ -3,6 +3,7 @@ package com.generic4.itda.controller;
 import static com.generic4.itda.fixture.MemberFixture.createMember;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willDoNothing;
@@ -12,6 +13,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
@@ -140,6 +142,9 @@ class ProposalControllerTest {
         given(proposal.getId()).willReturn(3L);
         given(positionRepository.findAll(any(Sort.class)))
                 .willReturn(List.of(Position.create("백엔드 개발자")));
+        // register 검증 로직에서 총 예산 계산이 null 이면 실패로 처리되므로, 성공 흐름을 위해 stub 한다.
+        given(proposalService.calculateTotalBudgetMin(any(ProposalForm.class))).willReturn(3_000_000L);
+        given(proposalService.calculateTotalBudgetMax(any(ProposalForm.class))).willReturn(4_000_000L);
         given(proposalService.register(anyString(), any(ProposalForm.class))).willReturn(proposal);
 
         ItDaPrincipal principal = ItDaPrincipal.from(
@@ -309,6 +314,178 @@ class ProposalControllerTest {
     }
 
     @Test
+    @DisplayName("수정 요청이 유효하면 saveDraft 후 edit 화면으로 이동한다")
+    void updateDraftAndRedirectToEdit() throws Exception {
+        Proposal proposal = org.mockito.Mockito.mock(Proposal.class);
+        given(proposal.getId()).willReturn(1L);
+        given(positionRepository.findAll(any(Sort.class))).willReturn(List.of());
+        given(proposalService.saveDraft(any(Long.class), anyString(), any(ProposalForm.class))).willReturn(proposal);
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(post("/proposals/1/edit")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        )))
+                        .with(csrf())
+                        .param("submitAction", "save")
+                        .param("title", "수정된 제목")
+                        .param("rawInputText", ""))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/proposals/1/edit"));
+
+        then(proposalService).should().saveDraft(any(Long.class), anyString(), any(ProposalForm.class));
+    }
+
+    @Test
+    @DisplayName("수정 요청에서 register 액션이 유효하면 추천 진입 화면으로 이동한다")
+    void registerAfterUpdateAndRedirectToRecommendationEntry() throws Exception {
+        Proposal proposal = org.mockito.Mockito.mock(Proposal.class);
+        given(proposal.getId()).willReturn(1L);
+        given(positionRepository.findAll(any(Sort.class)))
+                .willReturn(List.of(Position.create("백엔드 개발자")));
+        given(proposalService.calculateTotalBudgetMin(any(ProposalForm.class))).willReturn(3_000_000L);
+        given(proposalService.calculateTotalBudgetMax(any(ProposalForm.class))).willReturn(4_000_000L);
+        given(proposalService.register(any(Long.class), anyString(), any(ProposalForm.class))).willReturn(proposal);
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(post("/proposals/1/edit")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        )))
+                        .with(csrf())
+                        .param("submitAction", "register")
+                        .param("title", "쇼핑몰 앱 개발")
+                        .param("rawInputText", "")
+                        .param("expectedPeriod", "8")
+                        .param("positions[0].positionId", "1")
+                        .param("positions[0].title", "Node.js 백엔드 개발자")
+                        .param("positions[0].workType", "REMOTE")
+                        .param("positions[0].headCount", "1")
+                        .param("positions[0].unitBudgetMin", "3000000")
+                        .param("positions[0].unitBudgetMax", "4000000")
+                        .param("positions[0].expectedPeriod", "4")
+                        .param("positions[0].essentialSkillNames[0]", "Node.js"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/proposals/1/recommendations"));
+
+        then(proposalService).should().register(any(Long.class), anyString(), any(ProposalForm.class));
+    }
+
+    @Test
+    @DisplayName("수정 요청에서 register 조건을 만족하지 못하면 편집기에 머무르며 이유를 보여준다")
+    void stayOnFormWhenUpdateRegisterValidationFails() throws Exception {
+        given(positionRepository.findAll(any(Sort.class)))
+                .willReturn(List.of(Position.create("백엔드 개발자")));
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(post("/proposals/1/edit")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        )))
+                        .with(csrf())
+                        .param("submitAction", "register")
+                        .param("title", "쇼핑몰 앱 개발")
+                        .param("rawInputText", ""))
+                .andExpect(status().isOk())
+                .andExpect(view().name("client/proposalForm"))
+                .andExpect(model().attributeHasErrors("proposalForm"));
+
+        then(proposalService).should(never()).register(any(Long.class), anyString(), any(ProposalForm.class));
+    }
+
+    @Test
+    @DisplayName("수정 요청 시 제안서가 없으면 대시보드로 리다이렉트한다")
+    void redirectDashboardWhenUpdateNotFound() throws Exception {
+        willThrow(new ProposalNotFoundException("제안서를 찾을 수 없습니다. id=999"))
+                .given(proposalService).saveDraft(eq(999L), eq("client@example.com"), any(ProposalForm.class));
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(post("/proposals/999/edit")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        )))
+                        .with(csrf())
+                        .param("submitAction", "save")
+                        .param("title", "수정된 제목")
+                        .param("rawInputText", ""))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/client/dashboard"))
+                .andExpect(flash().attributeExists("errorMessage"));
+    }
+
+    @Test
+    @DisplayName("수정 요청 시 타인 제안서이면 대시보드로 리다이렉트한다")
+    void redirectDashboardWhenUpdateAccessDenied() throws Exception {
+        willThrow(new AccessDeniedException("본인 제안서만 조회하거나 수정할 수 있습니다."))
+                .given(proposalService).saveDraft(eq(1L), eq("client@example.com"), any(ProposalForm.class));
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(post("/proposals/1/edit")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        )))
+                        .with(csrf())
+                        .param("submitAction", "save")
+                        .param("title", "수정된 제목")
+                        .param("rawInputText", ""))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/client/dashboard"))
+                .andExpect(flash().attributeExists("errorMessage"));
+    }
+
+    @Test
+    @DisplayName("수정 요청 처리 중 예외가 발생하면 편집기에 머무르며 이유를 보여준다")
+    void stayOnFormWhenUpdateFailsWithIllegalState() throws Exception {
+        given(positionRepository.findAll(any(Sort.class)))
+                .willReturn(List.of(Position.create("백엔드 개발자")));
+        willThrow(new IllegalStateException("저장 중 오류가 발생했습니다."))
+                .given(proposalService).saveDraft(eq(1L), eq("client@example.com"), any(ProposalForm.class));
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(post("/proposals/1/edit")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        )))
+                        .with(csrf())
+                        .param("submitAction", "save")
+                        .param("title", "수정된 제목")
+                        .param("rawInputText", ""))
+                .andExpect(status().isOk())
+                .andExpect(view().name("client/proposalForm"))
+                .andExpect(model().attributeHasErrors("proposalForm"));
+    }
+
+    @Test
     @DisplayName("MATCHING 제안서는 GET /edit 에서 수정 시작 안내 화면을 보여준다")
     void renderEditStartWhenMatchingProposalNeedsDraft() throws Exception {
         Proposal proposal = Proposal.create(
@@ -343,6 +520,38 @@ class ProposalControllerTest {
     }
 
     @Test
+    @DisplayName("COMPLETE 제안서는 GET /edit 에서 수정 불가 메시지와 함께 대시보드로 이동한다")
+    void redirectDashboardWhenProposalIsComplete() throws Exception {
+        Proposal proposal = Proposal.create(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678"),
+                "기존 프로젝트",
+                "",
+                "설명",
+                3_000_000L,
+                4_000_000L,
+                8L
+        );
+        proposal.startMatching();
+        proposal.complete();
+
+        given(proposalService.findOwnedProposal(1L, "client@example.com")).willReturn(proposal);
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(get("/proposals/1/edit")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/client/dashboard"))
+                .andExpect(flash().attributeExists("errorMessage"));
+    }
+
+    @Test
     @DisplayName("수정 시작 POST는 새 draft를 만든 뒤 그 draft의 edit 화면으로 이동한다")
     void redirectToClonedDraftAfterCreateEditDraft() throws Exception {
         Proposal copied = org.mockito.Mockito.mock(Proposal.class);
@@ -362,6 +571,29 @@ class ProposalControllerTest {
                         .with(csrf()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/proposals/7/edit"));
+    }
+
+    @Test
+    @DisplayName("수정 시작 POST에서 새 draft로 이동하는 경우 noticeMessage 를 남긴다")
+    void keepNoticeMessageWhenRedirectedToNewDraftAfterCreateEditDraft() throws Exception {
+        Proposal copied = org.mockito.Mockito.mock(Proposal.class);
+        given(copied.getId()).willReturn(7L);
+        given(proposalService.createEditDraft(1L, "client@example.com")).willReturn(copied);
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(post("/proposals/1/edit-draft")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        )))
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/proposals/7/edit"))
+                .andExpect(flash().attributeExists("noticeMessage"));
     }
 
     @Test
@@ -427,6 +659,25 @@ class ProposalControllerTest {
     }
 
     @Test
+    @DisplayName("제안서 상세 조회 시 타인 제안서이면 대시보드로 리다이렉트하고 오류 메시지를 남긴다")
+    void redirectDashboardWhenDetailAccessDenied() throws Exception {
+        given(proposalService.findOwnedProposal(1L, "client@example.com"))
+                .willThrow(new AccessDeniedException("본인 제안서만 조회할 수 있습니다."));
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(get("/proposals/1")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/client/dashboard"))
+                .andExpect(flash().attributeExists("errorMessage"));
+    }
+
+    @Test
     @DisplayName("WRITING 상태 제안서 삭제 요청 시 대시보드로 리다이렉트한다")
     void deleteWritingProposalAndRedirectToDashboard() throws Exception {
         willDoNothing().given(proposalService).delete(1L, "client@example.com");
@@ -444,6 +695,28 @@ class ProposalControllerTest {
                 .andExpect(redirectedUrl("/client/dashboard"));
 
         then(proposalService).should().delete(1L, "client@example.com");
+    }
+
+    @Test
+    @DisplayName("없는 제안서 삭제 시도 시 에러 메시지와 함께 대시보드로 리다이렉트한다")
+    void redirectDashboardWithErrorWhenDeleteNotFound() throws Exception {
+        willThrow(new ProposalNotFoundException("제안서를 찾을 수 없습니다. id=999"))
+                .given(proposalService).delete(999L, "client@example.com");
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(post("/proposals/999/delete")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        )))
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/client/dashboard"))
+                .andExpect(flash().attributeExists("errorMessage"));
+
+        then(proposalService).should().delete(999L, "client@example.com");
     }
 
     @Test
