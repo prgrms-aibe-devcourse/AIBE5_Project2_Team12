@@ -5,36 +5,46 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
+import com.generic4.itda.domain.proposal.ProposalAiInterviewMessage;
 import com.generic4.itda.domain.proposal.ProposalStatus;
 import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.dto.proposal.ProposalForm;
 import com.generic4.itda.dto.proposal.ProposalPositionForm;
+import com.generic4.itda.exception.ProposalNotFoundException;
 import com.generic4.itda.repository.MatchingRepository;
 import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.PositionRepository;
+import com.generic4.itda.repository.ProposalAiInterviewMessageRepository;
 import com.generic4.itda.repository.ProposalRepository;
 import com.generic4.itda.repository.SkillRepository;
 import jakarta.persistence.EntityManager;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class ProposalServiceTest {
 
     private static final String EMAIL = "client@example.com";
+    private static final String OTHER_EMAIL = "other@example.com";
 
     @InjectMocks
     private ProposalService proposalService;
@@ -55,6 +65,9 @@ class ProposalServiceTest {
     private MatchingRepository matchingRepository;
 
     @Mock
+    private ProposalAiInterviewMessageRepository aiInterviewMessageRepository;
+
+    @Mock
     private EntityManager entityManager;
 
     private Member member;
@@ -69,6 +82,10 @@ class ProposalServiceTest {
                 .thenReturn(false);
         lenient().when(proposalRepository.findFirstBySourceProposal_IdAndStatusOrderByModifiedAtDescIdDesc(any(Long.class), any()))
                 .thenReturn(Optional.empty());
+        lenient().when(aiInterviewMessageRepository.findAllByProposalIdOrderBySequenceAsc(any(Long.class)))
+                .thenReturn(List.of());
+        lenient().when(aiInterviewMessageRepository.saveAll(any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
@@ -180,6 +197,49 @@ class ProposalServiceTest {
     }
 
     @Test
+    @DisplayName("MATCHING 제안서를 수정 초안으로 복제할 때 AI 인터뷰 메시지도 함께 복제한다")
+    void createEditDraft_copiesAiInterviewMessages() {
+        Proposal source = Proposal.create(member, "기존 프로젝트", "원본", "설명", 3_000_000L, 4_000_000L, 8L);
+        ReflectionTestUtils.setField(source, "id", 1L);
+        source.startMatching();
+
+        ProposalAiInterviewMessage userMessage = ProposalAiInterviewMessage.createUserMessage(
+                source,
+                "온라인 쇼핑몰 웹사이트를 만들고 싶어요.",
+                1
+        );
+        ProposalAiInterviewMessage assistantMessage = ProposalAiInterviewMessage.createAssistantMessage(
+                source,
+                "필요한 포지션을 알려주세요.",
+                2
+        );
+
+        when(proposalRepository.findById(1L)).thenReturn(Optional.of(source));
+        when(matchingRepository.existsByProposalPosition_Proposal_IdAndStatusIn(eq(1L), any()))
+                .thenReturn(false);
+        when(proposalRepository.findWithPositionsById(1L)).thenReturn(Optional.of(source));
+        when(proposalRepository.findPositionsWithSkillsByProposalId(1L)).thenReturn(source.getPositions());
+        when(aiInterviewMessageRepository.findAllByProposalIdOrderBySequenceAsc(1L))
+                .thenReturn(List.of(userMessage, assistantMessage));
+
+        Proposal copied = proposalService.createEditDraft(1L, EMAIL);
+
+        ArgumentCaptor<List<ProposalAiInterviewMessage>> captor = ArgumentCaptor.forClass(List.class);
+        verify(aiInterviewMessageRepository).saveAll(captor.capture());
+
+        List<ProposalAiInterviewMessage> copiedMessages = captor.getValue();
+        assertThat(copiedMessages).hasSize(2);
+        assertThat(copiedMessages.get(0).getProposal()).isSameAs(copied);
+        assertThat(copiedMessages.get(0).getRole()).isEqualTo(userMessage.getRole());
+        assertThat(copiedMessages.get(0).getContent()).isEqualTo(userMessage.getContent());
+        assertThat(copiedMessages.get(0).getSequence()).isEqualTo(userMessage.getSequence());
+        assertThat(copiedMessages.get(1).getProposal()).isSameAs(copied);
+        assertThat(copiedMessages.get(1).getRole()).isEqualTo(assistantMessage.getRole());
+        assertThat(copiedMessages.get(1).getContent()).isEqualTo(assistantMessage.getContent());
+        assertThat(copiedMessages.get(1).getSequence()).isEqualTo(assistantMessage.getSequence());
+    }
+
+    @Test
     @DisplayName("같은 원본에서 이미 열린 WRITING draft가 있으면 그 draft를 재사용한다")
     void createEditDraft_reusesExistingWritingDraft() {
         Proposal source = Proposal.create(member, "기존 프로젝트", "원본", "설명", 3_000_000L, 4_000_000L, 8L);
@@ -221,5 +281,92 @@ class ProposalServiceTest {
         assertThatThrownBy(() -> proposalService.createEditDraft(1L, EMAIL))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("진행 중이거나 완료된 매칭이 있는 제안서는 수정할 수 없습니다.");
+    }
+
+    @Test
+    @DisplayName("WRITING 상태 제안서는 정상적으로 삭제된다")
+    void delete_writingProposal_succeeds() {
+        Proposal proposal = Proposal.create(member, "삭제할 프로젝트", "", "설명", null, null, 6L);
+        ReflectionTestUtils.setField(proposal, "id", 1L);
+        when(proposalRepository.findById(1L)).thenReturn(Optional.of(proposal));
+
+        proposalService.delete(1L, EMAIL);
+
+        then(proposalRepository).should().delete(proposal);
+    }
+
+    @Test
+    @DisplayName("WRITING 상태가 아닌 제안서는 삭제할 수 없다")
+    void delete_nonWritingProposal_throws() {
+        Proposal proposal = Proposal.create(member, "매칭 중 프로젝트", "", "설명", null, null, 6L);
+        ReflectionTestUtils.setField(proposal, "id", 1L);
+        proposal.startMatching();
+        when(proposalRepository.findById(1L)).thenReturn(Optional.of(proposal));
+
+        assertThatThrownBy(() -> proposalService.delete(1L, EMAIL))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("작성 중인 제안서만 삭제할 수 있습니다.");
+    }
+
+    @Test
+    @DisplayName("본인 제안서가 아니면 삭제할 수 없다")
+    void delete_othersProposal_throws() {
+        Proposal proposal = Proposal.create(member, "다른 사람 프로젝트", "", "설명", null, null, 6L);
+        ReflectionTestUtils.setField(proposal, "id", 1L);
+        when(proposalRepository.findById(1L)).thenReturn(Optional.of(proposal));
+
+        assertThatThrownBy(() -> proposalService.delete(1L, OTHER_EMAIL))
+                .isInstanceOf(AccessDeniedException.class);
+        then(proposalRepository).should().findById(1L);
+        then(proposalRepository).shouldHaveNoMoreInteractions();
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 제안서는 삭제할 수 없다")
+    void delete_throws_whenNotFound() {
+        when(proposalRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> proposalService.delete(99L, EMAIL))
+                .isInstanceOf(ProposalNotFoundException.class);
+        then(proposalRepository).should().findById(99L);
+        then(proposalRepository).should(never()).delete(any(Proposal.class));
+    }
+
+    @Test
+    @DisplayName("소유자는 findOwnedProposal로 제안서를 조회할 수 있다")
+    void findOwnedProposal_returnsProposal_whenOwner() {
+        Proposal proposal = Proposal.create(member, "내 프로젝트", "원본", "설명", null, null, 6L);
+        ReflectionTestUtils.setField(proposal, "id", 1L);
+        when(proposalRepository.findWithPositionsById(1L)).thenReturn(Optional.of(proposal));
+
+        Proposal result = proposalService.findOwnedProposal(1L, EMAIL);
+
+        assertThat(result).isSameAs(proposal);
+        then(proposalRepository).should().findWithPositionsById(1L);
+        then(proposalRepository).should().findPositionsWithSkillsByProposalId(1L);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 제안서는 findOwnedProposal에서 예외가 발생한다")
+    void findOwnedProposal_throws_whenNotFound() {
+        when(proposalRepository.findWithPositionsById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> proposalService.findOwnedProposal(99L, EMAIL))
+                .isInstanceOf(ProposalNotFoundException.class);
+        then(proposalRepository).should().findWithPositionsById(99L);
+        then(proposalRepository).should(never()).findPositionsWithSkillsByProposalId(99L);
+    }
+
+    @Test
+    @DisplayName("타인 제안서는 findOwnedProposal에서 접근 거부 예외가 발생한다")
+    void findOwnedProposal_throws_whenNotOwner() {
+        Proposal proposal = Proposal.create(member, "내 프로젝트", "원본", "설명", null, null, 6L);
+        ReflectionTestUtils.setField(proposal, "id", 1L);
+        when(proposalRepository.findWithPositionsById(1L)).thenReturn(Optional.of(proposal));
+
+        assertThatThrownBy(() -> proposalService.findOwnedProposal(1L, OTHER_EMAIL))
+                .isInstanceOf(AccessDeniedException.class);
+        then(proposalRepository).should().findWithPositionsById(1L);
+        then(proposalRepository).should(never()).findPositionsWithSkillsByProposalId(1L);
     }
 }
