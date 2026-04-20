@@ -396,10 +396,7 @@
                 return;
             }
 
-            // 액션 메뉴 내부 클릭은 닫기 처리하지 않음 (링크/버튼이 직접 처리)
-            if (actionMenu.contains(e.target)) return;
-
-            // 삭제 버튼 (공유 메뉴 안의 #menuDelete)
+            // 삭제 버튼 (공유 메뉴 안의 #menuDelete) — actionMenu.contains 체크보다 먼저
             if (e.target.closest('#menuDelete')) {
                 closeActionMenu();
                 document.getElementById('deleteModalTitle').textContent = menuDelete.dataset.proposalTitle;
@@ -407,6 +404,9 @@
                 document.getElementById('deleteModal').classList.remove('hidden');
                 return;
             }
+
+            // 액션 메뉴 내부 링크 클릭은 그대로 동작하도록 통과
+            if (actionMenu.contains(e.target)) return;
 
             // 행 클릭 → 상세 페이지 이동
             var row = e.target.closest('.project-row');
