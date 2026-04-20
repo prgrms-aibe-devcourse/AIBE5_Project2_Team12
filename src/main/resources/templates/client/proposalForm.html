@@ -104,6 +104,17 @@
                                         <div class="max-w-[92%] rounded-[24px] border border-amber-100 bg-amber-50 px-5 py-4 text-sm leading-7 text-amber-700"
                                              x-text="aiBriefNoticeMessage"></div>
                                     </template>
+
+                                    <template x-if="aiBriefLoading">
+                                        <div class="max-w-[92%] rounded-[24px] border border-blue-100 bg-blue-50 px-5 py-4 text-sm leading-7 text-blue-700">
+                                            AI가 프로젝트 내용을 분석하고 제안서 초안을 작성하고 있습니다. 잠시만 기다려주세요.
+                                        </div>
+                                    </template>
+
+                                    <template x-if="aiBriefErrorMessage">
+                                        <div class="max-w-[92%] rounded-[24px] border border-red-100 bg-red-50 px-5 py-4 text-sm leading-7 text-red-700"
+                                             x-text="aiBriefErrorMessage"></div>
+                                    </template>
                                 </div>
                             </div>
 
@@ -113,12 +124,15 @@
                                     <textarea id="draftInput"
                                               x-model="draftInput"
                                               rows="2"
+                                              :disabled="aiBriefLoading"
                                               placeholder="예: 온라인 쇼핑몰 앱을 만들고 싶어요. 결제와 관리자 화면이 필요합니다."
-                                              class="min-h-[72px] flex-1 rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"></textarea>
+                                              class="min-h-[72px] flex-1 rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"></textarea>
                                     <button type="button"
                                             @click="sendPrompt()"
-                                            class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white transition hover:bg-slate-800">
-                                        <i data-lucide="send" class="h-4 w-4"></i>
+                                            :disabled="aiBriefLoading"
+                                            class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400">
+                                        <i x-show="!aiBriefLoading" data-lucide="send" class="h-4 w-4"></i>
+                                        <i x-show="aiBriefLoading" x-cloak data-lucide="loader-circle" class="h-4 w-4 animate-spin"></i>
                                     </button>
                                 </div>
                                 <p th:if="${#fields.hasErrors('rawInputText')}"
@@ -678,6 +692,12 @@
                     this.currentPosition = this.blankPosition();
                     this.loaded = true;
                     this.refreshIcons();
+
+                    if (this.aiBriefRequested && bootstrap.proposalId) {
+                        this.$nextTick(() => {
+                            this.generateAiBrief();
+                        });
+                    }
                 },
 
                 toggleChat() {
@@ -693,21 +713,17 @@
                     this.rawInputText = this.appendRawInput(this.rawInputText, this.draftInput);
                     this.draftInput = '';
                     this.aiBriefNoticeMessage = '프로젝트 원본 입력을 저장했습니다. 기존 입력값은 AI 결과로 갱신될 수 있습니다.';
+                    this.aiBriefErrorMessage = '';
 
                     if (!this.title || !this.title.trim()) {
                         this.title = 'AI 브리프 작성 중';
                     }
 
-                    if (bootstrap.isNew) {
-                        this.aiBriefRequested = true;
-                        this.submitAction = 'save';
-                        this.$nextTick(() => {
-                            this.$root.requestSubmit();
-                        });
-                        return;
-                    }
-
-                    this.refreshIcons();
+                    this.aiBriefRequested = true;
+                    this.submitAction = 'save';
+                    this.$nextTick(() => {
+                        this.$root.requestSubmit();
+                    });
                 },
 
                 appendRawInput(current, input) {
@@ -722,6 +738,61 @@
                     }
 
                     return `${current.trim()}\n${line}`;
+                },
+
+                async generateAiBrief() {
+                    if (!bootstrap.proposalId || this.aiBriefLoading) {
+                        return;
+                    }
+
+                    this.aiBriefLoading = true;
+                    this.aiBriefErrorMessage = '';
+                    this.aiBriefNoticeMessage = 'AI가 제안서 초안을 생성하고 있습니다. 기존 입력값은 AI 결과로 갱신될 수 있습니다.';
+                    this.refreshIcons();
+
+                    try {
+                        const response = await fetch(`/proposals/${bootstrap.proposalId}/ai-brief`, {
+                            method: 'POST',
+                            headers: {
+                                ...this.csrfHeaders(),
+                                'Accept': 'application/json'
+                            }
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(await this.extractErrorMessage(response));
+                        }
+
+                        this.aiBriefNoticeMessage = 'AI 브리프가 제안서에 반영되었습니다. 자동 채움 결과를 불러옵니다.';
+                        window.location.replace(`/proposals/${bootstrap.proposalId}/edit`);
+                    } catch (error) {
+                        this.aiBriefErrorMessage = error.message || 'AI 브리프 생성에 실패했습니다. 잠시 후 다시 시도하거나 오른쪽 폼을 직접 작성해주세요.';
+                        this.aiBriefNoticeMessage = '';
+                        this.aiBriefRequested = false;
+                    } finally {
+                        this.aiBriefLoading = false;
+                        this.refreshIcons();
+                    }
+                },
+
+                csrfHeaders() {
+                    const token = document.querySelector('meta[name="_csrf"]')?.getAttribute('content');
+                    const header = document.querySelector('meta[name="_csrf_header"]')?.getAttribute('content') || 'X-CSRF-TOKEN';
+
+                    if (!token) {
+                        return {};
+                    }
+
+                    return { [header]: token };
+                },
+
+                async extractErrorMessage(response) {
+                    try {
+                        const data = await response.json();
+                        return data.message || data.error || 'AI 브리프 생성에 실패했습니다. 잠시 후 다시 시도하거나 오른쪽 폼을 직접 작성해주세요.';
+                    } catch (error) {
+                        return 'AI 브리프 생성에 실패했습니다. 잠시 후 다시 시도하거나 오른쪽 폼을 직접 작성해주세요.';
+                    }
                 },
 
                 openAddPosition() {

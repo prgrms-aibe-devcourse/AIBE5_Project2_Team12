@@ -81,7 +81,7 @@ public class ProposalController {
                     ? proposalService.register(principal.getEmail(), form)
                     : proposalService.saveDraft(principal.getEmail(), form);
 
-            return redirectAfterCreate(proposal, registerAction, aiBriefRequested);
+            return redirectAfterSave(proposal, registerAction, aiBriefRequested);
         } catch (IllegalArgumentException | IllegalStateException e) {
             rejectGlobal(bindingResult, e.getMessage());
             addCommonAttributes(model);
@@ -117,7 +117,7 @@ public class ProposalController {
                 return "redirect:/client/dashboard";
             }
 
-            ProposalForm form = ProposalForm.from(proposal);
+            ProposalForm form = proposalService.findOwnedProposalForm(proposalId, principal.getEmail());
 
             addCommonAttributes(model);
             addMemberAttributes(model, principal);
@@ -170,6 +170,7 @@ public class ProposalController {
             @Valid @ModelAttribute("proposalForm") ProposalForm form,
             BindingResult bindingResult,
             @RequestParam(name = "submitAction", defaultValue = SAVE_ACTION) String submitAction,
+            @RequestParam(name = "aiBriefRequested", defaultValue = "false") boolean aiBriefRequested,
             Model model,
             RedirectAttributes redirectAttributes
     ) {
@@ -182,7 +183,7 @@ public class ProposalController {
             addMemberAttributes(model, principal);
             model.addAttribute("proposalId", proposalId);
             model.addAttribute("isNew", false);
-            model.addAttribute("aiBriefRequested", false);
+            model.addAttribute("aiBriefRequested", aiBriefRequested);
             return "client/proposalForm";
         }
 
@@ -191,9 +192,7 @@ public class ProposalController {
                     ? proposalService.register(proposalId, principal.getEmail(), form)
                     : proposalService.saveDraft(proposalId, principal.getEmail(), form);
 
-            return registerAction
-                    ? "redirect:/proposals/" + proposal.getId() + "/recommendations"
-                    : "redirect:/proposals/" + proposal.getId() + "/edit";
+            return redirectAfterSave(proposal, registerAction, aiBriefRequested);
         } catch (ProposalNotFoundException e) {
             redirectAttributes.addFlashAttribute("errorMessage", "존재하지 않는 제안서입니다.");
             return "redirect:/client/dashboard";
@@ -206,7 +205,7 @@ public class ProposalController {
             addMemberAttributes(model, principal);
             model.addAttribute("proposalId", proposalId);
             model.addAttribute("isNew", false);
-            model.addAttribute("aiBriefRequested", false);
+            model.addAttribute("aiBriefRequested", aiBriefRequested);
             return "client/proposalForm";
         }
     }
@@ -221,7 +220,7 @@ public class ProposalController {
         model.addAttribute("memberEmail", principal.getEmail());
     }
 
-    private String redirectAfterCreate(Proposal proposal, boolean registerAction, boolean aiBriefRequested) {
+    private String redirectAfterSave(Proposal proposal, boolean registerAction, boolean aiBriefRequested) {
         if (registerAction) {
             return "redirect:/proposals/" + proposal.getId() + "/recommendations";
         }
