@@ -43,9 +43,9 @@ class RecommendationResultCreatorTest {
             // given
             RecommendationRun run = mock(RecommendationRun.class);
 
-            ScoredCandidate low = scoredCandidate(1L, 10L, 101L, 0.5, 3);
-            ScoredCandidate mid = scoredCandidate(2L, 20L, 102L, 0.7, 3);
-            ScoredCandidate high = scoredCandidate(3L, 30L, 103L, 0.9, 3);
+            ScoredCandidate low = scoredCandidate(101L, 0.5, 3);
+            ScoredCandidate mid = scoredCandidate(102L, 0.7, 3);
+            ScoredCandidate high = scoredCandidate(103L, 0.9, 3);
 
             Resume resume101 = resumeWithId(101L);
             Resume resume102 = resumeWithId(102L);
@@ -81,8 +81,8 @@ class RecommendationResultCreatorTest {
             // 낮은 점수가 입력 리스트에 먼저 위치 → 정렬 후 dedup 시 올바르게 제거되는지 검증
             RecommendationRun run = mock(RecommendationRun.class);
 
-            ScoredCandidate lowerScore = scoredCandidate(1L, 10L, 100L, 0.4, 2);
-            ScoredCandidate higherScore = scoredCandidate(2L, 20L, 100L, 0.8, 2);
+            ScoredCandidate lowerScore = scoredCandidate(100L, 0.4, 2);
+            ScoredCandidate higherScore = scoredCandidate(100L, 0.8, 2);
 
             Resume resume = resumeWithId(100L);
             given(resumeRepository.findAllById(anyList()))
@@ -109,9 +109,9 @@ class RecommendationResultCreatorTest {
             // given
             RecommendationRun run = mock(RecommendationRun.class);
 
-            ScoredCandidate c1 = scoredCandidate(1L, 10L, 101L, 0.9, 3);
-            ScoredCandidate c2 = scoredCandidate(2L, 20L, 102L, 0.7, 3);
-            ScoredCandidate c3 = scoredCandidate(3L, 30L, 103L, 0.5, 3);
+            ScoredCandidate c1 = scoredCandidate(101L, 0.9, 3);
+            ScoredCandidate c2 = scoredCandidate(102L, 0.7, 3);
+            ScoredCandidate c3 = scoredCandidate(103L, 0.5, 3);
 
             Resume resume101 = resumeWithId(101L);
             Resume resume102 = resumeWithId(102L);
@@ -138,8 +138,8 @@ class RecommendationResultCreatorTest {
             // given
             RecommendationRun run = mock(RecommendationRun.class);
 
-            ScoredCandidate c1 = scoredCandidate(1L, 10L, 201L, 0.9, 2);
-            ScoredCandidate c2 = scoredCandidate(2L, 20L, 202L, 0.7, 2);
+            ScoredCandidate c1 = scoredCandidate(201L, 0.9, 2);
+            ScoredCandidate c2 = scoredCandidate(202L, 0.7, 2);
 
             Resume resume201 = resumeWithId(201L);
             Resume resume202 = resumeWithId(202L);
@@ -163,8 +163,8 @@ class RecommendationResultCreatorTest {
             // given
             RecommendationRun run = mock(RecommendationRun.class);
 
-            ScoredCandidate c1 = scoredCandidate(1L, 10L, 301L, 0.9, 2);
-            ScoredCandidate c2 = scoredCandidate(2L, 20L, 302L, 0.7, 2);
+            ScoredCandidate c1 = scoredCandidate(301L, 0.9, 2);
+            ScoredCandidate c2 = scoredCandidate(302L, 0.7, 2);
 
             // 302L에 해당하는 Resume 누락
             Resume resume301 = resumeWithId(301L);
@@ -188,10 +188,7 @@ class RecommendationResultCreatorTest {
             // given
             RecommendationRun run = mock(RecommendationRun.class);
 
-            ScoredCandidate candidate = scoredCandidateWithSkills(
-                    1L, 10L, 401L, 0.9, 3,
-                    Set.of("Java", "Spring", "Redis")
-            );
+            ScoredCandidate candidate = scoredCandidateWithSkills(401L, 0.9, 3, Set.of("Java", "Spring", "Redis"));
 
             Resume resume = resumeWithId(401L);
             given(resumeRepository.findAllById(anyList())).willReturn(List.of(resume));
@@ -214,10 +211,7 @@ class RecommendationResultCreatorTest {
             RecommendationRun run = mock(RecommendationRun.class);
 
             // careerYears=5, similarityScore=0.9, matchedSkills=["Java","Spring"]
-            ScoredCandidate candidate = scoredCandidateWithSkills(
-                    1L, 10L, 501L, 0.9, 5,
-                    Set.of("Java", "Spring")
-            );
+            ScoredCandidate candidate = scoredCandidateWithSkills(501L, 0.9, 5, Set.of("Java", "Spring"));
 
             Resume resume = resumeWithId(501L);
             given(resumeRepository.findAllById(anyList())).willReturn(List.of(resume));
@@ -240,10 +234,7 @@ class RecommendationResultCreatorTest {
             // given
             RecommendationRun run = mock(RecommendationRun.class);
 
-            ScoredCandidate candidate = scoredCandidateWithSkills(
-                    1L, 10L, 601L, 0.5, 0,
-                    Set.of("Java", "Spring")
-            );
+            ScoredCandidate candidate = scoredCandidateWithSkills(601L, 0.5, 0, Set.of("Java", "Spring"));
 
             Resume resume = resumeWithId(601L);
             given(resumeRepository.findAllById(anyList())).willReturn(List.of(resume));
@@ -264,18 +255,18 @@ class RecommendationResultCreatorTest {
 
     // --- fixture helpers ---
 
-    private ScoredCandidate scoredCandidate(
-            Long candidateId, Long memberId, Long resumeId, double finalScore, int careerYears
-    ) {
-        return scoredCandidateWithSkills(candidateId, memberId, resumeId, finalScore, careerYears, Set.of());
+    private ScoredCandidate scoredCandidate(Long resumeId, double finalScore, int careerYears) {
+        return scoredCandidateWithSkills(resumeId, finalScore, careerYears, Set.of());
     }
 
     private ScoredCandidate scoredCandidateWithSkills(
-            Long candidateId, Long memberId, Long resumeId,
-            double finalScore, int careerYears, Set<String> skills
+            Long resumeId,
+            double finalScore,
+            int careerYears,
+            Set<String> skills
     ) {
         RecommendationScorableCandidate candidate = new RecommendationScorableCandidate(
-                candidateId, memberId, resumeId, careerYears, skills
+                resumeId, careerYears, skills
         );
         ScoreBreakdown breakdown = new ScoreBreakdown(finalScore, 0.0, 0.0, finalScore);
         return new ScoredCandidate(candidate, breakdown);

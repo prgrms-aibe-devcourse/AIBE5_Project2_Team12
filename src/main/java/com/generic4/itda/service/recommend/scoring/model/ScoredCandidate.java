@@ -6,15 +6,7 @@ public record ScoredCandidate(
         RecommendationScorableCandidate candidate,
         ScoreBreakdown scoreBreakdown
 ) {
-
-    public Long candidateId() {
-        return candidate.candidateId();
-    }
-
-    public Long memberId() {
-        return candidate.memberId();
-    }
-
+    
     public Long resumeId() {
         return candidate.resumeId();
     }
