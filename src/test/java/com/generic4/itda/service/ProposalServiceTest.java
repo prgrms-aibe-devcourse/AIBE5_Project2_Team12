@@ -20,6 +20,7 @@ import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.PositionRepository;
 import com.generic4.itda.repository.ProposalRepository;
 import com.generic4.itda.repository.SkillRepository;
+import jakarta.persistence.EntityManager;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -52,6 +53,9 @@ class ProposalServiceTest {
 
     @Mock
     private MatchingRepository matchingRepository;
+
+    @Mock
+    private EntityManager entityManager;
 
     private Member member;
 

@@ -12,6 +12,7 @@ import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
 import com.generic4.itda.domain.skill.Skill;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceUnitUtil;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -343,6 +344,50 @@ class ProposalRepositoryTest {
         found.getPositions().forEach(p ->
                 assertThat(util.isLoaded(p, "skills")).isTrue()
         );
+    }
+
+    @DisplayName("findAllWithPositionsByMemberEmail은 해당 회원의 모든 제안서와 positions를 함께 조회한다")
+    @Test
+    void findAllWithPositionsByMemberEmail_positions를_함께_조회한다() {
+        Member member = memberRepository.save(createMember());
+        Position backend = persist(Position.create("백엔드 개발자"));
+        Position frontend = persist(Position.create("프론트엔드 개발자"));
+
+        Proposal proposal1 = Proposal.create(member, "제안서1", "원문", null, null, null, null);
+        proposal1.addPosition(backend, "백엔드", null, 1L, null, null, null, null, null, null);
+        Proposal proposal2 = Proposal.create(member, "제안서2", "원문", null, null, null, null);
+        proposal2.addPosition(frontend, "프론트", null, 1L, null, null, null, null, null, null);
+        proposalRepository.saveAndFlush(proposal1);
+        proposalRepository.saveAndFlush(proposal2);
+        entityManager.clear();
+
+        PersistenceUnitUtil util = entityManager.getEntityManagerFactory().getPersistenceUnitUtil();
+        List<Proposal> result = proposalRepository.findAllWithPositionsByMemberEmail(
+                member.getEmail().getValue());
+
+        assertThat(result).hasSize(2);
+        result.forEach(p -> assertThat(util.isLoaded(p, "positions")).isTrue());
+        assertThat(result).flatExtracting(Proposal::getPositions).hasSize(2);
+    }
+
+    @DisplayName("findAllWithPositionsByMemberEmailAndStatus는 상태 필터링된 제안서와 positions를 함께 조회한다")
+    @Test
+    void findAllWithPositionsByMemberEmailAndStatus_상태별_positions를_함께_조회한다() {
+        Member member = memberRepository.save(createMember());
+        Position backend = persist(Position.create("백엔드 개발자"));
+
+        Proposal writingProposal = Proposal.create(member, "작성중 제안서", "원문", null, null, null, null);
+        writingProposal.addPosition(backend, "백엔드", null, 1L, null, null, null, null, null, null);
+        proposalRepository.saveAndFlush(writingProposal);
+        entityManager.clear();
+
+        PersistenceUnitUtil util = entityManager.getEntityManagerFactory().getPersistenceUnitUtil();
+        List<Proposal> result = proposalRepository.findAllWithPositionsByMemberEmailAndStatus(
+                member.getEmail().getValue(), com.generic4.itda.domain.proposal.ProposalStatus.WRITING);
+
+        assertThat(result).hasSize(1);
+        assertThat(util.isLoaded(result.get(0), "positions")).isTrue();
+        assertThat(result.get(0).getPositions()).hasSize(1);
     }
 
     private <T> T persist(T entity) {

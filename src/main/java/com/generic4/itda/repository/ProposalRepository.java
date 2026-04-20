@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface ProposalRepository extends JpaRepository<Proposal, Long> {
 
@@ -39,4 +40,28 @@ public interface ProposalRepository extends JpaRepository<Proposal, Long> {
             where pp.proposal.id = :proposalId
             """)
     List<ProposalPosition> findPositionsWithSkillsByProposalId(Long proposalId);
+
+    @Query("""
+            select distinct p
+            from Proposal p
+            left join fetch p.positions pp
+            left join fetch pp.position pos
+            where p.member.email.value = :email
+            order by p.modifiedAt desc
+            """)
+    List<Proposal> findAllWithPositionsByMemberEmail(@Param("email") String email);
+
+    @Query("""
+            select distinct p
+            from Proposal p
+            left join fetch p.positions pp
+            left join fetch pp.position pos
+            where p.member.email.value = :email
+            and p.status = :status
+            order by p.modifiedAt desc
+            """)
+    List<Proposal> findAllWithPositionsByMemberEmailAndStatus(
+            @Param("email") String email,
+            @Param("status") ProposalStatus status
+    );
 }
