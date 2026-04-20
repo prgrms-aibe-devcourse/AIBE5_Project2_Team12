@@ -15,18 +15,18 @@ import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
-import org.springframework.util.StringUtils;
 import org.springframework.ui.Model;
+import org.springframework.util.StringUtils;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
@@ -49,6 +49,7 @@ public class ProposalController {
         model.addAttribute("proposalForm", form);
         model.addAttribute("proposalId", null);
         model.addAttribute("isNew", true);
+        model.addAttribute("aiBriefRequested", false);
 
         return "client/proposalForm";
     }
@@ -59,6 +60,7 @@ public class ProposalController {
             @Valid @ModelAttribute("proposalForm") ProposalForm form,
             BindingResult bindingResult,
             @RequestParam(name = "submitAction", defaultValue = SAVE_ACTION) String submitAction,
+            @RequestParam(name = "aiBriefRequested", defaultValue = "false") boolean aiBriefRequested,
             Model model
     ) {
         boolean registerAction = isRegisterAction(submitAction);
@@ -70,6 +72,7 @@ public class ProposalController {
             addMemberAttributes(model, principal);
             model.addAttribute("proposalId", null);
             model.addAttribute("isNew", true);
+            model.addAttribute("aiBriefRequested", aiBriefRequested);
             return "client/proposalForm";
         }
 
@@ -78,15 +81,14 @@ public class ProposalController {
                     ? proposalService.register(principal.getEmail(), form)
                     : proposalService.saveDraft(principal.getEmail(), form);
 
-            return registerAction
-                    ? "redirect:/proposals/" + proposal.getId() + "/recommendations"
-                    : "redirect:/proposals/" + proposal.getId() + "/edit";
+            return redirectAfterCreate(proposal, registerAction, aiBriefRequested);
         } catch (IllegalArgumentException | IllegalStateException e) {
             rejectGlobal(bindingResult, e.getMessage());
             addCommonAttributes(model);
             addMemberAttributes(model, principal);
             model.addAttribute("proposalId", null);
             model.addAttribute("isNew", true);
+            model.addAttribute("aiBriefRequested", aiBriefRequested);
             return "client/proposalForm";
         }
     }
@@ -95,6 +97,7 @@ public class ProposalController {
     public String editForm(
             @PathVariable Long proposalId,
             @AuthenticationPrincipal ItDaPrincipal principal,
+            @RequestParam(name = "aiBriefRequested", defaultValue = "false") boolean aiBriefRequested,
             Model model,
             RedirectAttributes redirectAttributes
     ) {
@@ -121,6 +124,7 @@ public class ProposalController {
             model.addAttribute("proposalForm", form);
             model.addAttribute("proposalId", proposalId);
             model.addAttribute("isNew", false);
+            model.addAttribute("aiBriefRequested", aiBriefRequested);
 
             return "client/proposalForm";
         } catch (ProposalNotFoundException e) {
@@ -178,6 +182,7 @@ public class ProposalController {
             addMemberAttributes(model, principal);
             model.addAttribute("proposalId", proposalId);
             model.addAttribute("isNew", false);
+            model.addAttribute("aiBriefRequested", false);
             return "client/proposalForm";
         }
 
@@ -201,6 +206,7 @@ public class ProposalController {
             addMemberAttributes(model, principal);
             model.addAttribute("proposalId", proposalId);
             model.addAttribute("isNew", false);
+            model.addAttribute("aiBriefRequested", false);
             return "client/proposalForm";
         }
     }
@@ -213,6 +219,18 @@ public class ProposalController {
     private void addMemberAttributes(Model model, ItDaPrincipal principal) {
         model.addAttribute("memberName", principal.getName());
         model.addAttribute("memberEmail", principal.getEmail());
+    }
+
+    private String redirectAfterCreate(Proposal proposal, boolean registerAction, boolean aiBriefRequested) {
+        if (registerAction) {
+            return "redirect:/proposals/" + proposal.getId() + "/recommendations";
+        }
+
+        if (aiBriefRequested) {
+            return "redirect:/proposals/" + proposal.getId() + "/edit?aiBriefRequested=true";
+        }
+
+        return "redirect:/proposals/" + proposal.getId() + "/edit";
     }
 
     private boolean isRegisterAction(String submitAction) {
