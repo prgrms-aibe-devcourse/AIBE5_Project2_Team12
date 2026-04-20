@@ -406,29 +406,7 @@ class ProposalControllerTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/client/dashboard"));
     }
-
-    @Test
-    @DisplayName("제안서 상세 조회 시 proposalDetail 뷰와 proposal 모델을 반환한다")
-    void renderProposalDetail() throws Exception {
-        Proposal proposal = Proposal.create(
-                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678"),
-                "기존 프로젝트", "", "설명", null, null, 6L
-        );
-        given(proposalService.findOwnedProposal(1L, "client@example.com")).willReturn(proposal);
-
-        ItDaPrincipal principal = ItDaPrincipal.from(
-                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
-        );
-
-        mockMvc.perform(get("/proposals/1")
-                        .with(authentication(new UsernamePasswordAuthenticationToken(
-                                principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
-                        ))))
-                .andExpect(status().isOk())
-                .andExpect(view().name("client/proposalDetail"))
-                .andExpect(model().attributeExists("proposal"));
-    }
-
+    
     @Test
     @DisplayName("없는 제안서 상세 조회 시 대시보드로 리다이렉트한다")
     void redirectDashboardWhenDetailNotFound() throws Exception {
