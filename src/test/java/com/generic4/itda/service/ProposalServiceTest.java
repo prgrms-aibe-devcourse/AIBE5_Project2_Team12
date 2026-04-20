@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
@@ -221,5 +222,30 @@ class ProposalServiceTest {
         assertThatThrownBy(() -> proposalService.createEditDraft(1L, EMAIL))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("진행 중이거나 완료된 매칭이 있는 제안서는 수정할 수 없습니다.");
+    }
+
+    @Test
+    @DisplayName("WRITING 상태 제안서는 정상적으로 삭제된다")
+    void delete_writingProposal_succeeds() {
+        Proposal proposal = Proposal.create(member, "삭제할 프로젝트", "", "설명", null, null, 6L);
+        ReflectionTestUtils.setField(proposal, "id", 1L);
+        when(proposalRepository.findById(1L)).thenReturn(Optional.of(proposal));
+
+        proposalService.delete(1L, EMAIL);
+
+        then(proposalRepository).should().delete(proposal);
+    }
+
+    @Test
+    @DisplayName("WRITING 상태가 아닌 제안서는 삭제할 수 없다")
+    void delete_nonWritingProposal_throws() {
+        Proposal proposal = Proposal.create(member, "매칭 중 프로젝트", "", "설명", null, null, 6L);
+        ReflectionTestUtils.setField(proposal, "id", 1L);
+        proposal.startMatching();
+        when(proposalRepository.findById(1L)).thenReturn(Optional.of(proposal));
+
+        assertThatThrownBy(() -> proposalService.delete(1L, EMAIL))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("작성 중인 제안서만 삭제할 수 있습니다.");
     }
 }
