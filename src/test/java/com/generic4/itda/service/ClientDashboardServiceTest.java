@@ -58,14 +58,14 @@ class ClientDashboardServiceTest {
                 2
         );
 
-        given(proposalRepository.findAllByMember_Email_ValueOrderByModifiedAtDesc(OWNER_EMAIL))
+        given(proposalRepository.findAllWithPositionsByMemberEmail(OWNER_EMAIL))
                 .willReturn(List.of(waitingProposal, matchingProposal));
         stubCounts(6L, 2L, 3L, 1L);
 
         ClientDashboardViewModel result = clientDashboardService.getDashboard(OWNER_EMAIL, ClientDashboardFilter.ALL);
 
         InOrder inOrder = inOrder(proposalRepository);
-        inOrder.verify(proposalRepository).findAllByMember_Email_ValueOrderByModifiedAtDesc(OWNER_EMAIL);
+        inOrder.verify(proposalRepository).findAllWithPositionsByMemberEmail(OWNER_EMAIL);
         verifyCountQueries(inOrder);
 
         assertThat(result.selectedFilterKey()).isEqualTo("all");
@@ -107,7 +107,7 @@ class ClientDashboardServiceTest {
                 2
         );
 
-        given(proposalRepository.findAllByMember_Email_ValueAndStatusOrderByModifiedAtDesc(
+        given(proposalRepository.findAllWithPositionsByMemberEmailAndStatus(
                 OWNER_EMAIL,
                 ProposalStatus.WRITING
         )).willReturn(List.of(waitingProposal));
@@ -117,7 +117,7 @@ class ClientDashboardServiceTest {
 
         InOrder inOrder = inOrder(proposalRepository);
         inOrder.verify(proposalRepository)
-                .findAllByMember_Email_ValueAndStatusOrderByModifiedAtDesc(OWNER_EMAIL, ProposalStatus.WRITING);
+                .findAllWithPositionsByMemberEmailAndStatus(OWNER_EMAIL, ProposalStatus.WRITING);
         verifyCountQueries(inOrder);
 
         assertThat(result.selectedFilterKey()).isEqualTo("waiting");
@@ -134,14 +134,14 @@ class ClientDashboardServiceTest {
     @Test
     @DisplayName("필터가 null이면 전체 필터로 조회한다")
     void getDashboard_defaultsToAllFilterWhenFilterIsNull() {
-        given(proposalRepository.findAllByMember_Email_ValueOrderByModifiedAtDesc(OWNER_EMAIL))
+        given(proposalRepository.findAllWithPositionsByMemberEmail(OWNER_EMAIL))
                 .willReturn(List.of());
         stubCounts(0L, 0L, 0L, 0L);
 
         ClientDashboardViewModel result = clientDashboardService.getDashboard(OWNER_EMAIL, null);
 
         InOrder inOrder = inOrder(proposalRepository);
-        inOrder.verify(proposalRepository).findAllByMember_Email_ValueOrderByModifiedAtDesc(OWNER_EMAIL);
+        inOrder.verify(proposalRepository).findAllWithPositionsByMemberEmail(OWNER_EMAIL);
         verifyCountQueries(inOrder);
 
         assertThat(result.selectedFilterKey()).isEqualTo("all");
