@@ -85,6 +85,39 @@ class ClientDashboardControllerTest {
     }
 
     @Test
+    @DisplayName("AJAX 요청 시 listSection fragment만 반환한다")
+    void dashboardItems_returnsListSectionFragment() throws Exception {
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+        ClientDashboardViewModel dashboard = new ClientDashboardViewModel(
+                "waiting",
+                "매칭 대기 중",
+                List.of(
+                        new ClientDashboardSummaryItem("all", "전체 프로젝트", 6L, "전체", false),
+                        new ClientDashboardSummaryItem("waiting", "매칭 대기 중", 2L, "대기 중", true)
+                ),
+                List.of()
+        );
+        given(clientDashboardService.getDashboard("client@example.com", com.generic4.itda.dto.client.ClientDashboardFilter.WAITING))
+                .willReturn(dashboard);
+
+        mockMvc.perform(get("/client/dashboard/items")
+                        .param("filter", "waiting")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("client/dashboard :: #listSection"))
+                .andExpect(model().attribute("dashboard", dashboard));
+
+        then(clientDashboardService).should()
+                .getDashboard("client@example.com", com.generic4.itda.dto.client.ClientDashboardFilter.WAITING);
+    }
+
+    @Test
     @DisplayName("인증되지 않은 사용자는 로그인 페이지로 리다이렉트된다")
     void redirectToLoginWhenUnauthenticated() throws Exception {
         mockMvc.perform(get("/client/dashboard"))
