@@ -41,8 +41,8 @@ class AiBriefProposalMapperTest {
     private AiBriefProposalMapper aiBriefProposalMapper;
 
     @Test
-    @DisplayName("AI 브리프를 적용하면 제안서 기본 정보가 바뀌고 기존 모집 단위는 새 결과로 교체된다")
-    void apply_updatesProposalFieldsAndReplacesPositions() {
+    @DisplayName("AI 브리프를 적용하면 제안서 기본 정보가 바뀌고 AI 결과 기준으로 모집 단위가 동기화된다")
+    void apply_updatesProposalFieldsAndSynchronizesPositionsByAiResult() {
         Proposal proposal = createProposal();
         Position oldPosition = Position.create("디자이너");
         Skill oldSkill = Skill.create("Figma", null);
@@ -96,17 +96,183 @@ class AiBriefProposalMapperTest {
         assertThat(proposal.getTotalBudgetMax()).isEqualTo(8_000_000L);
         assertThat(proposal.getExpectedPeriod()).isEqualTo(12L);
         assertThat(proposal.getPositions()).hasSize(1);
-        assertThat(proposal.getPositions().get(0).getPosition().getName()).isEqualTo("백엔드 개발자");
-        assertThat(proposal.getPositions().get(0).getTitle()).isEqualTo("Node.js 백엔드 개발자");
-        assertThat(proposal.getPositions().get(0).getWorkType()).isEqualTo(ProposalWorkType.HYBRID);
-        assertThat(proposal.getPositions().get(0).getExpectedPeriod()).isEqualTo(12L);
-        assertThat(proposal.getPositions().get(0).getCareerMinYears()).isEqualTo(3);
-        assertThat(proposal.getPositions().get(0).getCareerMaxYears()).isEqualTo(6);
-        assertThat(proposal.getPositions().get(0).getWorkPlace()).isEqualTo("판교");
-        assertThat(proposal.getPositions().get(0).getSkills()).hasSize(1);
-        assertThat(proposal.getPositions().get(0).getSkills().get(0).getSkill().getName()).isEqualTo("Java");
-        assertThat(proposal.getPositions().get(0).getSkills().get(0).getImportance())
+
+        ProposalPosition backendPosition = findProposalPosition(proposal, "백엔드 개발자");
+        assertThat(backendPosition.getTitle()).isEqualTo("Node.js 백엔드 개발자");
+        assertThat(backendPosition.getWorkType()).isEqualTo(ProposalWorkType.HYBRID);
+        assertThat(backendPosition.getExpectedPeriod()).isEqualTo(12L);
+        assertThat(backendPosition.getCareerMinYears()).isEqualTo(3);
+        assertThat(backendPosition.getCareerMaxYears()).isEqualTo(6);
+        assertThat(backendPosition.getWorkPlace()).isEqualTo("판교");
+        assertThat(backendPosition.getSkills()).hasSize(1);
+        assertThat(backendPosition.getSkills().get(0).getSkill().getName()).isEqualTo("Java");
+        assertThat(backendPosition.getSkills().get(0).getImportance())
                 .isEqualTo(ProposalPositionSkillImportance.PREFERENCE);
+    }
+
+    @Test
+    @DisplayName("AI 브리프가 기존 직무를 다시 제안하면 기존 모집 단위를 업데이트한다")
+    void apply_updatesExistingPositionWhenPositionNameMatches() {
+        Proposal proposal = createProposal();
+        Position backend = Position.create("백엔드 개발자");
+        Skill oldSkill = Skill.create("Spring", null);
+        Skill newSkill = Skill.create("Java", null);
+        ProposalPosition existingPosition = proposal.addPosition(
+                backend,
+                "기존 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                1_000_000L,
+                2_000_000L,
+                3L,
+                null,
+                null,
+                null
+        );
+        existingPosition.addSkill(oldSkill, ProposalPositionSkillImportance.ESSENTIAL);
+
+        given(positionRepository.findByName("백엔드 개발자")).willReturn(Optional.of(backend));
+        given(skillRepository.findByName("Java")).willReturn(Optional.of(newSkill));
+
+        AiBriefResult aiBriefResult = AiBriefResult.of(
+                "새 제목",
+                "새 설명",
+                null,
+                null,
+                8L,
+                List.of(
+                        AiBriefPositionResult.of(
+                                "백엔드 개발자",
+                                "플랫폼 백엔드 개발자",
+                                ProposalWorkType.HYBRID,
+                                2L,
+                                3_000_000L,
+                                4_000_000L,
+                                8L,
+                                3,
+                                6,
+                                "판교",
+                                List.of(AiBriefSkillResult.of("Java", ProposalPositionSkillImportance.ESSENTIAL))
+                        )
+                )
+        );
+
+        aiBriefProposalMapper.apply(proposal, aiBriefResult);
+
+        assertThat(proposal.getPositions()).hasSize(1);
+        ProposalPosition updatedPosition = proposal.getPositions().get(0);
+        assertThat(updatedPosition).isSameAs(existingPosition);
+        assertThat(updatedPosition.getPosition()).isSameAs(backend);
+        assertThat(updatedPosition.getTitle()).isEqualTo("플랫폼 백엔드 개발자");
+        assertThat(updatedPosition.getWorkType()).isEqualTo(ProposalWorkType.HYBRID);
+        assertThat(updatedPosition.getHeadCount()).isEqualTo(2L);
+        assertThat(updatedPosition.getUnitBudgetMin()).isEqualTo(3_000_000L);
+        assertThat(updatedPosition.getUnitBudgetMax()).isEqualTo(4_000_000L);
+        assertThat(updatedPosition.getExpectedPeriod()).isEqualTo(8L);
+        assertThat(updatedPosition.getCareerMinYears()).isEqualTo(3);
+        assertThat(updatedPosition.getCareerMaxYears()).isEqualTo(6);
+        assertThat(updatedPosition.getWorkPlace()).isEqualTo("판교");
+        assertThat(updatedPosition.getSkills())
+                .extracting(skill -> skill.getSkill().getName(), skill -> skill.getImportance())
+                .containsExactly(tuple("Java", ProposalPositionSkillImportance.ESSENTIAL));
+    }
+
+    @Test
+    @DisplayName("AI 브리프가 기존 스킬을 다시 제안하면 중복 추가하지 않고 중요도만 갱신한다")
+    void apply_updatesExistingSkillImportanceWithoutDuplicatingSkill() {
+        Proposal proposal = createProposal();
+        Position backend = Position.create("백엔드 개발자");
+        Skill java = Skill.create("Java", null);
+
+        ProposalPosition existingPosition = proposal.addPosition(
+                backend,
+                "기존 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                1_000_000L,
+                2_000_000L,
+                3L,
+                null,
+                null,
+                null
+        );
+        existingPosition.addSkill(java, ProposalPositionSkillImportance.PREFERENCE);
+
+        given(positionRepository.findByName("백엔드 개발자")).willReturn(Optional.of(backend));
+        given(skillRepository.findByName("Java")).willReturn(Optional.of(java));
+
+        AiBriefResult aiBriefResult = AiBriefResult.of(
+                "새 제목",
+                "새 설명",
+                null,
+                null,
+                8L,
+                List.of(
+                        AiBriefPositionResult.of(
+                                "백엔드 개발자",
+                                "플랫폼 백엔드 개발자",
+                                ProposalWorkType.REMOTE,
+                                1L,
+                                null,
+                                null,
+                                8L,
+                                null,
+                                null,
+                                null,
+                                List.of(AiBriefSkillResult.of("Java", ProposalPositionSkillImportance.ESSENTIAL))
+                        )
+                )
+        );
+
+        aiBriefProposalMapper.apply(proposal, aiBriefResult);
+
+        ProposalPosition updatedPosition = proposal.getPositions().get(0);
+        assertThat(updatedPosition.getSkills()).hasSize(1);
+        assertThat(updatedPosition.getSkills())
+                .extracting(skill -> skill.getSkill().getName(), skill -> skill.getImportance())
+                .containsExactly(tuple("Java", ProposalPositionSkillImportance.ESSENTIAL));
+    }
+
+    @Test
+    @DisplayName("AI 브리프 포지션 필수값이 비어 있으면 기본값으로 보정한다")
+    void apply_fillsDefaultRequiredPositionFieldsWhenAiOmitsThem() {
+        Proposal proposal = createProposal();
+        Position backend = Position.create("백엔드 개발자");
+
+        given(positionRepository.findByName("백엔드 개발자")).willReturn(Optional.of(backend));
+
+        AiBriefResult aiBriefResult = AiBriefResult.of(
+                "새 제목",
+                "새 설명",
+                null,
+                null,
+                null,
+                List.of(
+                        AiBriefPositionResult.of(
+                                "백엔드 개발자",
+                                "백엔드 개발자",
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                List.of()
+                        )
+                )
+        );
+
+        aiBriefProposalMapper.apply(proposal, aiBriefResult);
+
+        assertThat(proposal.getPositions()).hasSize(1);
+        ProposalPosition proposalPosition = proposal.getPositions().get(0);
+        assertThat(proposalPosition.getPosition()).isSameAs(backend);
+        assertThat(proposalPosition.getTitle()).isEqualTo("백엔드 개발자");
+        assertThat(proposalPosition.getWorkType()).isEqualTo(ProposalWorkType.REMOTE);
+        assertThat(proposalPosition.getHeadCount()).isEqualTo(1L);
+        assertThat(proposalPosition.getWorkPlace()).isNull();
     }
 
     @Test
@@ -213,6 +379,13 @@ class AiBriefProposalMapperTest {
         assertThat(proposal.getPositions().get(0).getSkills().get(0).getSkill()).isSameAs(java);
         then(positionRepository).should(never()).save(any(Position.class));
         then(skillRepository).should(never()).save(any(Skill.class));
+    }
+
+    private ProposalPosition findProposalPosition(Proposal proposal, String positionName) {
+        return proposal.getPositions().stream()
+                .filter(proposalPosition -> proposalPosition.getPosition().getName().equals(positionName))
+                .findFirst()
+                .orElseThrow();
     }
 
     private Proposal createProposal() {

@@ -3,6 +3,9 @@ package com.generic4.itda.service;
 import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
+import com.generic4.itda.domain.proposal.ProposalPositionSkill;
+import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
+import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.domain.skill.Skill;
 import com.generic4.itda.dto.proposal.AiBriefPositionResult;
 import com.generic4.itda.dto.proposal.AiBriefResult;
@@ -10,7 +13,11 @@ import com.generic4.itda.dto.proposal.AiBriefSkillResult;
 import com.generic4.itda.repository.PositionRepository;
 import com.generic4.itda.repository.SkillRepository;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
@@ -19,6 +26,10 @@ import org.springframework.util.StringUtils;
 @Component
 @RequiredArgsConstructor
 public class AiBriefProposalMapper {
+
+    private static final Long DEFAULT_HEAD_COUNT = 1L;
+    private static final ProposalWorkType DEFAULT_WORK_TYPE = ProposalWorkType.REMOTE;
+    private static final String DEFAULT_WORK_PLACE = "협의";
 
     private final PositionRepository positionRepository;
     private final SkillRepository skillRepository;
@@ -36,42 +47,156 @@ public class AiBriefProposalMapper {
                 resolveExpectedPeriod(proposal, aiBriefResult)
         );
 
-        replacePositions(proposal, aiBriefResult.getPositions());
+        mergePositions(proposal, aiBriefResult.getPositions());
     }
 
-    private void replacePositions(Proposal proposal, List<AiBriefPositionResult> positions) {
-        if (positions == null || positions.isEmpty()) {
+    private void mergePositions(Proposal proposal, List<AiBriefPositionResult> positionResults) {
+        if (positionResults == null || positionResults.isEmpty()) {
             return;
         }
 
-        List<ProposalPosition> existingPositions = new ArrayList<>(proposal.getPositions());
-        for (ProposalPosition existingPosition : existingPositions) {
-            proposal.removePosition(existingPosition);
+        Map<String, ProposalPosition> existingByPositionName = existingPositionsByPositionName(proposal);
+        List<PositionApplication> applications = mergePositionApplicationsByPositionName(positionResults);
+        Set<ProposalPosition> appliedPositions = new HashSet<>();
+
+        for (PositionApplication application : applications) {
+            ProposalPosition proposalPosition = existingByPositionName.get(normalizeKey(application.position().getName()));
+            AiBriefPositionResult result = application.result();
+            ProposalWorkType workType = resolveWorkType(result);
+            String workPlace = resolveWorkPlace(workType, result.getWorkPlace());
+
+            if (proposalPosition == null) {
+                proposalPosition = proposal.addPosition(
+                        application.position(),
+                        result.getTitle(),
+                        workType,
+                        resolveHeadCount(result),
+                        result.getUnitBudgetMin(),
+                        result.getUnitBudgetMax(),
+                        result.getExpectedPeriod(),
+                        result.getCareerMinYears(),
+                        result.getCareerMaxYears(),
+                        workPlace
+                );
+            } else {
+                proposalPosition.update(
+                        application.position(),
+                        result.getTitle(),
+                        workType,
+                        resolveHeadCount(result),
+                        result.getUnitBudgetMin(),
+                        result.getUnitBudgetMax(),
+                        result.getExpectedPeriod(),
+                        result.getCareerMinYears(),
+                        result.getCareerMaxYears(),
+                        workPlace
+                );
+            }
+
+            replaceSkills(proposalPosition, result.getSkills());
+            appliedPositions.add(proposalPosition);
         }
 
-        for (AiBriefPositionResult positionResult : positions) {
-            Position position = findOrCreatePosition(positionResult.getPositionCategoryName());
-            ProposalPosition proposalPosition = proposal.addPosition(
-                    position,
-                    positionResult.getTitle(),
-                    positionResult.getWorkType(),
-                    positionResult.getHeadCount(),
-                    positionResult.getUnitBudgetMin(),
-                    positionResult.getUnitBudgetMax(),
-                    positionResult.getExpectedPeriod(),
-                    positionResult.getCareerMinYears(),
-                    positionResult.getCareerMaxYears(),
-                    positionResult.getWorkPlace()
-            );
-            addSkills(proposalPosition, positionResult.getSkills());
+        removePositionsNotInAiResult(proposal, appliedPositions);
+    }
+
+    private void removePositionsNotInAiResult(Proposal proposal, Set<ProposalPosition> appliedPositions) {
+        List<ProposalPosition> existingPositions = new ArrayList<>(proposal.getPositions());
+        for (ProposalPosition existingPosition : existingPositions) {
+            if (!appliedPositions.contains(existingPosition)) {
+                proposal.removePosition(existingPosition);
+            }
         }
     }
 
-    private void addSkills(ProposalPosition proposalPosition, List<AiBriefSkillResult> skills) {
-        for (AiBriefSkillResult skillResult : skills) {
-            Skill skill = findOrCreateSkill(skillResult.getSkillName());
-            proposalPosition.addSkill(skill, skillResult.getImportance());
+    private Map<String, ProposalPosition> existingPositionsByPositionName(Proposal proposal) {
+        Map<String, ProposalPosition> existingPositions = new LinkedHashMap<>();
+        for (ProposalPosition proposalPosition : proposal.getPositions()) {
+            if (proposalPosition.getPosition() != null && StringUtils.hasText(proposalPosition.getPosition().getName())) {
+                existingPositions.put(normalizeKey(proposalPosition.getPosition().getName()), proposalPosition);
+            }
         }
+        return existingPositions;
+    }
+
+    private List<PositionApplication> mergePositionApplicationsByPositionName(List<AiBriefPositionResult> positionResults) {
+        Map<String, PositionApplication> merged = new LinkedHashMap<>();
+
+        for (AiBriefPositionResult positionResult : positionResults) {
+            Position position = findOrCreatePosition(positionResult.getPositionCategoryName());
+            merged.put(normalizeKey(position.getName()), new PositionApplication(position, positionResult));
+        }
+
+        return new ArrayList<>(merged.values());
+    }
+
+    private Long resolveHeadCount(AiBriefPositionResult result) {
+        if (result.getHeadCount() == null || result.getHeadCount() < 1) {
+            return DEFAULT_HEAD_COUNT;
+        }
+        return result.getHeadCount();
+    }
+
+    private ProposalWorkType resolveWorkType(AiBriefPositionResult result) {
+        if (result.getWorkType() == null) {
+            return DEFAULT_WORK_TYPE;
+        }
+        return result.getWorkType();
+    }
+
+    private String resolveWorkPlace(ProposalWorkType workType, String workPlace) {
+        if (workType == ProposalWorkType.REMOTE) {
+            return null;
+        }
+
+        if ((workType == ProposalWorkType.SITE || workType == ProposalWorkType.HYBRID)
+                && !StringUtils.hasText(workPlace)) {
+            return DEFAULT_WORK_PLACE;
+        }
+
+        return StringUtils.hasText(workPlace) ? workPlace.trim() : null;
+    }
+
+    private void replaceSkills(ProposalPosition proposalPosition, List<AiBriefSkillResult> skills) {
+        Map<String, SkillApplication> desiredSkills = buildDesiredSkills(skills);
+
+        List<ProposalPositionSkill> existingSkills = new ArrayList<>(proposalPosition.getSkills());
+        for (ProposalPositionSkill existingSkill : existingSkills) {
+            String key = normalizeKey(existingSkill.getSkill().getName());
+            SkillApplication desiredSkill = desiredSkills.remove(key);
+
+            if (desiredSkill == null) {
+                proposalPosition.removeSkill(existingSkill.getSkill());
+                continue;
+            }
+
+            existingSkill.changeImportance(desiredSkill.importance());
+        }
+
+        for (SkillApplication desiredSkill : desiredSkills.values()) {
+            proposalPosition.addSkill(desiredSkill.skill(), desiredSkill.importance());
+        }
+    }
+
+    private Map<String, SkillApplication> buildDesiredSkills(List<AiBriefSkillResult> skills) {
+        Map<String, SkillApplication> desiredSkills = new LinkedHashMap<>();
+        if (skills == null || skills.isEmpty()) {
+            return desiredSkills;
+        }
+
+        for (AiBriefSkillResult skillResult : skills) {
+            if (skillResult == null || !StringUtils.hasText(skillResult.getSkillName())) {
+                continue;
+            }
+
+            Skill skill = findOrCreateSkill(skillResult.getSkillName());
+            desiredSkills.putIfAbsent(
+                    normalizeKey(skill.getName()),
+                    new SkillApplication(skill, skillResult.getImportance())
+            );
+        }
+
+        return desiredSkills;
     }
 
     private Position findOrCreatePosition(String positionCategoryName) {
@@ -117,5 +242,15 @@ public class AiBriefProposalMapper {
             return aiBriefResult.getExpectedPeriod();
         }
         return proposal.getExpectedPeriod();
+    }
+
+    private String normalizeKey(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private record PositionApplication(Position position, AiBriefPositionResult result) {
+    }
+
+    private record SkillApplication(Skill skill, ProposalPositionSkillImportance importance) {
     }
 }
