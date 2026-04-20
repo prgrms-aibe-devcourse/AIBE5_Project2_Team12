@@ -28,7 +28,7 @@ public class RecommendationResultCreator {
     private static final int SCORE_SCALE = 4;
     private final ResumeRepository resumeRepository;
 
-    List<RecommendationResult> create(
+    public List<RecommendationResult> create(
             RecommendationRun run,
             List<ScoredCandidate> scoredCandidates,
             int topK,
@@ -144,7 +144,7 @@ public class RecommendationResultCreator {
         List<String> highlights = new ArrayList<>();
 
         if (!matchedSkills.isEmpty()) {
-            highlights.add("공토 스킬 " + matchedSkills.size() + "개 보유");
+            highlights.add("공통 스킬 " + matchedSkills.size() + "개 보유");
         }
 
         if (candidate.careerYears() > 0) {
