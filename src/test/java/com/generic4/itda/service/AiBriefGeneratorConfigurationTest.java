@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.generic4.itda.config.ai.AiBriefProperties;
 import com.generic4.itda.repository.PositionRepository;
+import com.generic4.itda.repository.ProposalAiInterviewMessageRepository;
 import com.generic4.itda.repository.ProposalRepository;
 import com.generic4.itda.repository.SkillRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -31,6 +32,8 @@ class AiBriefGeneratorConfigurationTest {
                     assertThat(context).hasSingleBean(AiBriefGenerator.class);
                     assertThat(context).hasSingleBean(DisabledAiBriefGenerator.class);
                     assertThat(context).doesNotHaveBean(OpenAiAiBriefGenerator.class);
+                    assertThat(context).doesNotHaveBean(AiInterviewGenerator.class);
+                    assertThat(context).doesNotHaveBean(OpenAiAiInterviewGenerator.class);
                     assertThat(context).hasSingleBean(ProposalAiBriefService.class);
                 });
     }
@@ -47,6 +50,8 @@ class AiBriefGeneratorConfigurationTest {
                 .run(context -> {
                     assertThat(context).hasSingleBean(AiBriefGenerator.class);
                     assertThat(context).hasSingleBean(OpenAiAiBriefGenerator.class);
+                    assertThat(context).hasSingleBean(AiInterviewGenerator.class);
+                    assertThat(context).hasSingleBean(OpenAiAiInterviewGenerator.class);
                     assertThat(context).doesNotHaveBean(DisabledAiBriefGenerator.class);
                     assertThat(context).hasSingleBean(ProposalAiBriefService.class);
                 });
@@ -69,6 +74,7 @@ class AiBriefGeneratorConfigurationTest {
     @Import({
             DisabledAiBriefGenerator.class,
             OpenAiAiBriefGenerator.class,
+            OpenAiAiInterviewGenerator.class,
             AiBriefProposalMapper.class,
             ProposalAiBriefService.class
     })
@@ -87,6 +93,11 @@ class AiBriefGeneratorConfigurationTest {
         @Bean
         ProposalRepository proposalRepository() {
             return mock(ProposalRepository.class);
+        }
+
+        @Bean
+        ProposalAiInterviewMessageRepository proposalAiInterviewMessageRepository() {
+            return mock(ProposalAiInterviewMessageRepository.class);
         }
 
         @Bean

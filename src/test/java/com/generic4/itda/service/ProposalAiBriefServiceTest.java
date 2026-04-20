@@ -9,12 +9,15 @@ import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 
 import com.generic4.itda.domain.proposal.Proposal;
+import com.generic4.itda.domain.proposal.ProposalAiInterviewMessage;
 import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.dto.proposal.AiBriefGenerateRequest;
 import com.generic4.itda.dto.proposal.AiBriefResult;
 import com.generic4.itda.exception.AiBriefGenerationException;
 import com.generic4.itda.exception.ProposalNotFoundException;
+import com.generic4.itda.repository.ProposalAiInterviewMessageRepository;
 import com.generic4.itda.repository.ProposalRepository;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,6 +36,9 @@ class ProposalAiBriefServiceTest {
 
     @Mock
     private ProposalRepository proposalRepository;
+
+    @Mock
+    private ProposalAiInterviewMessageRepository messageRepository;
 
     @Mock
     private AiBriefGenerator aiBriefGenerator;
@@ -60,6 +66,7 @@ class ProposalAiBriefServiceTest {
         );
 
         given(proposalRepository.findById(1L)).willReturn(Optional.of(proposal));
+        given(messageRepository.findAllByProposalIdOrderBySequenceAsc(1L)).willReturn(List.of());
         given(aiBriefGenerator.generate(any(AiBriefGenerateRequest.class))).willReturn(aiBriefResult);
 
         AiBriefResult result = proposalAiBriefService.generate(1L, OWNER_EMAIL);
@@ -67,6 +74,49 @@ class ProposalAiBriefServiceTest {
         assertThat(result).isSameAs(aiBriefResult);
         then(aiBriefGenerator).should().generate(requestCaptor.capture());
         assertThat(requestCaptor.getValue().getRawInputText()).isEqualTo("AI 브리프용 원본 입력");
+        then(aiBriefProposalMapper).should().apply(proposal, aiBriefResult);
+    }
+
+    @Test
+    @DisplayName("AI 인터뷰 히스토리가 있으면 raw input text 대신 대화 히스토리로 AI 브리프를 생성한다")
+    void generateAiBriefWithInterviewHistoryWhenMessagesExist() {
+        Proposal proposal = createProposal("기존 raw input");
+        ProposalAiInterviewMessage userMessage = ProposalAiInterviewMessage.createUserMessage(
+                proposal,
+                "온라인 쇼핑몰을 만들고 싶어요.",
+                1
+        );
+        ProposalAiInterviewMessage assistantMessage = ProposalAiInterviewMessage.createAssistantMessage(
+                proposal,
+                "백엔드 개발자는 몇 명 필요하고 근무 형태는 어떻게 할까요?",
+                2
+        );
+        AiBriefResult aiBriefResult = AiBriefResult.of(
+                "AI가 만든 제목",
+                "AI가 만든 설명",
+                3_000_000L,
+                5_000_000L,
+                6L,
+                null
+        );
+
+        given(proposalRepository.findById(1L)).willReturn(Optional.of(proposal));
+        given(messageRepository.findAllByProposalIdOrderBySequenceAsc(1L))
+                .willReturn(List.of(userMessage, assistantMessage));
+        given(aiBriefGenerator.generate(any(AiBriefGenerateRequest.class))).willReturn(aiBriefResult);
+
+        AiBriefResult result = proposalAiBriefService.generate(1L, OWNER_EMAIL);
+
+        assertThat(result).isSameAs(aiBriefResult);
+        then(aiBriefGenerator).should().generate(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().getRawInputText()).isEqualTo(
+                "[USER] 온라인 쇼핑몰을 만들고 싶어요." + System.lineSeparator()
+                        + "[ASSISTANT] 백엔드 개발자는 몇 명 필요하고 근무 형태는 어떻게 할까요?"
+        );
+        assertThat(proposal.getRawInputText()).isEqualTo(
+                "[USER] 온라인 쇼핑몰을 만들고 싶어요." + System.lineSeparator()
+                        + "[ASSISTANT] 백엔드 개발자는 몇 명 필요하고 근무 형태는 어떻게 할까요?"
+        );
         then(aiBriefProposalMapper).should().apply(proposal, aiBriefResult);
     }
 
@@ -79,6 +129,7 @@ class ProposalAiBriefServiceTest {
                 .isInstanceOf(ProposalNotFoundException.class)
                 .hasMessage("제안서를 찾을 수 없습니다. id=1");
 
+        then(messageRepository).should(never()).findAllByProposalIdOrderBySequenceAsc(any());
         then(aiBriefGenerator).should(never()).generate(any());
         then(aiBriefProposalMapper).should(never()).apply(any(), any());
     }
@@ -94,6 +145,7 @@ class ProposalAiBriefServiceTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("작성 중인 제안서만 AI 브리프를 생성할 수 있습니다.");
 
+        then(messageRepository).should(never()).findAllByProposalIdOrderBySequenceAsc(any());
         then(aiBriefGenerator).should(never()).generate(any());
         then(aiBriefProposalMapper).should(never()).apply(any(), any());
     }
@@ -103,6 +155,7 @@ class ProposalAiBriefServiceTest {
     void failWhenAiGeneratorThrowsException() {
         Proposal proposal = createProposal("실패용 원본 입력");
         given(proposalRepository.findById(1L)).willReturn(Optional.of(proposal));
+        given(messageRepository.findAllByProposalIdOrderBySequenceAsc(1L)).willReturn(List.of());
         given(aiBriefGenerator.generate(any(AiBriefGenerateRequest.class)))
                 .willThrow(new RuntimeException("llm failure"));
 
@@ -128,6 +181,7 @@ class ProposalAiBriefServiceTest {
                 .isInstanceOf(AccessDeniedException.class)
                 .hasMessage("본인 제안서에 대해서만 AI 브리프를 생성할 수 있습니다.");
 
+        then(messageRepository).should(never()).findAllByProposalIdOrderBySequenceAsc(any());
         then(aiBriefGenerator).should(never()).generate(any());
         then(aiBriefProposalMapper).should(never()).apply(any(), any());
     }
