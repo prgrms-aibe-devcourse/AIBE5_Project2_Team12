@@ -76,27 +76,41 @@
                                 </p>
                             </div>
 
-                            <div class="flex-1 overflow-y-auto px-6 py-6">
+                            <div class="flex-1 overflow-y-auto px-6 py-6" x-ref="chatScroll">
                                 <div class="space-y-5">
                                     <div class="max-w-[92%] rounded-[24px] border border-slate-200 bg-slate-50 px-5 py-4 text-sm leading-7 text-slate-600">
                                         안녕하세요! 만들고 싶은 IT 서비스나 프로젝트를 자유롭게 적어주세요.
-                                        전송하면 입력 내용을 저장하고 AI 브리프 생성 흐름을 시작합니다.
+                                        전송하면 AI가 후속 질문을 이어가고, 오른쪽 제안서 폼을 자동으로 갱신합니다.
                                     </div>
 
-                                    <template x-if="rawInputText.trim().length > 0">
+                                    <template x-if="aiInterviewMessages.length > 0">
+                                        <div class="space-y-5">
+                                            <template x-for="message in aiInterviewMessages" :key="message.id || `${message.role}-${message.sequence}`">
+                                                <div class="flex" :class="message.role === 'USER' ? 'justify-end' : 'justify-start'">
+                                                    <div class="max-w-[88%] whitespace-pre-line rounded-[24px] px-5 py-4 text-sm leading-7 shadow-sm"
+                                                         :class="message.role === 'USER'
+                                                            ? 'bg-slate-950 text-white shadow-slate-900/10'
+                                                            : 'border border-blue-100 bg-blue-50 text-blue-700'"
+                                                         x-text="message.content"></div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+
+                                    <template x-if="aiInterviewMessages.length === 0 && rawInputText.trim().length > 0">
                                         <div class="space-y-5">
                                             <div class="ml-auto max-w-[88%] whitespace-pre-line rounded-[24px] bg-slate-950 px-5 py-4 text-sm leading-7 text-white shadow-sm shadow-slate-900/10"
                                                  x-text="rawInputText"></div>
 
                                             <div class="max-w-[92%] rounded-[24px] border border-blue-100 bg-blue-50 px-5 py-4 text-sm leading-7 text-blue-700">
-                                                프로젝트 원본 입력을 확인했습니다. AI 브리프를 생성하면 오른쪽 폼이 갱신될 수 있습니다.
+                                                첫 입력을 확인했습니다. 곧 AI가 후속 질문을 생성하고 대화 히스토리로 저장합니다.
                                             </div>
                                         </div>
                                     </template>
 
-                                    <template x-if="rawInputText.trim().length === 0">
+                                    <template x-if="aiInterviewMessages.length === 0 && rawInputText.trim().length === 0">
                                         <div class="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-6 py-8 text-sm leading-7 text-slate-500">
-                                            아직 입력된 프로젝트 아이디어가 없습니다. 아래 입력창에 원하는 서비스를 적어두면, AI가 제안서 초안을 만들기 위한 원본 입력으로 저장합니다.
+                                            아직 대화가 없습니다. 아래 입력창에 원하는 서비스를 적어주세요.
                                         </div>
                                     </template>
 
@@ -107,7 +121,7 @@
 
                                     <template x-if="aiBriefLoading">
                                         <div class="max-w-[92%] rounded-[24px] border border-blue-100 bg-blue-50 px-5 py-4 text-sm leading-7 text-blue-700">
-                                            AI가 프로젝트 내용을 분석하고 제안서 초안을 작성하고 있습니다. 잠시만 기다려주세요.
+                                            AI가 답변을 분석하고 제안서 초안을 갱신하고 있습니다. 잠시만 기다려주세요.
                                         </div>
                                     </template>
 
@@ -125,6 +139,8 @@
                                               x-model="draftInput"
                                               rows="2"
                                               :disabled="aiBriefLoading"
+                                              @keydown.enter.meta.prevent="sendPrompt()"
+                                              @keydown.enter.ctrl.prevent="sendPrompt()"
                                               placeholder="예: 온라인 쇼핑몰 앱을 만들고 싶어요. 결제와 관리자 화면이 필요합니다."
                                               class="min-h-[72px] flex-1 rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"></textarea>
                                     <button type="button"
@@ -621,6 +637,16 @@
             title: /*[[${proposalForm.title}]]*/ '',
             rawInputText: /*[[${proposalForm.rawInputText}]]*/ '',
             aiBriefRequested: /*[[${aiBriefRequested}]]*/ false,
+            aiInterviewMessages: [
+                /*[# th:each="message, stat : ${aiInterviewMessages}"]*/
+                {
+                    id: /*[[${message.id}]]*/ null,
+                    role: /*[[${message.role}]]*/ '',
+                    content: /*[[${message.content}]]*/ '',
+                    sequence: /*[[${message.sequence}]]*/ null
+                }/*[(${stat.last} ? '' : ',')]*/
+                /*[/]*/
+            ],
             description: /*[[${proposalForm.description}]]*/ '',
             expectedPeriod: /*[[${proposalForm.expectedPeriod}]]*/ null,
             workTypes: [
@@ -678,6 +704,7 @@
                 aiBriefNoticeMessage: '',
                 aiBriefLoading: false,
                 aiBriefErrorMessage: '',
+                aiInterviewMessages: [],
                 title: bootstrap.title || '',
                 rawInputText: bootstrap.rawInputText || '',
                 draftInput: '',
@@ -693,6 +720,7 @@
                 positionErrors: [],
 
                 init() {
+                    this.aiInterviewMessages = (bootstrap.aiInterviewMessages || []).map(message => this.normalizeMessage(message));
                     this.positions = (bootstrap.positions || []).map((position, index) => this.normalizePosition({
                         ...position,
                         clientKey: position.id ? `position-${position.id}` : `seed-${index}`
@@ -700,10 +728,11 @@
                     this.currentPosition = this.blankPosition();
                     this.loaded = true;
                     this.refreshIcons();
+                    this.scrollChatToBottom();
 
                     if (this.aiBriefRequested && bootstrap.proposalId) {
                         this.$nextTick(() => {
-                            this.generateAiBrief();
+                            this.startInitialInterviewIfNeeded();
                         });
                     }
                 },
@@ -713,25 +742,98 @@
                     this.refreshIcons();
                 },
 
-                sendPrompt() {
-                    if (!this.draftInput || !this.draftInput.trim()) {
+                async sendPrompt() {
+                    const message = (this.draftInput || '').trim();
+                    if (!message || this.aiBriefLoading) {
                         return;
                     }
 
-                    this.rawInputText = this.appendRawInput(this.rawInputText, this.draftInput);
-                    this.draftInput = '';
-                    this.aiBriefNoticeMessage = '프로젝트 원본 입력을 저장했습니다. 기존 입력값은 AI 결과로 갱신될 수 있습니다.';
                     this.aiBriefErrorMessage = '';
+                    this.aiBriefNoticeMessage = '';
 
                     if (!this.title || !this.title.trim()) {
                         this.title = 'AI 브리프 작성 중';
                     }
 
-                    this.aiBriefRequested = true;
-                    this.submitAction = 'save';
-                    this.$nextTick(() => {
-                        this.$root.requestSubmit();
-                    });
+                    if (!bootstrap.proposalId) {
+                        this.rawInputText = this.appendRawInput(this.rawInputText, message);
+                        this.draftInput = '';
+                        this.submitAction = 'save';
+                        this.aiBriefRequested = true;
+                        this.$nextTick(() => {
+                            this.$root.requestSubmit();
+                        });
+                        return;
+                    }
+
+                    this.draftInput = '';
+                    await this.sendInterviewMessage(message);
+                },
+
+                async startInitialInterviewIfNeeded() {
+                    if (this.aiInterviewMessages.length > 0) {
+                        return;
+                    }
+
+                    const message = this.extractInitialMessage(this.rawInputText);
+                    if (!message) {
+                        await this.generateAiBrief();
+                        return;
+                    }
+
+                    this.aiBriefNoticeMessage = '첫 입력을 AI 인터뷰 메시지로 저장하고 후속 질문을 생성하고 있습니다.';
+                    await this.sendInterviewMessage(message);
+                    this.aiBriefRequested = false;
+                },
+
+                extractInitialMessage(rawInputText) {
+                    const text = (rawInputText || '').trim();
+                    if (!text) {
+                        return '';
+                    }
+
+                    const lines = text.split('\n')
+                        .map(line => line.trim())
+                        .filter(line => line.length > 0)
+                        .map(line => line.startsWith('- ') ? line.slice(2).trim() : line);
+
+                    return lines.join('\n').trim();
+                },
+
+                async sendInterviewMessage(message) {
+                    if (!bootstrap.proposalId || this.aiBriefLoading) {
+                        return;
+                    }
+
+                    this.aiBriefLoading = true;
+                    this.aiBriefErrorMessage = '';
+                    this.refreshIcons();
+
+                    try {
+                        const response = await fetch(`/proposals/${bootstrap.proposalId}/ai-interview/messages`, {
+                            method: 'POST',
+                            headers: {
+                                ...this.csrfHeaders(),
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({ message })
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(await this.extractErrorMessage(response));
+                        }
+
+                        const data = await response.json();
+                        this.applyInterviewResponse(data);
+                        this.aiBriefNoticeMessage = '';
+                        this.scrollChatToBottom();
+                    } catch (error) {
+                        this.aiBriefErrorMessage = error.message || 'AI 인터뷰 메시지 전송에 실패했습니다. 잠시 후 다시 시도해주세요.';
+                    } finally {
+                        this.aiBriefLoading = false;
+                        this.refreshIcons();
+                    }
                 },
 
                 appendRawInput(current, input) {
@@ -774,7 +876,7 @@
                         this.aiBriefNoticeMessage = 'AI 브리프가 제안서에 반영되었습니다. 자동 채움 결과를 불러옵니다.';
                         window.location.replace(`/proposals/${bootstrap.proposalId}/edit`);
                     } catch (error) {
-                        this.aiBriefErrorMessage = error.message || 'AI 브리프 생성에 실패했습니다. 잠시 후 다시 시도하거나 오른쪽 폼을 직접 작성해주세요.';
+                        this.aiBriefErrorMessage = error.message || 'AI 요청 처리에 실패했습니다. 잠시 후 다시 시도하거나 오른쪽 폼을 직접 작성해주세요.';
                         this.aiBriefNoticeMessage = '';
                         this.aiBriefRequested = false;
                     } finally {
@@ -797,10 +899,45 @@
                 async extractErrorMessage(response) {
                     try {
                         const data = await response.json();
-                        return data.message || data.error || 'AI 브리프 생성에 실패했습니다. 잠시 후 다시 시도하거나 오른쪽 폼을 직접 작성해주세요.';
+                        return data.message || data.error || 'AI 요청 처리에 실패했습니다. 잠시 후 다시 시도하거나 오른쪽 폼을 직접 작성해주세요.';
                     } catch (error) {
-                        return 'AI 브리프 생성에 실패했습니다. 잠시 후 다시 시도하거나 오른쪽 폼을 직접 작성해주세요.';
+                        return 'AI 요청 처리에 실패했습니다. 잠시 후 다시 시도하거나 오른쪽 폼을 직접 작성해주세요.';
                     }
+                },
+
+                applyInterviewResponse(data) {
+                    const proposalForm = data.proposalForm || {};
+                    this.applyProposalForm(proposalForm);
+                    this.aiInterviewMessages = (data.messages || []).map(message => this.normalizeMessage(message));
+                },
+
+                applyProposalForm(proposalForm) {
+                    this.title = proposalForm.title || '';
+                    this.rawInputText = proposalForm.rawInputText || '';
+                    this.description = proposalForm.description || '';
+                    this.expectedPeriod = proposalForm.expectedPeriod ?? '';
+                    this.status = proposalForm.status || this.status || 'WRITING';
+                    this.positions = (proposalForm.positions || []).map((position, index) => this.normalizePosition({
+                        ...position,
+                        clientKey: position.id ? `position-${position.id}` : `ai-${Date.now()}-${index}`
+                    }));
+                },
+
+                normalizeMessage(message) {
+                    return {
+                        id: message.id ?? null,
+                        role: message.role || 'ASSISTANT',
+                        content: message.content || '',
+                        sequence: message.sequence ?? null
+                    };
+                },
+
+                scrollChatToBottom() {
+                    this.$nextTick(() => {
+                        if (this.$refs.chatScroll) {
+                            this.$refs.chatScroll.scrollTop = this.$refs.chatScroll.scrollHeight;
+                        }
+                    });
                 },
 
                 openAddPosition() {
