@@ -132,6 +132,14 @@ public class ProposalService {
         return proposal;
     }
 
+    public void delete(Long proposalId, String memberEmail) {
+        Proposal proposal = getOwnedProposal(proposalId, memberEmail);
+        if (proposal.getStatus() != ProposalStatus.WRITING) {
+            throw new IllegalStateException("작성 중인 제안서만 삭제할 수 있습니다.");
+        }
+        proposalRepository.delete(proposal);
+    }
+
     @Transactional(readOnly = true)
     public Proposal findOwnedProposal(Long proposalId, String memberEmail) {
         Proposal proposal = proposalRepository.findWithPositionsById(proposalId)

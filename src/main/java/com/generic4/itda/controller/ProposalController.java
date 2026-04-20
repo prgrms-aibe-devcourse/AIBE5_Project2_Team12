@@ -93,6 +93,27 @@ public class ProposalController {
         }
     }
 
+    @GetMapping("/{proposalId}")
+    public String detail(
+            @PathVariable Long proposalId,
+            @AuthenticationPrincipal ItDaPrincipal principal,
+            Model model,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            Proposal proposal = proposalService.findOwnedProposal(proposalId, principal.getEmail());
+            model.addAttribute("proposal", proposal);
+            addMemberAttributes(model, principal);
+            return "client/proposalDetail";
+        } catch (ProposalNotFoundException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", "존재하지 않는 제안서입니다.");
+            return "redirect:/client/dashboard";
+        } catch (AccessDeniedException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", "본인 제안서만 조회할 수 있습니다.");
+            return "redirect:/client/dashboard";
+        }
+    }
+
     @GetMapping("/{proposalId}/edit")
     public String editForm(
             @PathVariable Long proposalId,
@@ -137,6 +158,25 @@ public class ProposalController {
             redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
             return "redirect:/client/dashboard";
         }
+    }
+
+    @PostMapping("/{proposalId}/delete")
+    public String delete(
+            @PathVariable Long proposalId,
+            @AuthenticationPrincipal ItDaPrincipal principal,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            proposalService.delete(proposalId, principal.getEmail());
+            redirectAttributes.addFlashAttribute("noticeMessage", "프로젝트가 삭제되었습니다.");
+        } catch (ProposalNotFoundException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", "존재하지 않는 제안서입니다.");
+        } catch (org.springframework.security.access.AccessDeniedException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", "본인 제안서만 삭제할 수 있습니다.");
+        } catch (IllegalStateException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
+        }
+        return "redirect:/client/dashboard";
     }
 
     @PostMapping("/{proposalId}/edit-draft")
