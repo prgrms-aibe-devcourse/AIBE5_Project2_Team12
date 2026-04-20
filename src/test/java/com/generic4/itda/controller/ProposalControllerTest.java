@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willDoNothing;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -404,5 +405,86 @@ class ProposalControllerTest {
                         ))))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/client/dashboard"));
+    }
+
+    @Test
+    @DisplayName("제안서 상세 조회 시 proposalDetail 뷰와 proposal 모델을 반환한다")
+    void renderProposalDetail() throws Exception {
+        Proposal proposal = Proposal.create(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678"),
+                "기존 프로젝트", "", "설명", null, null, 6L
+        );
+        given(proposalService.findOwnedProposal(1L, "client@example.com")).willReturn(proposal);
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(get("/proposals/1")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("client/proposalDetail"))
+                .andExpect(model().attributeExists("proposal"));
+    }
+
+    @Test
+    @DisplayName("없는 제안서 상세 조회 시 대시보드로 리다이렉트한다")
+    void redirectDashboardWhenDetailNotFound() throws Exception {
+        given(proposalService.findOwnedProposal(999L, "client@example.com"))
+                .willThrow(new ProposalNotFoundException("제안서를 찾을 수 없습니다. id=999"));
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(get("/proposals/999")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/client/dashboard"));
+    }
+
+    @Test
+    @DisplayName("WRITING 상태 제안서 삭제 요청 시 대시보드로 리다이렉트한다")
+    void deleteWritingProposalAndRedirectToDashboard() throws Exception {
+        willDoNothing().given(proposalService).delete(1L, "client@example.com");
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(post("/proposals/1/delete")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        )))
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/client/dashboard"));
+
+        then(proposalService).should().delete(1L, "client@example.com");
+    }
+
+    @Test
+    @DisplayName("삭제 불가 상태의 제안서 삭제 시도 시 에러 메시지와 함께 대시보드로 리다이렉트한다")
+    void redirectDashboardWithErrorWhenDeleteFails() throws Exception {
+        willThrow(new IllegalStateException("작성 중인 제안서만 삭제할 수 있습니다."))
+                .given(proposalService).delete(1L, "client@example.com");
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(post("/proposals/1/delete")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        )))
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/client/dashboard"));
+
+        then(proposalService).should().delete(1L, "client@example.com");
     }
 }
