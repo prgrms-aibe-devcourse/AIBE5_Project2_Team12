@@ -88,32 +88,32 @@ class ResumeEmbeddingRepositoryTest {
     }
 
     @Test
-    @DisplayName("같은 resume에서 다른 embeddingModel로 변경 후 flush하면 unique constraint 위반이 발생한다")
-    void 같은_resume에서_다른_embeddingModel로_변경_후_flush하면_unique_constraint_위반이_발생한다() {
+    @DisplayName("이력서 ID 목록과 모델명으로 임베딩을 조회한다")
+    void 이력서_ID_목록과_모델명으로_임베딩을_조회한다() {
         // given
-        ResumeEmbedding first = resumeEmbeddingRepository.saveAndFlush(
-                ResumeEmbedding.create(
-                        resume, new SourceHash("hash001"), "text-embedding-3-small",
-                        new EmbeddingVector(List.of(0.1, 0.2))));
+        String model = "text-embedding-3-small";
         resumeEmbeddingRepository.saveAndFlush(
-                ResumeEmbedding.create(
-                        resume, new SourceHash("hash002"), "text-embedding-3-large",
-                        new EmbeddingVector(List.of(0.3, 0.4))));
-        em.clear();
-
-        ResumeEmbedding found = resumeEmbeddingRepository.findById(first.getId()).orElseThrow();
+                ResumeEmbedding.create(resume, new SourceHash("hash1"), model, new EmbeddingVector(List.of(0.1, 0.2))));
+        
+        Member otherMember = memberRepository.save(createMember("other@test.com", "pass", "other", "010-1111-2222"));
+        Resume otherResume = resumeRepository.save(
+                Resume.create(otherMember, "자기소개입니다.", (byte) 5, new CareerPayload(),
+                        WorkType.SITE, ResumeWritingStatus.WRITING, null));
+        resumeEmbeddingRepository.saveAndFlush(
+                ResumeEmbedding.create(otherResume, new SourceHash("hash2"), model, new EmbeddingVector(List.of(0.3, 0.4))));
+        
+        resumeEmbeddingRepository.saveAndFlush(
+                ResumeEmbedding.create(resume, new SourceHash("hash3"), "other-model", new EmbeddingVector(List.of(0.5, 0.6))));
 
         // when
-        found.refresh(
-                new SourceHash("hash003"),
-                "text-embedding-3-large",
-                new EmbeddingVector(List.of(0.9, 0.8)));
+        List<ResumeEmbedding> results = resumeEmbeddingRepository.findAllByResume_IdInAndEmbeddingModel(
+                List.of(resume.getId(), otherResume.getId()), model);
 
         // then
-        assertThatThrownBy(() -> {
-            resumeEmbeddingRepository.save(found);
-            resumeEmbeddingRepository.flush();
-        })
-                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(results).hasSize(2);
+        assertThat(results).extracting(ResumeEmbedding::getEmbeddingModel)
+                .containsOnly(model);
+        assertThat(results).extracting(re -> re.getResume().getId())
+                .containsExactlyInAnyOrder(resume.getId(), otherResume.getId());
     }
 }
