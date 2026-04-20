@@ -18,12 +18,31 @@ import org.springframework.util.Assert;
 @RequiredArgsConstructor
 public class HeuristicV1RecommendationScorer {
 
+    private static final String DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
+
     private final RecommendationQueryTextGenerator recommendationQueryTextGenerator;
     private final QueryEmbeddingGenerator queryEmbeddingGenerator;
     private final ResumeEmbeddingReader resumeEmbeddingReader;
     private final CosineSimilarityCalculator cosineSimilarityCalculator;
     private final SkillAdjustmentCalculator skillAdjustmentCalculator;
     private final CareerAdjustmentCalculator careerAdjustmentCalculator;
+
+    public List<ScoredCandidate> score(
+            Proposal proposal,
+            ProposalPosition proposalPosition,
+            Set<String> requiredSkillNames,
+            Set<String> preferredSkillNames,
+            List<RecommendationScorableCandidate> candidates
+    ) {
+        return score(
+                proposal,
+                proposalPosition,
+                requiredSkillNames,
+                preferredSkillNames,
+                candidates,
+                DEFAULT_EMBEDDING_MODEL
+        );
+    }
 
     public List<ScoredCandidate> score(
             Proposal proposal,
