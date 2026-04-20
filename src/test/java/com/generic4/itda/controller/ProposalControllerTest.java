@@ -25,6 +25,7 @@ import com.generic4.itda.domain.proposal.ProposalStatus;
 import com.generic4.itda.dto.proposal.ProposalForm;
 import com.generic4.itda.dto.security.ItDaPrincipal;
 import com.generic4.itda.exception.ProposalNotFoundException;
+import org.springframework.security.access.AccessDeniedException;
 import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.PositionRepository;
 import com.generic4.itda.service.ProposalService;
@@ -406,7 +407,7 @@ class ProposalControllerTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/client/dashboard"));
     }
-    
+
     @Test
     @DisplayName("없는 제안서 상세 조회 시 대시보드로 리다이렉트한다")
     void redirectDashboardWhenDetailNotFound() throws Exception {
@@ -429,6 +430,27 @@ class ProposalControllerTest {
     @DisplayName("WRITING 상태 제안서 삭제 요청 시 대시보드로 리다이렉트한다")
     void deleteWritingProposalAndRedirectToDashboard() throws Exception {
         willDoNothing().given(proposalService).delete(1L, "client@example.com");
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(post("/proposals/1/delete")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        )))
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/client/dashboard"));
+
+        then(proposalService).should().delete(1L, "client@example.com");
+    }
+
+    @Test
+    @DisplayName("타인의 제안서 삭제 시도 시 에러 메시지와 함께 대시보드로 리다이렉트한다")
+    void redirectDashboardWithErrorWhenDeleteAccessDenied() throws Exception {
+        willThrow(new AccessDeniedException("본인 제안서만 삭제할 수 있습니다."))
+                .given(proposalService).delete(1L, "client@example.com");
 
         ItDaPrincipal principal = ItDaPrincipal.from(
                 createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
