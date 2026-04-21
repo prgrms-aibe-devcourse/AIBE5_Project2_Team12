@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 
@@ -24,12 +25,21 @@ import com.generic4.itda.domain.recommendation.vo.HardFilterStat;
 import com.generic4.itda.domain.resume.Proficiency;
 import com.generic4.itda.domain.resume.ResumeStatus;
 import com.generic4.itda.domain.skill.Skill;
+import com.generic4.itda.exception.QueryEmbeddingGenerationException;
+import com.generic4.itda.config.ai.AiEmbeddingProperties;
 import com.generic4.itda.repository.RecommendationResultRepository;
 import com.generic4.itda.repository.RecommendationRunRepository;
+import com.generic4.itda.service.recommend.scoring.CareerAdjustmentCalculator;
+import com.generic4.itda.service.recommend.scoring.CosineSimilarityCalculator;
 import com.generic4.itda.service.recommend.scoring.HeuristicV1RecommendationScorer;
+import com.generic4.itda.service.recommend.scoring.QueryEmbeddingGenerator;
+import com.generic4.itda.service.recommend.scoring.RecommendationQueryTextGenerator;
+import com.generic4.itda.service.recommend.scoring.ResumeEmbeddingReader;
+import com.generic4.itda.service.recommend.scoring.SkillAdjustmentCalculator;
 import com.generic4.itda.service.recommend.scoring.model.RecommendationScorableCandidate;
 import com.generic4.itda.service.recommend.scoring.model.ScoredCandidate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
@@ -58,6 +68,27 @@ class RecommendationRunProcessorTest {
 
     @Mock
     private RecommendationResultCreator recommendationResultCreator;
+
+    @Mock
+    private RecommendationQueryTextGenerator recommendationQueryTextGenerator;
+
+    @Mock
+    private AiEmbeddingProperties aiEmbeddingProperties;
+
+    @Mock
+    private QueryEmbeddingGenerator queryEmbeddingGenerator;
+
+    @Mock
+    private ResumeEmbeddingReader resumeEmbeddingReader;
+
+    @Mock
+    private CosineSimilarityCalculator cosineSimilarityCalculator;
+
+    @Mock
+    private SkillAdjustmentCalculator skillAdjustmentCalculator;
+
+    @Mock
+    private CareerAdjustmentCalculator careerAdjustmentCalculator;
 
     @InjectMocks
     private RecommendationRunProcessor recommendationRunProcessor;
@@ -166,6 +197,164 @@ class RecommendationRunProcessorTest {
         assertThat(run.getStatus()).isEqualTo(RecommendationRunStatus.FAILED);
         assertThat(run.getErrorMessage()).isEqualTo("하드 필터 계산 실패");
         then(recommendationScorer).shouldHaveNoInteractions();
+        then(recommendationResultCreator).shouldHaveNoInteractions();
+        then(recommendationResultRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("후보가 존재하고 query embedding 생성이 성공하면 scorer 실경로를 거쳐 결과를 저장하고 COMPUTED 상태가 된다")
+    void query_embedding_생성이_성공하면_scorer_실경로를_거쳐_정상_완료된다() {
+        ProposalPosition proposalPosition = createProposalPositionWithSkills();
+        RecommendationRun run = createRun(proposalPosition, true);
+        RecommendationRunProcessor processorWithRealScorer = createProcessorWithRealScorer();
+
+        List<RecommendationCandidate> candidates = List.of(
+                createCandidate(101L, 3,
+                        createCandidateSkill(1L, "Java", Proficiency.ADVANCED),
+                        createCandidateSkill(2L, "Spring", Proficiency.INTERMEDIATE))
+        );
+        List<Double> queryEmbedding = List.of(0.1, 0.9);
+        List<Double> resumeEmbedding = List.of(0.8, 0.2);
+        List<RecommendationResult> results = List.of(org.mockito.Mockito.mock(RecommendationResult.class));
+
+        given(recommendationRunRepository.findById(1L))
+                .willReturn(Optional.of(run));
+        given(recommendationCandidateFinder.findCandidates(run.getProposalPosition(), run.getTopK()))
+                .willReturn(candidates);
+        given(recommendationQueryTextGenerator.generate(
+                proposalPosition.getProposal(),
+                proposalPosition,
+                Set.of("Java"),
+                Set.of("Spring")
+        )).willReturn("query text");
+        given(aiEmbeddingProperties.getModel()).willReturn("text-embedding-3-small");
+        given(queryEmbeddingGenerator.generate("query text"))
+                .willReturn(queryEmbedding);
+        given(resumeEmbeddingReader.readEmbeddingsByResumeIds(List.of(101L), "text-embedding-3-small"))
+                .willReturn(Map.of(101L, resumeEmbedding));
+        given(cosineSimilarityCalculator.calculate(queryEmbedding, resumeEmbedding))
+                .willReturn(0.4);
+        given(skillAdjustmentCalculator.calculate(anySet(), anySet(), anySet()))
+                .willReturn(0.1);
+        given(careerAdjustmentCalculator.calculate(anyInt(), any(), any()))
+                .willReturn(0.08);
+        given(recommendationResultCreator.create(
+                any(),
+                anyList(),
+                anyInt(),
+                anySet()
+        )).willReturn(results);
+
+        assertThatCode(() -> processorWithRealScorer.process(1L))
+                .doesNotThrowAnyException();
+
+        assertThat(run.getStatus()).isEqualTo(RecommendationRunStatus.COMPUTED);
+        assertThat(run.getErrorMessage()).isNull();
+        assertThat(run.getHardFilterStats()).isEqualTo(new HardFilterStat(1, 1));
+        assertThat(run.getCandidateCount()).isEqualTo(1);
+        then(queryEmbeddingGenerator).should().generate("query text");
+        then(recommendationResultCreator).should().create(
+                eq(run),
+                anyList(),
+                anyInt(),
+                anySet()
+        );
+        then(recommendationResultRepository).should().saveAll(results);
+    }
+
+    @Test
+    @DisplayName("query embedding 생성 중 예외가 발생하면 FAILED 상태로 전이하고 결과를 저장하지 않는다")
+    void query_embedding_생성_실패시_FAILED_처리하고_결과를_저장하지_않는다() {
+        ProposalPosition proposalPosition = createProposalPositionWithSkills();
+        RecommendationRun run = createRun(proposalPosition, true);
+        RecommendationRunProcessor processorWithRealScorer = createProcessorWithRealScorer();
+
+        List<RecommendationCandidate> candidates = List.of(
+                createCandidate(101L, 3,
+                        createCandidateSkill(1L, "Java", Proficiency.ADVANCED))
+        );
+
+        given(recommendationRunRepository.findById(1L))
+                .willReturn(Optional.of(run));
+        given(recommendationCandidateFinder.findCandidates(run.getProposalPosition(), run.getTopK()))
+                .willReturn(candidates);
+        given(recommendationQueryTextGenerator.generate(
+                proposalPosition.getProposal(),
+                proposalPosition,
+                Set.of("Java"),
+                Set.of("Spring")
+        )).willReturn("query text");
+        given(aiEmbeddingProperties.getModel()).willReturn("text-embedding-3-small");
+        given(queryEmbeddingGenerator.generate("query text"))
+                .willThrow(new QueryEmbeddingGenerationException("임베딩 실패"));
+
+        assertThatCode(() -> processorWithRealScorer.process(1L))
+                .doesNotThrowAnyException();
+
+        assertThat(run.getStatus()).isEqualTo(RecommendationRunStatus.FAILED);
+        assertThat(run.getErrorMessage()).isEqualTo("임베딩 실패");
+        then(recommendationResultCreator).shouldHaveNoInteractions();
+        then(recommendationResultRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("scorer 내부 예외가 발생하면 FAILED 상태로 전이하고 결과를 저장하지 않는다")
+    void scorer_내부_예외가_발생하면_FAILED_처리하고_결과를_저장하지_않는다() {
+        RecommendationRun run = createRun(true);
+
+        List<RecommendationCandidate> candidates = List.of(
+                createCandidate(10L, 3,
+                        createCandidateSkill(1L, "Java", Proficiency.ADVANCED))
+        );
+
+        given(recommendationRunRepository.findById(1L))
+                .willReturn(Optional.of(run));
+        given(recommendationCandidateFinder.findCandidates(run.getProposalPosition(), run.getTopK()))
+                .willReturn(candidates);
+        given(recommendationScorer.score(
+                any(),
+                any(),
+                anySet(),
+                anySet(),
+                anyList()
+        )).willThrow(new RuntimeException("scorer 계산 실패"));
+
+        assertThatCode(() -> recommendationRunProcessor.process(1L))
+                .doesNotThrowAnyException();
+
+        assertThat(run.getStatus()).isEqualTo(RecommendationRunStatus.FAILED);
+        assertThat(run.getErrorMessage()).isEqualTo("scorer 계산 실패");
+        then(recommendationResultCreator).shouldHaveNoInteractions();
+        then(recommendationResultRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    @DisplayName("scorer 예외 메시지가 없으면 기본 실패 메시지로 FAILED 처리한다")
+    void scorer_예외_메시지가_없으면_기본_실패_메시지로_FAILED_처리한다() {
+        RecommendationRun run = createRun(true);
+
+        List<RecommendationCandidate> candidates = List.of(
+                createCandidate(10L, 3,
+                        createCandidateSkill(1L, "Java", Proficiency.ADVANCED))
+        );
+
+        given(recommendationRunRepository.findById(1L))
+                .willReturn(Optional.of(run));
+        given(recommendationCandidateFinder.findCandidates(run.getProposalPosition(), run.getTopK()))
+                .willReturn(candidates);
+        given(recommendationScorer.score(
+                any(),
+                any(),
+                anySet(),
+                anySet(),
+                anyList()
+        )).willThrow(new RuntimeException());
+
+        assertThatCode(() -> recommendationRunProcessor.process(1L))
+                .doesNotThrowAnyException();
+
+        assertThat(run.getStatus()).isEqualTo(RecommendationRunStatus.FAILED);
+        assertThat(run.getErrorMessage()).isEqualTo("추천 실행 중 오류가 발생했습니다.");
         then(recommendationResultCreator).shouldHaveNoInteractions();
         then(recommendationResultRepository).shouldHaveNoInteractions();
     }
@@ -377,5 +566,25 @@ class RecommendationRunProcessorTest {
             Proficiency proficiency
     ) {
         return new RecommendationCandidate.CandidateSkill(skillId, skillName, proficiency);
+    }
+
+    private RecommendationRunProcessor createProcessorWithRealScorer() {
+        HeuristicV1RecommendationScorer realScorer = new HeuristicV1RecommendationScorer(
+                aiEmbeddingProperties,
+                recommendationQueryTextGenerator,
+                queryEmbeddingGenerator,
+                resumeEmbeddingReader,
+                cosineSimilarityCalculator,
+                skillAdjustmentCalculator,
+                careerAdjustmentCalculator
+        );
+
+        return new RecommendationRunProcessor(
+                recommendationRunRepository,
+                recommendationResultRepository,
+                recommendationCandidateFinder,
+                realScorer,
+                recommendationResultCreator
+        );
     }
 }

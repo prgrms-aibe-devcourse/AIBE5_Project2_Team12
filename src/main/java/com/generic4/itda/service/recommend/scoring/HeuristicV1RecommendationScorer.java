@@ -1,5 +1,6 @@
 package com.generic4.itda.service.recommend.scoring;
 
+import com.generic4.itda.config.ai.AiEmbeddingProperties;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
 import com.generic4.itda.service.recommend.scoring.model.RecommendationScorableCandidate;
@@ -18,8 +19,7 @@ import org.springframework.util.Assert;
 @RequiredArgsConstructor
 public class HeuristicV1RecommendationScorer {
 
-    private static final String DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
-
+    private final AiEmbeddingProperties properties;
     private final RecommendationQueryTextGenerator recommendationQueryTextGenerator;
     private final QueryEmbeddingGenerator queryEmbeddingGenerator;
     private final ResumeEmbeddingReader resumeEmbeddingReader;
@@ -40,7 +40,7 @@ public class HeuristicV1RecommendationScorer {
                 requiredSkillNames,
                 preferredSkillNames,
                 candidates,
-                DEFAULT_EMBEDDING_MODEL
+                properties.getModel()
         );
     }
 
