@@ -12,12 +12,12 @@ class HardFilterStatConverterTest {
 
     @Test
     void convert() {
-        HardFilterStat stat = new HardFilterStat(10, 8, 5, 3);
+        HardFilterStat stat = new HardFilterStat(10, 3);
 
         String json = converter.convertToDatabaseColumn(stat);
         HardFilterStat restored = converter.convertToEntityAttribute(json);
 
         assertThat(restored).isEqualTo(stat);
-        assertThat(restored.finalCount()).isEqualTo(3);
+        assertThat(restored.finalCandidates()).isEqualTo(3);
     }
 }
