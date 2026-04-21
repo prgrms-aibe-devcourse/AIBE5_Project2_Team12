@@ -1,9 +1,9 @@
 package com.generic4.itda.service.recommend;
 
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
 
 import com.generic4.itda.repository.RecommendationRunRepository;
 import java.util.List;
@@ -19,7 +19,7 @@ import org.springframework.data.domain.PageRequest;
 @ExtendWith(MockitoExtension.class)
 class RecommendationRunExecutorTest {
 
-    private static final PageRequest NEXT_PENDING_RUN = PageRequest.of(0, 1);
+    private static final PageRequest NEXT_PENDING_RUN = PageRequest.of(0, 10);
 
     @Mock
     private RecommendationRunRepository recommendationRunRepository;
@@ -65,10 +65,10 @@ class RecommendationRunExecutorTest {
     }
 
     @Test
-    @DisplayName("여러 대기 run이 있어도 가장 앞의 run 하나만 점유 시도한다")
-    void 여러_대기_run이_있어도_가장_앞의_run_하나만_점유_시도한다() {
+    @DisplayName("가장 앞의 run 점유에 성공하면 다음 run은 점유 시도하지 않는다")
+    void 가장_앞의_run_점유에_성공하면_다음_run은_점유_시도하지_않는다() {
         given(recommendationRunRepository.findPendingRunIds(NEXT_PENDING_RUN))
-                .willReturn(List.of(1L));
+                .willReturn(List.of(1L, 2L));
 
         given(recommendationRunRepository.claimAsRunning(1L))
                 .willReturn(1);
@@ -77,5 +77,6 @@ class RecommendationRunExecutorTest {
 
         assertThat(result).contains(1L);
         then(recommendationRunRepository).should().claimAsRunning(1L);
+        then(recommendationRunRepository).should(never()).claimAsRunning(2L);
     }
 }
