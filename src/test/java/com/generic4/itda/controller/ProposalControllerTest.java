@@ -28,6 +28,7 @@ import com.generic4.itda.dto.proposal.ProposalForm;
 import com.generic4.itda.dto.security.ItDaPrincipal;
 import com.generic4.itda.exception.ProposalNotFoundException;
 import org.springframework.security.access.AccessDeniedException;
+import com.generic4.itda.repository.MatchingRepository;
 import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.PositionRepository;
 import com.generic4.itda.service.ProposalAiInterviewService;
@@ -59,6 +60,9 @@ class ProposalControllerTest {
 
     @MockitoBean
     private MemberRepository memberRepository;
+
+    @MockitoBean
+    private MatchingRepository matchingRepository;
 
     @Test
     @DisplayName("인증된 사용자가 새 제안서 작성 화면을 조회하면 편집기를 렌더링한다")
@@ -660,29 +664,53 @@ class ProposalControllerTest {
         );
 
         mockMvc.perform(get("/proposals/999")
+                        .header("Referer", "/client/dashboard")
                         .with(authentication(new UsernamePasswordAuthenticationToken(
                                 principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
                         ))))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/client/dashboard"));
+                .andExpect(redirectedUrl("/"));
     }
 
     @Test
-    @DisplayName("제안서 상세 조회 시 타인 제안서이면 대시보드로 리다이렉트하고 오류 메시지를 남긴다")
+    @DisplayName("존재하지 않는 제안서 조회 시 홈으로 리다이렉트된다")
+    void redirectHomeWhenDetailNotFoundWithExternalReferer() throws Exception {
+        given(proposalService.findOwnedProposal(999L, "client@example.com"))
+                .willThrow(new ProposalNotFoundException("제안서를 찾을 수 없습니다. id=999"));
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "client", "010-1234-5678")
+        );
+
+        mockMvc.perform(get("/proposals/999")
+                        .header("Referer", "https://example.com/somewhere")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/"));
+    }
+
+    @Test
+    @DisplayName("제안서 상세 조회 권한이 없으면 홈으로 리다이렉트하고 에러 메시지를 남긴다")
     void redirectDashboardWhenDetailAccessDenied() throws Exception {
         given(proposalService.findOwnedProposal(1L, "client@example.com"))
                 .willThrow(new AccessDeniedException("본인 제안서만 조회할 수 있습니다."));
+
+        given(proposalService.findProposalForFreelancer(1L, "client@example.com"))
+                .willThrow(new AccessDeniedException("매칭 이력이 없는 제안서입니다."));
 
         ItDaPrincipal principal = ItDaPrincipal.from(
                 createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
         );
 
         mockMvc.perform(get("/proposals/1")
+                        .header("Referer", "/client/dashboard")
                         .with(authentication(new UsernamePasswordAuthenticationToken(
                                 principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
                         ))))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/client/dashboard"))
+                .andExpect(redirectedUrl("/"))
                 .andExpect(flash().attributeExists("errorMessage"));
     }
 
