@@ -8,9 +8,11 @@ import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.resume.*;
 import com.generic4.itda.domain.skill.Skill;
 import com.generic4.itda.dto.resume.ResumeForm;
+import com.generic4.itda.dto.resume.ResumeSkillItemForm;
 import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.ResumeRepository;
 import com.generic4.itda.repository.SkillRepository;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -58,6 +60,7 @@ class ResumeServiceTest {
         // given
         when(resumeRepository.existsByMemberEmailValue(EMAIL)).thenReturn(false);
         when(memberRepository.findByEmail_Value(EMAIL)).thenReturn(member);
+        when(resumeRepository.save(any(Resume.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
         resumeService.create(EMAIL, form);
@@ -65,6 +68,28 @@ class ResumeServiceTest {
         // then
         verify(resumeRepository).save(any(Resume.class));
         verify(memberRepository).findByEmail_Value(EMAIL);
+    }
+
+    @Test
+    @DisplayName("이력서 생성 시 전달된 스킬 목록을 함께 저장한다")
+    void create_Success_WithSkills() {
+        when(resumeRepository.existsByMemberEmailValue(EMAIL)).thenReturn(false);
+        when(memberRepository.findByEmail_Value(EMAIL)).thenReturn(member);
+        when(resumeRepository.save(any(Resume.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Skill java = Skill.create("Java", null);
+        when(skillRepository.findById(1L)).thenReturn(Optional.of(java));
+
+        ResumeSkillItemForm item = new ResumeSkillItemForm();
+        item.setSkillId(1L);
+        item.setProficiency(Proficiency.INTERMEDIATE);
+        form.setSkillItems(List.of(item));
+
+        Resume created = resumeService.create(EMAIL, form);
+
+        assertThat(created.getSkills()).isNotEmpty();
+        verify(skillRepository).findById(1L);
+        verify(resumeRepository).save(any(Resume.class));
     }
 
     @Test

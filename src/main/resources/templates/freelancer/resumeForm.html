@@ -199,6 +199,14 @@
                         <p th:each="err : ${#fields.globalErrors()}" th:text="${err}"></p>
                     </div>
 
+                    <!-- 신규 작성: 프론트에서 쌓은 스킬을 함께 제출하기 위한 hidden fields -->
+                    <div id="draftSkillFields" class="hidden" th:if="${isNew eq true}">
+                        <th:block th:each="item, iter : *{skillItems}">
+                            <input type="hidden" th:name="|skillItems[${iter.index}].skillId|" th:value="${item.skillId}">
+                            <input type="hidden" th:name="|skillItems[${iter.index}].proficiency|" th:value="${item.proficiency}">
+                        </th:block>
+                    </div>
+
                     <!-- ===== 공개 및 AI 추천 설정 ===== -->
                     <div class="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm space-y-5">
                         <h3 class="text-base font-bold text-slate-700">공개 및 추천 설정</h3>
@@ -416,7 +424,77 @@
 
                     <!-- 신규: 이력서 저장 전 안내 -->
                     <th:block th:if="${resume == null}">
-                        <p class="text-sm text-slate-400">이력서를 먼저 저장한 후 스킬을 등록할 수 있습니다.</p>
+                        <div class="space-y-4">
+                            <p class="text-sm text-slate-500">
+                                저장 전에도 스킬을 추가할 수 있습니다. 추가한 스킬은 저장 시 함께 등록됩니다.
+                            </p>
+
+                            <div id="draftSkillsChips" class="flex flex-wrap gap-3">
+                                <!-- JS 렌더링 -->
+                            </div>
+
+                            <div class="border-t border-slate-100 pt-5">
+                                <div class="flex flex-wrap gap-3 items-end">
+                                    <div class="flex-1 min-w-[160px]">
+                                        <div class="flex justify-between items-end mb-1.5">
+                                            <label class="text-xs font-bold text-slate-400 block">스킬 검색</label>
+                                            <p id="draftSkillError"
+                                               class="text-[10px] text-red-500 font-bold hidden"></p>
+                                        </div>
+
+                                        <input type="hidden"
+                                               id="skillIdInput"
+                                               name="draftSkillPickSkillId">
+
+                                        <div class="relative">
+                                            <input type="text"
+                                                   id="skillSearchInput"
+                                                   placeholder="예) Java, React, ㅈㅂ"
+                                                   autocomplete="off"
+                                                   class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-blue-400 focus:outline-none">
+
+                                            <div id="skillDropdown"
+                                                 class="absolute left-0 right-0 top-full mt-2 hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-200/60 overflow-hidden z-50">
+                                                <ul id="skillOptions"
+                                                    role="listbox"
+                                                    class="max-h-64 overflow-auto py-2 text-sm">
+                                                    <li id="skillNoResult"
+                                                        class="hidden px-4 py-2 text-slate-400">
+                                                        검색 결과가 없습니다.
+                                                    </li>
+                                                    <li th:each="skill : ${skills}"
+                                                        role="option"
+                                                        tabindex="-1"
+                                                        th:attr="data-skill-id=${skill.id},data-skill-name=${skill.name}"
+                                                        class="skill-option px-4 py-2 cursor-pointer text-slate-700 hover:bg-slate-50">
+                                                        <span th:text="${skill.name}">Skill</span>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex-1 min-w-[120px]">
+                                        <div class="flex justify-between items-end mb-1.5">
+                                            <label class="text-xs font-bold text-slate-400 block">숙련도</label>
+                                        </div>
+                                        <select id="draftSkillProficiency"
+                                                class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm appearance-none focus:border-blue-400 focus:outline-none transition-all">
+                                            <option value="">선택</option>
+                                            <option th:each="p : ${proficiencies}"
+                                                    th:value="${p}"
+                                                    th:text="${p.description}"></option>
+                                        </select>
+                                    </div>
+
+                                    <button type="button"
+                                            id="draftSkillAddButton"
+                                            class="px-6 py-3 bg-slate-800 text-white text-sm font-bold rounded-xl hover:bg-slate-700 transition-all active:scale-95">
+                                        + 추가
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </th:block>
 
                     <!-- 기존 이력서: 스킬 목록 -->
@@ -485,12 +563,37 @@
                                               class="text-[10px] text-red-500 font-bold animate-pulse"
                                               th:errors="*{skillId}">필수값입니다.</span>
                                     </div>
-                                    <select th:field="*{skillId}"
-                                            th:classappend="${#fields.hasErrors('skillId')} ? 'border-red-400 ring-1 ring-red-400/10' : ''"
-                                            class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm appearance-none focus:border-blue-400 focus:outline-none">
-                                        <option value="">스킬 선택</option>
-                                        <option th:each="skill : ${skills}" th:value="${skill.id}" th:text="${skill.name}"></option>
-                                    </select>
+                                    <input type="hidden"
+                                           th:field="*{skillId}"
+                                           id="skillIdInput">
+
+                                    <div class="relative">
+                                        <input type="text"
+                                               id="skillSearchInput"
+                                               placeholder="스킬 검색..."
+                                               autocomplete="off"
+                                               th:classappend="${#fields.hasErrors('skillId')} ? 'border-red-400 ring-1 ring-red-400/10' : ''"
+                                               class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-blue-400 focus:outline-none">
+
+                                        <div id="skillDropdown"
+                                             class="absolute left-0 right-0 top-full mt-2 hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-200/60 overflow-hidden z-50">
+                                            <ul id="skillOptions"
+                                                role="listbox"
+                                                class="max-h-64 overflow-auto py-2 text-sm">
+                                                <li id="skillNoResult"
+                                                    class="hidden px-4 py-2 text-slate-400">
+                                                    검색 결과가 없습니다.
+                                                </li>
+                                                <li th:each="skill : ${skills}"
+                                                    role="option"
+                                                    tabindex="-1"
+                                                    th:attr="data-skill-id=${skill.id},data-skill-name=${skill.name}"
+                                                    class="skill-option px-4 py-2 cursor-pointer text-slate-700 hover:bg-slate-50">
+                                                    <span th:text="${skill.name}">Skill</span>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div class="flex-1 min-w-[120px]">
@@ -544,6 +647,22 @@
 
         e.preventDefault();
 
+        if (form.id === 'skillAddForm') {
+            const hiddenSkillId = form.querySelector('#skillIdInput');
+            const searchInput = form.querySelector('#skillSearchInput');
+            if (hiddenSkillId && searchInput && !hiddenSkillId.value) {
+                const q = (searchInput.value || '').trim().toLowerCase();
+                if (q) {
+                    const candidates = Array.from(form.querySelectorAll('.skill-option'));
+                    const exact = candidates.find(el => (el.dataset.skillName || '').toLowerCase() === q);
+                    if (exact) {
+                        hiddenSkillId.value = exact.dataset.skillId || '';
+                        searchInput.value = exact.dataset.skillName || searchInput.value;
+                    }
+                }
+            }
+        }
+
         try {
             const response = await fetch(form.action, {
                 method: 'POST',
@@ -556,11 +675,422 @@
             if (section) {
                 section.outerHTML = html;
                 if (window.lucide) lucide.createIcons();
+                if (window.initSkillAutocomplete) window.initSkillAutocomplete();
             }
         } catch (err) {
             console.error('스킬 처리 중 오류:', err);
         }
     });
+
+    // ─── 스킬 검색 autocomplete (영문 + 초성) ─────────────────────
+    window.initSkillAutocomplete = function () {
+        const input = document.getElementById('skillSearchInput');
+        const hiddenSkillId = document.getElementById('skillIdInput');
+        const dropdown = document.getElementById('skillDropdown');
+        const optionsRoot = document.getElementById('skillOptions');
+        const noResult = document.getElementById('skillNoResult');
+        if (!input || !hiddenSkillId || !dropdown || !optionsRoot) return;
+        if (input.dataset.autocompleteInit === 'true') return;
+        input.dataset.autocompleteInit = 'true';
+
+        const optionEls = Array.from(optionsRoot.querySelectorAll('.skill-option'));
+        const CHOSEONGS = [
+            'ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ',
+            'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'
+        ];
+        const CHOSEONG_SET = new Set(CHOSEONGS);
+
+        function getChoseong(text) {
+            if (!text) return '';
+            let result = '';
+            for (const ch of text) {
+                const code = ch.codePointAt(0);
+                if (code >= 0xac00 && code <= 0xd7a3) {
+                    const index = Math.floor((code - 0xac00) / 588);
+                    result += CHOSEONGS[index] || '';
+                }
+            }
+            return result;
+        }
+
+        function normalizeQuery(value) {
+            return (value || '').trim();
+        }
+
+        function isChoseongQuery(query) {
+            const stripped = query.replace(/\s+/g, '');
+            if (!stripped) return false;
+            for (const ch of stripped) {
+                if (!CHOSEONG_SET.has(ch)) return false;
+            }
+            return true;
+        }
+
+        function openDropdown() {
+            positionDropdown();
+            dropdown.classList.remove('hidden');
+            input.setAttribute('aria-expanded', 'true');
+        }
+
+        function closeDropdown() {
+            dropdown.classList.add('hidden');
+            input.setAttribute('aria-expanded', 'false');
+            clearActive();
+        }
+
+        function positionDropdown() {
+            const rect = input.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const spaceAbove = rect.top;
+
+            // When near bottom of viewport, show options upward.
+            const preferUp = spaceBelow < 260 && spaceAbove > spaceBelow;
+            if (preferUp) {
+                dropdown.classList.remove('top-full', 'mt-2');
+                dropdown.classList.add('bottom-full', 'mb-2');
+            } else {
+                dropdown.classList.remove('bottom-full', 'mb-2');
+                dropdown.classList.add('top-full', 'mt-2');
+            }
+        }
+
+        function isOpen() {
+            return !dropdown.classList.contains('hidden');
+        }
+
+        let activeIndex = -1;
+
+        function clearActive() {
+            optionEls.forEach(el => el.classList.remove('bg-slate-100'));
+            input.removeAttribute('aria-activedescendant');
+            activeIndex = -1;
+        }
+
+        function visibleOptions() {
+            return optionEls.filter(el => !el.classList.contains('hidden'));
+        }
+
+        function setActiveByIndex(nextIndex) {
+            const visible = visibleOptions();
+            if (visible.length === 0) {
+                clearActive();
+                return;
+            }
+            const bounded = Math.max(0, Math.min(nextIndex, visible.length - 1));
+            visible.forEach(el => el.classList.remove('bg-slate-100'));
+            const active = visible[bounded];
+            active.classList.add('bg-slate-100');
+            if (!active.id) {
+                active.id = 'skill-option-' + active.dataset.skillId;
+            }
+            input.setAttribute('aria-activedescendant', active.id);
+            active.scrollIntoView({ block: 'nearest' });
+            activeIndex = bounded;
+        }
+
+        function chooseOption(el) {
+            if (!el) return;
+            const id = el.dataset.skillId;
+            const name = el.dataset.skillName;
+            hiddenSkillId.value = id || '';
+            input.value = name || '';
+            closeDropdown();
+            input.focus();
+        }
+
+        function applyFilter() {
+            const query = normalizeQuery(input.value);
+            const queryLower = query.toLowerCase();
+            const choseongMode = isChoseongQuery(query);
+            const choseongQuery = query.replace(/\s+/g, '');
+
+            let visibleCount = 0;
+            for (const el of optionEls) {
+                const name = el.dataset.skillName || '';
+                if (!el.dataset.lowerName) {
+                    el.dataset.lowerName = name.toLowerCase();
+                    el.dataset.choseong = getChoseong(name);
+                }
+
+                let matched = false;
+                if (!query) {
+                    matched = true;
+                } else if (el.dataset.lowerName.includes(queryLower)) {
+                    matched = true;
+                } else if (choseongMode && (el.dataset.choseong || '').includes(choseongQuery)) {
+                    matched = true;
+                }
+
+                if (matched) {
+                    el.classList.remove('hidden');
+                    visibleCount++;
+                } else {
+                    el.classList.add('hidden');
+                }
+            }
+
+            if (noResult) {
+                if (visibleCount === 0) {
+                    noResult.classList.remove('hidden');
+                } else {
+                    noResult.classList.add('hidden');
+                }
+            }
+            clearActive();
+        }
+
+        input.setAttribute('role', 'combobox');
+        input.setAttribute('aria-autocomplete', 'list');
+        input.setAttribute('aria-expanded', 'false');
+        input.setAttribute('aria-controls', 'skillOptions');
+        input.setAttribute('aria-haspopup', 'listbox');
+
+        input.addEventListener('focus', function () {
+            applyFilter();
+            openDropdown();
+        });
+        input.addEventListener('blur', function () {
+            setTimeout(function () {
+                closeDropdown();
+            }, 0);
+        });
+        input.addEventListener('input', function () {
+            hiddenSkillId.value = '';
+            applyFilter();
+            openDropdown();
+        });
+
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                closeDropdown();
+                return;
+            }
+
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (!isOpen()) {
+                    applyFilter();
+                    openDropdown();
+                }
+                const visible = visibleOptions();
+                if (visible.length === 0) return;
+                const delta = e.key === 'ArrowDown' ? 1 : -1;
+                const next = activeIndex < 0 ? (delta > 0 ? 0 : visible.length - 1) : activeIndex + delta;
+                setActiveByIndex(next);
+                return;
+            }
+
+            if (e.key === 'Enter' && isOpen()) {
+                const visible = visibleOptions();
+                if (visible.length === 0) return;
+                e.preventDefault();
+                const target = activeIndex >= 0 ? visible[activeIndex] : visible[0];
+                chooseOption(target);
+            }
+        });
+
+        optionEls.forEach(function (el) {
+            el.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+                chooseOption(el);
+            });
+        });
+
+        document.addEventListener('mousedown', function (e) {
+            if (!isOpen()) return;
+            if (dropdown.contains(e.target) || input.contains(e.target)) return;
+            closeDropdown();
+        });
+
+        if (hiddenSkillId.value) {
+            const selected = optionEls.find(el => el.dataset.skillId === hiddenSkillId.value);
+            if (selected) input.value = selected.dataset.skillName || '';
+        }
+    };
+
+    document.addEventListener('DOMContentLoaded', function () {
+        if (window.initSkillAutocomplete) window.initSkillAutocomplete();
+    });
+
+    // ─── 신규 작성: 스킬 임시 추가 → 저장 시 일괄 제출 ────────────────
+    (function () {
+        function initDraftSkills() {
+            const addButton = document.getElementById('draftSkillAddButton');
+            const chipsRoot = document.getElementById('draftSkillsChips');
+            const fieldsRoot = document.getElementById('draftSkillFields');
+            const pickSkillId = document.getElementById('skillIdInput');
+            const pickSkillName = document.getElementById('skillSearchInput');
+            const pickProficiency = document.getElementById('draftSkillProficiency');
+            const errorEl = document.getElementById('draftSkillError');
+
+            if (!addButton || !chipsRoot || !fieldsRoot || !pickSkillId || !pickSkillName || !pickProficiency) {
+                return;
+            }
+
+            const optionEls = Array.from(document.querySelectorAll('#skillOptions .skill-option'));
+            const skillNameById = new Map(optionEls.map(el => [el.dataset.skillId, el.dataset.skillName]));
+            const proficiencyLabelByValue = new Map(
+                Array.from(pickProficiency.querySelectorAll('option'))
+                    .filter(o => o.value)
+                    .map(o => [o.value, o.textContent])
+            );
+
+            function showError(message) {
+                if (!errorEl) return;
+                if (!message) {
+                    errorEl.textContent = '';
+                    errorEl.classList.add('hidden');
+                    return;
+                }
+                errorEl.textContent = message;
+                errorEl.classList.remove('hidden');
+            }
+
+            function readDraftSkillsFromHidden() {
+                const inputs = Array.from(fieldsRoot.querySelectorAll('input[type="hidden"]'));
+                const byIndex = new Map();
+                for (const input of inputs) {
+                    const match = input.name.match(/^skillItems\[(\d+)\]\.(skillId|proficiency)$/);
+                    if (!match) continue;
+                    const index = Number(match[1]);
+                    const field = match[2];
+                    if (!byIndex.has(index)) byIndex.set(index, {});
+                    byIndex.get(index)[field] = input.value;
+                }
+                const items = Array.from(byIndex.entries())
+                    .sort((a, b) => a[0] - b[0])
+                    .map(([, v]) => ({
+                        skillId: v.skillId,
+                        skillName: skillNameById.get(v.skillId) || '',
+                        proficiency: v.proficiency
+                    }))
+                    .filter(v => v.skillId && v.proficiency);
+                return items;
+            }
+
+            let draftSkills = readDraftSkillsFromHidden();
+
+            function render() {
+                // Hidden fields
+                fieldsRoot.innerHTML = '';
+                draftSkills.forEach((item, index) => {
+                    const idInput = document.createElement('input');
+                    idInput.type = 'hidden';
+                    idInput.name = `skillItems[${index}].skillId`;
+                    idInput.value = item.skillId;
+                    fieldsRoot.appendChild(idInput);
+
+                    const profInput = document.createElement('input');
+                    profInput.type = 'hidden';
+                    profInput.name = `skillItems[${index}].proficiency`;
+                    profInput.value = item.proficiency;
+                    fieldsRoot.appendChild(profInput);
+                });
+
+                // Chips
+                chipsRoot.innerHTML = '';
+                if (draftSkills.length === 0) {
+                    const empty = document.createElement('p');
+                    empty.className = 'text-sm text-slate-400';
+                    empty.textContent = '추가된 스킬이 없습니다.';
+                    chipsRoot.appendChild(empty);
+                    return;
+                }
+
+                draftSkills.forEach((item, index) => {
+                    const chip = document.createElement('div');
+                    chip.className = 'flex items-center gap-2 bg-slate-100 rounded-xl px-4 py-2.5';
+
+                    const name = document.createElement('span');
+                    name.className = 'text-sm font-semibold text-slate-700';
+                    name.textContent = item.skillName || `#${item.skillId}`;
+                    chip.appendChild(name);
+
+                    const prof = document.createElement('span');
+                    prof.className = 'text-xs font-bold px-2 py-0.5 rounded-lg border bg-white text-slate-600 border-slate-200';
+                    prof.textContent = proficiencyLabelByValue.get(item.proficiency) || item.proficiency;
+                    chip.appendChild(prof);
+
+                    const remove = document.createElement('button');
+                    remove.type = 'button';
+                    remove.className = 'text-slate-300 hover:text-red-400 transition-colors ml-1 flex items-center';
+                    remove.innerHTML = '<i data-lucide="x" class="w-3 h-3"></i>';
+                    remove.addEventListener('click', function () {
+                        draftSkills = draftSkills.filter((_, i) => i !== index);
+                        render();
+                        if (window.lucide) lucide.createIcons();
+                    });
+                    chip.appendChild(remove);
+
+                    chipsRoot.appendChild(chip);
+                });
+            }
+
+            function addCurrentPick() {
+                showError('');
+                let skillId = (pickSkillId.value || '').trim();
+                const proficiency = (pickProficiency.value || '').trim();
+
+                if (!skillId) {
+                    const q = (pickSkillName.value || '').trim().toLowerCase();
+                    if (q) {
+                        const exact = optionEls.find(el => (el.dataset.skillName || '').toLowerCase() === q);
+                        if (exact) {
+                            skillId = exact.dataset.skillId || '';
+                            pickSkillId.value = skillId;
+                            pickSkillName.value = exact.dataset.skillName || pickSkillName.value;
+                        } else {
+                            const visible = optionEls.filter(el => !el.classList.contains('hidden'));
+                            if (visible.length === 1) {
+                                skillId = visible[0].dataset.skillId || '';
+                                pickSkillId.value = skillId;
+                                pickSkillName.value = visible[0].dataset.skillName || pickSkillName.value;
+                            }
+                        }
+                    }
+
+                    if (!skillId) {
+                        showError('스킬을 선택해주세요.');
+                        return;
+                    }
+                }
+                if (!proficiency) {
+                    showError('숙련도를 선택해주세요.');
+                    return;
+                }
+                if (draftSkills.some(s => s.skillId === skillId)) {
+                    showError('이미 추가된 스킬입니다.');
+                    return;
+                }
+
+                draftSkills.push({
+                    skillId,
+                    skillName: skillNameById.get(skillId) || (pickSkillName.value || '').trim(),
+                    proficiency
+                });
+
+                pickSkillId.value = '';
+                pickSkillName.value = '';
+                pickProficiency.value = '';
+                render();
+                if (window.lucide) lucide.createIcons();
+            }
+
+            // Initial render (restore from server-rendered hidden fields)
+            render();
+            if (window.lucide) lucide.createIcons();
+
+            addButton.addEventListener('click', addCurrentPick);
+            pickSkillName.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addCurrentPick();
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', initDraftSkills);
+    })();
 
     // ─── 경력 모달 ────────────────────────────────────────
     window.clearCareerErrors = function () {

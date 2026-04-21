@@ -180,14 +180,14 @@ class ResumeControllerTest {
         }
 
         @Test
-        @DisplayName("이미 이력서가 있으면 /resumes/edit 로 리다이렉트한다")
+        @DisplayName("이미 이력서가 있으면 /resumes/me 로 리다이렉트한다")
         void redirectsToEditWhenResumeAlreadyExists() throws Exception {
             Resume resume = mockResume();
             given(resumeService.findByEmail("user@example.com")).willReturn(resume);
 
             mockMvc.perform(get("/resumes/new").with(authentication(auth)))
                     .andExpect(status().is3xxRedirection())
-                    .andExpect(redirectedUrl("/resumes/edit"));
+                    .andExpect(redirectedUrl("/resumes/me"));
         }
     }
 
@@ -200,7 +200,7 @@ class ResumeControllerTest {
     class CreateTest {
 
         @Test
-        @DisplayName("유효한 입력이면 이력서를 생성하고 /resumes/edit 로 리다이렉트한다")
+        @DisplayName("유효한 입력이면 이력서를 생성하고 /resumes/me 로 리다이렉트한다")
         void createAndRedirectOnValidInput() throws Exception {
             mockMvc.perform(post("/resumes/new").with(authentication(auth)).with(csrf())
                             .param("introduction", "안녕하세요, 백엔드 개발자입니다.")
@@ -210,7 +210,7 @@ class ResumeControllerTest {
                             .param("preferredWorkType", "REMOTE")
                             .param("portfolioUrl", ""))
                     .andExpect(status().is3xxRedirection())
-                    .andExpect(redirectedUrl("/resumes/edit"));
+                    .andExpect(redirectedUrl("/resumes/me"));
 
             then(resumeService).should().create(eq("user@example.com"), any(ResumeForm.class));
         }
