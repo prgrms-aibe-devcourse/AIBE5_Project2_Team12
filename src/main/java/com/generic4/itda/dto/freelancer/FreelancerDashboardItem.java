@@ -18,14 +18,6 @@ public record FreelancerDashboardItem(
 ) {
 
     /**
-     * Dashboard 뷰에서 스킬 태그 렌더링을 위해 사용하는 접근자.
-     * 현재 dashboard 조회 쿼리는 스킬을 포함하지 않으므로 기본값은 빈 리스트로 둔다.
-     */
-    public List<String> skillNames() {
-        return List.of();
-    }
-
-    /**
      * Thymeleaf 템플릿에서 `item.status()` 형태로 호출하고 있어 호환을 위해 제공한다.
      */
     public DashboardProposalStatus status() {
