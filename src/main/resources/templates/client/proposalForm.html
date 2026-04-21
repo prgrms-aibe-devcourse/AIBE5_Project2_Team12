@@ -839,35 +839,56 @@
                 },
 
                 async saveCurrentDraftBeforeInterview() {
-                    const formData = new FormData(this.$root);
-                    formData.set('submitAction', 'save');
-                    formData.set('aiBriefRequested', 'false');
-                    formData.set('title', this.title || '');
-                    formData.set('rawInputText', '');
-                    formData.set('description', this.description || '');
-                    formData.set('expectedPeriod', this.expectedPeriod || '');
-
-                    const response = await fetch(this.$root.getAttribute('action'), {
-                        method: 'POST',
+                    const response = await fetch(`/proposals/${bootstrap.proposalId}/ai-interview/draft`, {
+                        method: 'PATCH',
                         headers: {
                             ...this.csrfHeaders(),
-                            'Accept': 'text/html'
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
                         },
-                        body: formData,
-                        redirect: 'manual'
+                        body: JSON.stringify(this.buildInterviewDraftPayload())
                     });
 
-                    if (response.type === 'opaqueredirect' || response.status === 0) {
-                        return;
-                    }
-
-                    if (response.status >= 300 && response.status < 400) {
-                        return;
-                    }
-
                     if (!response.ok) {
-                        throw new Error('AI 인터뷰 전 현재 제안서 내용을 임시저장하지 못했습니다. 입력값을 확인해주세요.');
+                        throw new Error(await this.extractErrorMessage(response));
                     }
+                },
+
+                buildInterviewDraftPayload() {
+                    return {
+                        title: this.title || '',
+                        description: this.description || '',
+                        expectedPeriod: this.toNullableNumber(this.expectedPeriod),
+                        positions: this.positions.map(position => this.toInterviewDraftPositionPayload(position))
+                    };
+                },
+
+                toInterviewDraftPositionPayload(position) {
+                    return {
+                        id: this.toNullableNumber(position.id),
+                        positionId: this.toNullableNumber(position.positionId),
+                        title: position.title || '',
+                        workType: position.workType || null,
+                        headCount: this.toNullableNumber(position.headCount),
+                        unitBudgetMin: this.toNullableNumber(position.unitBudgetMin),
+                        unitBudgetMax: this.toNullableNumber(position.unitBudgetMax),
+                        expectedPeriod: this.toNullableNumber(position.expectedPeriod),
+                        careerMinYears: this.toNullableNumber(position.careerMinYears),
+                        careerMaxYears: this.toNullableNumber(position.careerMaxYears),
+                        workPlace: position.workPlace || '',
+                        status: position.status || 'OPEN',
+                        essentialSkillNames: position.essentialSkillNames || [],
+                        preferredSkillNames: position.preferredSkillNames || []
+                    };
+                },
+
+                toNullableNumber(value) {
+                    if (value === null || value === undefined || value === '') {
+                        return null;
+                    }
+
+                    const number = Number(value);
+                    return Number.isNaN(number) ? null : number;
                 },
 
                 appendRawInput(current, input) {
