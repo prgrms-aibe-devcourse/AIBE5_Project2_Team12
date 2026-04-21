@@ -124,6 +124,7 @@ public class ProposalController {
             return "redirect:/";
         } catch (AccessDeniedException ignored) {
             // 소유자가 아닌 경우 → 프리랜서 접근 시도
+            return "redirect:/";
         }
 
         // 2) 프리랜서(매칭 이력 기반) 접근 시도
