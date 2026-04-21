@@ -1,6 +1,7 @@
 package com.generic4.itda.service;
 
 import com.generic4.itda.domain.skill.Skill;
+import com.generic4.itda.exception.UnresolvedSkillException;
 import com.generic4.itda.repository.SkillRepository;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -31,7 +32,7 @@ public class SkillResolver {
 
     public Skill resolveRequired(String input) {
         return resolve(input)
-                .orElseThrow(() -> new IllegalArgumentException("등록되지 않은 스킬입니다: " + input));
+                .orElseThrow(() -> new UnresolvedSkillException("등록되지 않은 스킬입니다: " + input));
     }
 
     private static Map<String, String> createCanonicalNames() {

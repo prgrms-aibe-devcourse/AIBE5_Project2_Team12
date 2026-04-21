@@ -8,6 +8,7 @@ import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
 
 import com.generic4.itda.domain.skill.Skill;
+import com.generic4.itda.exception.UnresolvedSkillException;
 import com.generic4.itda.repository.SkillRepository;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -107,7 +108,7 @@ class SkillResolverTest {
         given(skillRepository.findByName("Unknown Skill")).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> skillResolver.resolveRequired("Unknown Skill"))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(UnresolvedSkillException.class)
                 .hasMessage("등록되지 않은 스킬입니다: Unknown Skill");
     }
 

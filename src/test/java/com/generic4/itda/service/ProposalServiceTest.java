@@ -15,6 +15,8 @@ import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalAiInterviewMessage;
+import com.generic4.itda.domain.proposal.ProposalPosition;
+import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
 import com.generic4.itda.domain.proposal.ProposalStatus;
 import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.domain.skill.Skill;
@@ -22,12 +24,12 @@ import com.generic4.itda.dto.proposal.AiInterviewDraftSaveRequest;
 import com.generic4.itda.dto.proposal.ProposalForm;
 import com.generic4.itda.dto.proposal.ProposalPositionForm;
 import com.generic4.itda.exception.ProposalNotFoundException;
+import com.generic4.itda.exception.UnresolvedSkillException;
 import com.generic4.itda.repository.MatchingRepository;
 import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.PositionRepository;
 import com.generic4.itda.repository.ProposalAiInterviewMessageRepository;
 import com.generic4.itda.repository.ProposalRepository;
-import com.generic4.itda.repository.SkillRepository;
 import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Optional;
@@ -61,7 +63,7 @@ class ProposalServiceTest {
     private PositionRepository positionRepository;
 
     @Mock
-    private SkillRepository skillRepository;
+    private SkillResolver skillResolver;
 
     @Mock
     private MatchingRepository matchingRepository;
@@ -176,6 +178,10 @@ class ProposalServiceTest {
         Position backend = Position.create("백엔드 개발자");
         ReflectionTestUtils.setField(backend, "id", 1L);
 
+        Skill java = Skill.create("Java", null);
+        Skill springBoot = Skill.create("Spring Boot", null);
+        Skill aws = Skill.create("AWS", null);
+
         ProposalPositionForm positionForm = new ProposalPositionForm();
         positionForm.setPositionId(1L);
         positionForm.setTitle("Spring 백엔드 개발자");
@@ -197,8 +203,9 @@ class ProposalServiceTest {
 
         when(proposalRepository.findById(1L)).thenReturn(Optional.of(proposal));
         when(positionRepository.findById(1L)).thenReturn(Optional.of(backend));
-        when(skillRepository.findByName(any())).thenReturn(Optional.empty());
-        when(skillRepository.save(any(Skill.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(skillResolver.resolveRequired("Java")).thenReturn(java);
+        when(skillResolver.resolveRequired("Spring Boot")).thenReturn(springBoot);
+        when(skillResolver.resolveRequired("AWS")).thenReturn(aws);
 
         Proposal saved = proposalService.saveInterviewDraft(1L, EMAIL, request);
 
@@ -212,6 +219,67 @@ class ProposalServiceTest {
         assertThat(saved.getPositions()).hasSize(1);
         assertThat(saved.getPositions().get(0).getTitle()).isEqualTo("Spring 백엔드 개발자");
         assertThat(saved.getPositions().get(0).getSkills()).hasSize(3);
+    }
+
+    @Test
+    @DisplayName("제안서 폼 스킬 문자열은 SkillResolver로 정규 Skill에 매핑해 저장한다")
+    void saveDraft_resolvesSkillAliasToCanonicalSkill() {
+        Position frontend = Position.create("프론트엔드 개발자");
+        ReflectionTestUtils.setField(frontend, "id", 1L);
+        Skill react = Skill.create("React", null);
+
+        ProposalPositionForm positionForm = new ProposalPositionForm();
+        positionForm.setPositionId(1L);
+        positionForm.setTitle("React 프론트엔드 개발자");
+        positionForm.setWorkType(ProposalWorkType.REMOTE);
+        positionForm.setHeadCount(1L);
+        positionForm.setEssentialSkillNames(List.of("React.js"));
+
+        ProposalForm form = new ProposalForm();
+        form.setTitle("프론트엔드 프로젝트");
+        form.setRawInputText("");
+        form.getPositions().add(positionForm);
+
+        when(positionRepository.findById(1L)).thenReturn(Optional.of(frontend));
+        when(skillResolver.resolveRequired("React.js")).thenReturn(react);
+
+        Proposal proposal = proposalService.saveDraft(EMAIL, form);
+
+        ProposalPosition proposalPosition = proposal.getPositions().get(0);
+        assertThat(proposalPosition.getSkills()).hasSize(1);
+        assertThat(proposalPosition.getSkills().get(0).getSkill()).isSameAs(react);
+        assertThat(proposalPosition.getSkills().get(0).getSkill().getName()).isEqualTo("React");
+        assertThat(proposalPosition.getSkills().get(0).getImportance())
+                .isEqualTo(ProposalPositionSkillImportance.ESSENTIAL);
+    }
+
+    @Test
+    @DisplayName("제안서 폼 스킬이 기존 Skill에 매핑되지 않으면 저장에 실패한다")
+    void saveDraft_throwsWhenSkillCannotBeResolved() {
+        Position backend = Position.create("백엔드 개발자");
+        ReflectionTestUtils.setField(backend, "id", 1L);
+
+        ProposalPositionForm positionForm = new ProposalPositionForm();
+        positionForm.setPositionId(1L);
+        positionForm.setTitle("백엔드 개발자");
+        positionForm.setWorkType(ProposalWorkType.REMOTE);
+        positionForm.setHeadCount(1L);
+        positionForm.setEssentialSkillNames(List.of("Unknown Skill"));
+
+        ProposalForm form = new ProposalForm();
+        form.setTitle("백엔드 프로젝트");
+        form.setRawInputText("");
+        form.getPositions().add(positionForm);
+
+        when(positionRepository.findById(1L)).thenReturn(Optional.of(backend));
+        when(skillResolver.resolveRequired("Unknown Skill"))
+                .thenThrow(new UnresolvedSkillException("등록되지 않은 스킬입니다: Unknown Skill"));
+
+        assertThatThrownBy(() -> proposalService.saveDraft(EMAIL, form))
+                .isInstanceOf(UnresolvedSkillException.class)
+                .hasMessage("등록되지 않은 스킬입니다: Unknown Skill");
+
+        then(proposalRepository).should(never()).save(any(Proposal.class));
     }
 
     @Test

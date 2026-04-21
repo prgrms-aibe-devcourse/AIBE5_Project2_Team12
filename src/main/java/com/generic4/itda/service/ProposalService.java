@@ -1,7 +1,7 @@
 package com.generic4.itda.service;
 
-import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.matching.constant.MatchingStatus;
+import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.AiInterviewMessageRole;
 import com.generic4.itda.domain.proposal.Proposal;
@@ -20,7 +20,6 @@ import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.PositionRepository;
 import com.generic4.itda.repository.ProposalAiInterviewMessageRepository;
 import com.generic4.itda.repository.ProposalRepository;
-import com.generic4.itda.repository.SkillRepository;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -51,7 +50,7 @@ public class ProposalService {
     private final ProposalRepository proposalRepository;
     private final MemberRepository memberRepository;
     private final PositionRepository positionRepository;
-    private final SkillRepository skillRepository;
+    private final SkillResolver skillResolver;
     private final MatchingRepository matchingRepository;
     private final ProposalAiInterviewMessageRepository aiInterviewMessageRepository;
 
@@ -344,8 +343,7 @@ public class ProposalService {
             ProposalPositionSkillImportance importance
     ) {
         for (String skillName : normalizeSkillNames(skillNames)) {
-            Skill skill = skillRepository.findByName(skillName)
-                    .orElseGet(() -> skillRepository.save(Skill.create(skillName, null)));
+            Skill skill = skillResolver.resolveRequired(skillName);
             desiredSkills.putIfAbsent(normalizeKey(skill.getName()), new SkillApplication(skill, importance));
         }
     }
