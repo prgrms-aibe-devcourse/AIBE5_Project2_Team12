@@ -12,12 +12,13 @@ import com.generic4.itda.dto.resume.ResumeSkillItemForm;
 import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.ResumeRepository;
 import com.generic4.itda.repository.SkillRepository;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-
+@Slf4j
 @Service
 @Transactional
 @RequiredArgsConstructor
@@ -27,6 +28,7 @@ public class ResumeService {
     private final MemberRepository memberRepository;
     private final SkillRepository skillRepository;
     private final ObjectMapper objectMapper;
+    private final ResumeEmbeddingService resumeEmbeddingService;
 
     // 이력서 생성
     @Transactional
@@ -61,7 +63,9 @@ public class ResumeService {
             }
         }
 
-        return resumeRepository.save(resume);
+        Resume saved = resumeRepository.save(resume);
+        triggerResumeEmbedding(saved);
+        return saved;
     }
 
     // 이력서 수정
@@ -86,6 +90,8 @@ public class ResumeService {
         if (resume.isAiMatchingEnabled() != form.isAiMatchingEnabled()) {
             resume.toggleAiMatchingEnabled();
         }
+
+        triggerResumeEmbedding(resume);
     }
 
     // 경력 추가
@@ -93,6 +99,8 @@ public class ResumeService {
         Resume resume = getResumeByEmail(email);
         resume.addCareerItem(item);
         resumeRepository.updateCareerJson(resume.getId(), toCareerJson(resume));
+
+        triggerResumeEmbedding(resume);
     }
 
     // 경력 수정
@@ -100,6 +108,8 @@ public class ResumeService {
         Resume resume = getResumeByEmail(email);
         resume.updateCareerItem(index, item);
         resumeRepository.updateCareerJson(resume.getId(), toCareerJson(resume));
+
+        triggerResumeEmbedding(resume);
     }
 
     // 경력 삭제
@@ -107,6 +117,8 @@ public class ResumeService {
         Resume resume = getResumeByEmail(email);
         resume.removeCareerItem(index);
         resumeRepository.updateCareerJson(resume.getId(), toCareerJson(resume));
+
+        triggerResumeEmbedding(resume);
     }
 
     private String toCareerJson(Resume resume) {
@@ -122,6 +134,8 @@ public class ResumeService {
         Resume resume = getResumeByEmail(email);
         Skill skill = getSkillById(skillId);
         resume.addSkill(skill, proficiency);
+
+        triggerResumeEmbedding(resume);
     }
 
     // 스킬 수정
@@ -129,6 +143,8 @@ public class ResumeService {
         Resume resume = getResumeByEmail(email);
         Skill skill = getSkillById(skillId);
         resume.updateSkill(skill, proficiency);
+
+        triggerResumeEmbedding(resume);
     }
 
     // 스킬 삭제
@@ -136,6 +152,8 @@ public class ResumeService {
         Resume resume = getResumeByEmail(email);
         Skill skill = getSkillById(skillId);
         resume.removeSkill(skill);
+
+        triggerResumeEmbedding(resume);
     }
 
     // 이력서 조회
@@ -171,5 +189,13 @@ public class ResumeService {
     private Skill getSkillById(Long skillId) {
         return skillRepository.findById(skillId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 스킬입니다."));
+    }
+
+    private void triggerResumeEmbedding(Resume resume) {
+        try {
+            resumeEmbeddingService.createOrRefresh(resume);
+        } catch (Exception e) {
+            log.error("이력서 임베딩 생성/갱신 실패. resumeId={}", resume.getId(), e);
+        }
     }
 }
