@@ -11,12 +11,12 @@ import com.generic4.itda.dto.proposal.AiBriefPositionResult;
 import com.generic4.itda.dto.proposal.AiBriefResult;
 import com.generic4.itda.dto.proposal.AiBriefSkillResult;
 import com.generic4.itda.repository.PositionRepository;
-import com.generic4.itda.repository.SkillRepository;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -32,7 +32,7 @@ public class AiBriefProposalMapper {
     private static final String DEFAULT_WORK_PLACE = "협의";
 
     private final PositionRepository positionRepository;
-    private final SkillRepository skillRepository;
+    private final SkillResolver skillResolver;
 
     public void apply(Proposal proposal, AiBriefResult aiBriefResult) {
         Assert.notNull(proposal, "제안서는 필수값입니다.");
@@ -295,7 +295,12 @@ public class AiBriefProposalMapper {
                 continue;
             }
 
-            Skill skill = findOrCreateSkill(skillResult.getSkillName());
+            Optional<Skill> resolvedSkill = skillResolver.resolve(skillResult.getSkillName());
+            if (resolvedSkill.isEmpty()) {
+                continue;
+            }
+
+            Skill skill = resolvedSkill.get();
             desiredSkills.putIfAbsent(
                     normalizeKey(skill.getName()),
                     new SkillApplication(skill, skillResult.getImportance())
@@ -308,11 +313,6 @@ public class AiBriefProposalMapper {
     private Position findOrCreatePosition(String positionCategoryName) {
         return positionRepository.findByName(positionCategoryName)
                 .orElseGet(() -> positionRepository.save(Position.create(positionCategoryName)));
-    }
-
-    private Skill findOrCreateSkill(String skillName) {
-        return skillRepository.findByName(skillName)
-                .orElseGet(() -> skillRepository.save(Skill.create(skillName, null)));
     }
 
     private String resolveTitle(Proposal proposal, AiBriefResult aiBriefResult) {
