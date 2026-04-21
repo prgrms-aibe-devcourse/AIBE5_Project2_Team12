@@ -17,6 +17,8 @@ import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalAiInterviewMessage;
 import com.generic4.itda.domain.proposal.ProposalStatus;
 import com.generic4.itda.domain.proposal.ProposalWorkType;
+import com.generic4.itda.domain.skill.Skill;
+import com.generic4.itda.dto.proposal.AiInterviewDraftSaveRequest;
 import com.generic4.itda.dto.proposal.ProposalForm;
 import com.generic4.itda.dto.proposal.ProposalPositionForm;
 import com.generic4.itda.exception.ProposalNotFoundException;
@@ -155,6 +157,127 @@ class ProposalServiceTest {
         assertThatThrownBy(() -> proposalService.saveDraft(1L, EMAIL, form))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("매칭 중 제안서는 원본을 직접 수정할 수 없습니다. 수정 시작을 통해 새 초안을 만든 뒤 편집해주세요.");
+    }
+
+    @Test
+    @DisplayName("AI 인터뷰 draft 저장은 rawInputText를 유지하고 현재 draft 필드를 저장한다")
+    void saveInterviewDraft_keepsRawInputTextAndUpdatesDraftFields() {
+        Proposal proposal = Proposal.create(
+                member,
+                "기존 프로젝트",
+                "기존 원본 입력",
+                "기존 설명",
+                null,
+                null,
+                6L
+        );
+        ReflectionTestUtils.setField(proposal, "id", 1L);
+
+        Position backend = Position.create("백엔드 개발자");
+        ReflectionTestUtils.setField(backend, "id", 1L);
+
+        ProposalPositionForm positionForm = new ProposalPositionForm();
+        positionForm.setPositionId(1L);
+        positionForm.setTitle("Spring 백엔드 개발자");
+        positionForm.setWorkType(ProposalWorkType.REMOTE);
+        positionForm.setHeadCount(2L);
+        positionForm.setUnitBudgetMin(3_000_000L);
+        positionForm.setUnitBudgetMax(4_000_000L);
+        positionForm.setExpectedPeriod(4L);
+        positionForm.setCareerMinYears(2);
+        positionForm.setCareerMaxYears(5);
+        positionForm.setEssentialSkillNames(List.of("Java", "Spring Boot"));
+        positionForm.setPreferredSkillNames(List.of("AWS"));
+
+        AiInterviewDraftSaveRequest request = new AiInterviewDraftSaveRequest();
+        request.setTitle("수정된 프로젝트");
+        request.setDescription("수정된 설명");
+        request.setExpectedPeriod(8L);
+        request.setPositions(List.of(positionForm));
+
+        when(proposalRepository.findById(1L)).thenReturn(Optional.of(proposal));
+        when(positionRepository.findById(1L)).thenReturn(Optional.of(backend));
+        when(skillRepository.findByName(any())).thenReturn(Optional.empty());
+        when(skillRepository.save(any(Skill.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Proposal saved = proposalService.saveInterviewDraft(1L, EMAIL, request);
+
+        assertThat(saved).isSameAs(proposal);
+        assertThat(saved.getTitle()).isEqualTo("수정된 프로젝트");
+        assertThat(saved.getRawInputText()).isEqualTo("기존 원본 입력");
+        assertThat(saved.getDescription()).isEqualTo("수정된 설명");
+        assertThat(saved.getExpectedPeriod()).isEqualTo(8L);
+        assertThat(saved.getTotalBudgetMin()).isEqualTo(6_000_000L);
+        assertThat(saved.getTotalBudgetMax()).isEqualTo(8_000_000L);
+        assertThat(saved.getPositions()).hasSize(1);
+        assertThat(saved.getPositions().get(0).getTitle()).isEqualTo("Spring 백엔드 개발자");
+        assertThat(saved.getPositions().get(0).getSkills()).hasSize(3);
+    }
+
+    @Test
+    @DisplayName("AI 인터뷰 draft 저장은 WRITING 상태가 아니면 실패한다")
+    void saveInterviewDraft_blocksNonWritingProposal() {
+        Proposal proposal = Proposal.create(
+                member,
+                "기존 프로젝트",
+                "기존 원본 입력",
+                "설명",
+                null,
+                null,
+                6L
+        );
+        ReflectionTestUtils.setField(proposal, "id", 1L);
+        proposal.startMatching();
+
+        AiInterviewDraftSaveRequest request = new AiInterviewDraftSaveRequest();
+        request.setTitle("수정된 프로젝트");
+        request.setDescription("수정된 설명");
+        request.setExpectedPeriod(6L);
+
+        when(proposalRepository.findById(1L)).thenReturn(Optional.of(proposal));
+
+        assertThatThrownBy(() -> proposalService.saveInterviewDraft(1L, EMAIL, request))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("매칭 중 제안서는 원본을 직접 수정할 수 없습니다. 수정 시작을 통해 새 초안을 만든 뒤 편집해주세요.");
+    }
+
+    @Test
+    @DisplayName("AI 인터뷰 draft 저장은 본인 제안서가 아니면 실패한다")
+    void saveInterviewDraft_blocksOtherMemberProposal() {
+        Proposal proposal = Proposal.create(
+                member,
+                "기존 프로젝트",
+                "기존 원본 입력",
+                "설명",
+                null,
+                null,
+                6L
+        );
+        ReflectionTestUtils.setField(proposal, "id", 1L);
+
+        AiInterviewDraftSaveRequest request = new AiInterviewDraftSaveRequest();
+        request.setTitle("수정된 프로젝트");
+        request.setDescription("수정된 설명");
+        request.setExpectedPeriod(6L);
+
+        when(proposalRepository.findById(1L)).thenReturn(Optional.of(proposal));
+
+        assertThatThrownBy(() -> proposalService.saveInterviewDraft(1L, OTHER_EMAIL, request))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    @DisplayName("AI 인터뷰 draft 저장은 존재하지 않는 제안서면 실패한다")
+    void saveInterviewDraft_throwsWhenNotFound() {
+        AiInterviewDraftSaveRequest request = new AiInterviewDraftSaveRequest();
+        request.setTitle("수정된 프로젝트");
+        request.setDescription("수정된 설명");
+        request.setExpectedPeriod(6L);
+
+        when(proposalRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> proposalService.saveInterviewDraft(99L, EMAIL, request))
+                .isInstanceOf(ProposalNotFoundException.class);
     }
 
     @Test
