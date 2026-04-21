@@ -138,6 +138,32 @@ class HeuristicV1RecommendationScorerTest {
         verify(careerAdjustmentCalculator).calculate(7, 5, 8);
     }
 
+    @Test
+    @DisplayName("명시적 embeddingModel을 전달하면 properties가 아닌 전달된 모델로 reader를 호출한다")
+    void score_UsesExplicitEmbeddingModel_NotProperties_WhenModelParamIsPassed() {
+        // given
+        String customModel = "custom-model-v1";
+        RecommendationScorableCandidate candidate = candidateWith(100L);
+        List<Double> queryEmbedding = dummyQueryEmbedding();
+        List<Double> resumeEmbedding = List.of(0.2, 0.8);
+
+        given(recommendationQueryTextGenerator.generate(any(), any(), any(), any()))
+                .willReturn("query text");
+        given(queryEmbeddingGenerator.generate(anyString())).willReturn(queryEmbedding);
+        given(resumeEmbeddingReader.readEmbeddingsByResumeIds(List.of(100L), customModel))
+                .willReturn(Map.of(100L, resumeEmbedding));
+        given(cosineSimilarityCalculator.calculate(any(), any())).willReturn(0.0);
+        given(skillAdjustmentCalculator.calculate(any(), any(), any())).willReturn(0.0);
+        given(careerAdjustmentCalculator.calculate(any(int.class), any(), any())).willReturn(0.0);
+
+        // when
+        scorer.score(proposal, proposalPosition, Set.of(), Set.of(), List.of(candidate), customModel);
+
+        // then
+        verify(resumeEmbeddingReader).readEmbeddingsByResumeIds(List.of(100L), customModel);
+        verify(properties, never()).getModel();
+    }
+
     // -------------------------------------------------------------------------
     // 시나리오 1: 빈 후보 리스트
     // -------------------------------------------------------------------------
@@ -185,6 +211,9 @@ class HeuristicV1RecommendationScorerTest {
 
         // then
         assertThat(result).isEmpty();
+        verify(cosineSimilarityCalculator, never()).calculate(any(), any());
+        verify(skillAdjustmentCalculator, never()).calculate(any(), any(), any());
+        verify(careerAdjustmentCalculator, never()).calculate(any(int.class), any(), any());
     }
 
     // -------------------------------------------------------------------------
