@@ -23,6 +23,7 @@ import com.generic4.itda.domain.recommendation.vo.HardFilterStat;
 import com.generic4.itda.domain.recommendation.vo.ReasonFacts;
 import com.generic4.itda.domain.resume.CareerPayload;
 import com.generic4.itda.domain.resume.Resume;
+import com.generic4.itda.domain.resume.ResumeStatus;
 import com.generic4.itda.domain.resume.ResumeWritingStatus;
 import com.generic4.itda.domain.skill.Skill;
 import com.generic4.itda.repository.MemberRepository;
@@ -30,10 +31,13 @@ import com.generic4.itda.repository.ProposalRepository;
 import com.generic4.itda.repository.RecommendationResultRepository;
 import com.generic4.itda.repository.RecommendationRunRepository;
 import com.generic4.itda.service.recommend.scoring.HeuristicV1RecommendationScorer;
+import com.generic4.itda.service.recommend.scoring.model.RecommendationScorableCandidate;
+import com.generic4.itda.service.recommend.scoring.model.ScoreBreakdown;
 import com.generic4.itda.service.recommend.scoring.model.ScoredCandidate;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -82,6 +86,23 @@ class RecommendationRunProcessorIntegrationTest {
 
         Member resumeOwner = memberRepository.save(createMember("resume-owner-happy@test.com", "pw", "이력서소유자", "010-1111-2222"));
         Resume resume = persist(Resume.create(resumeOwner, "백엔드 개발 경험", (byte) 3, new CareerPayload(), null, ResumeWritingStatus.DONE, null));
+        RecommendationCandidate stubbedCandidate = new RecommendationCandidate(
+                resume.getId(),
+                ResumeStatus.ACTIVE,
+                true,
+                true,
+                (byte) 3,
+                List.of(new RecommendationCandidate.CandidateSkill(1L, "Java", com.generic4.itda.domain.resume.Proficiency.ADVANCED))
+        );
+        RecommendationScorableCandidate stubbedScorableCandidate = new RecommendationScorableCandidate(
+                resume.getId(),
+                3,
+                Set.of("Java")
+        );
+        ScoredCandidate stubbedScoredCandidate = new ScoredCandidate(
+                stubbedScorableCandidate,
+                new ScoreBreakdown(0.7000, 0.1000, 0.0500, 0.8500)
+        );
 
         RecommendationResult stubbedResult = RecommendationResult.create(
                 fixture.run(),
@@ -92,8 +113,8 @@ class RecommendationRunProcessorIntegrationTest {
                 new ReasonFacts(List.of("Java"), List.of(), 3, List.of())
         );
 
-        given(recommendationCandidateFinder.findCandidates(any(), anyInt())).willReturn(List.of());
-        given(recommendationScorer.score(any(), any(), anySet(), anySet(), anyList())).willReturn(List.of());
+        given(recommendationCandidateFinder.findCandidates(any(), anyInt())).willReturn(List.of(stubbedCandidate));
+        given(recommendationScorer.score(any(), any(), anySet(), anySet(), anyList())).willReturn(List.of(stubbedScoredCandidate));
         given(recommendationResultCreator.create(any(), anyList(), anyInt(), anySet())).willReturn(List.of(stubbedResult));
 
         entityManager.flush();
@@ -111,10 +132,10 @@ class RecommendationRunProcessorIntegrationTest {
         assertThat(persistedRun.getStatus()).isEqualTo(RecommendationRunStatus.COMPUTED);
         assertThat(persistedRun.getErrorMessage()).isNull();
 
-        // then: HardFilterStat 반영 검증 (candidates=0개, results=1개)
+        // then: HardFilterStat 반영 검증 (candidates=1개, results=1개)
         HardFilterStat stat = persistedRun.getHardFilterStats();
         assertThat(stat).isNotNull();
-        assertThat(stat.totalCandidates()).isZero();
+        assertThat(stat.totalCandidates()).isEqualTo(1);
         assertThat(stat.finalCandidates()).isEqualTo(1);
         assertThat(persistedRun.getCandidateCount()).isEqualTo(1);
 
