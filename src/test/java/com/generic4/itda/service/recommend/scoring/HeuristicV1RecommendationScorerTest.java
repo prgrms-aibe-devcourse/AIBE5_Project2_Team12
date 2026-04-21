@@ -11,6 +11,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
+import com.generic4.itda.config.ai.AiEmbeddingProperties;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
 import com.generic4.itda.service.recommend.scoring.model.RecommendationScorableCandidate;
@@ -28,6 +29,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("HeuristicV1RecommendationScorer 단위 테스트")
 class HeuristicV1RecommendationScorerTest {
+
+    @Mock
+    private AiEmbeddingProperties properties;
 
     @Mock
     private RecommendationQueryTextGenerator recommendationQueryTextGenerator;
@@ -85,6 +89,7 @@ class HeuristicV1RecommendationScorerTest {
         List<Double> queryEmbedding = dummyQueryEmbedding();
         List<Double> resumeEmbedding = List.of(0.2, 0.8);
 
+        given(properties.getModel()).willReturn(EMBEDDING_MODEL);
         given(proposalPosition.getCareerMinYears()).willReturn(5);
         given(proposalPosition.getCareerMaxYears()).willReturn(8);
         given(recommendationQueryTextGenerator.generate(
