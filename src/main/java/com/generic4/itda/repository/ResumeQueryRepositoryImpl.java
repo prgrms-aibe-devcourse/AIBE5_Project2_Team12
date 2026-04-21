@@ -55,6 +55,7 @@ public class ResumeQueryRepositoryImpl implements ResumeQueryRepository {
                 .where(
                         recommendable(),
                         workTypeMatches(proposalPosition),
+                        excludeProposalOwner(proposalPosition),
                         resumeSkill.skill.id.in(requiredSkillIds)
                 )
                 .groupBy(resume.id, resume.careerYears)
@@ -78,7 +79,8 @@ public class ResumeQueryRepositoryImpl implements ResumeQueryRepository {
                 .from(resume)
                 .where(
                         recommendable(),
-                        workTypeMatches(proposalPosition)
+                        workTypeMatches(proposalPosition),
+                        excludeProposalOwner(proposalPosition)
                 )
                 .orderBy(
                         resume.careerYears.desc(),
@@ -107,5 +109,10 @@ public class ResumeQueryRepositoryImpl implements ResumeQueryRepository {
             case REMOTE -> resume.preferredWorkType.in(WorkType.REMOTE, WorkType.HYBRID);
             case HYBRID -> resume.preferredWorkType.eq(WorkType.HYBRID);
         };
+    }
+
+    private BooleanExpression excludeProposalOwner(ProposalPosition proposalPosition) {
+        Long proposalOwnerId = proposalPosition.getProposal().getMember().getId();
+        return resume.member.id.ne(proposalOwnerId);
     }
 }

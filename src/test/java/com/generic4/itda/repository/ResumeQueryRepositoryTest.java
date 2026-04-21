@@ -18,6 +18,7 @@ import com.generic4.itda.domain.resume.WorkType;
 import com.generic4.itda.domain.skill.Skill;
 import com.generic4.itda.service.recommend.CandidatePoolRow;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -201,6 +202,44 @@ class ResumeQueryRepositoryTest {
                 .containsExactly(doneResume.getId());
     }
 
+    @DisplayName("findCandidatePool은 제안서 작성자의 이력서를 후보 풀에서 제외한다")
+    @Test
+    void findCandidatePool_excludesProposalOwnerResume() {
+        // given
+        Skill java = skillRepository.saveAndFlush(Skill.create("Java-query-pool-owner", null));
+        Skill spring = skillRepository.saveAndFlush(Skill.create("Spring-query-pool-owner", null));
+
+        Resume proposalOwnerResume = saveResume(
+                "pool-owner",
+                (byte) 20,
+                true,
+                true,
+                true,
+                skill(java, Proficiency.ADVANCED),
+                skill(spring, Proficiency.ADVANCED)
+        );
+        Resume otherResume = saveResume(
+                "pool-other",
+                (byte) 10,
+                true,
+                true,
+                true,
+                skill(java, Proficiency.INTERMEDIATE),
+                skill(spring, Proficiency.INTERMEDIATE)
+        );
+
+        // when
+        List<CandidatePoolRow> result = resumeQueryRepository.findCandidatePool(
+                createProposalPosition(null, proposalOwnerResume.getMember()),
+                List.of(java.getId(), spring.getId()),
+                10
+        );
+
+        // then
+        assertThat(result).extracting(CandidatePoolRow::resumeId)
+                .containsExactly(otherResume.getId());
+    }
+
     @DisplayName("findCandidatePool은 근무 형태 정책 조합에 따라 후보를 필터링한다")
     @ParameterizedTest(name = "proposalWorkType={0}")
     @MethodSource("workTypePolicyCases")
@@ -297,6 +336,23 @@ class ResumeQueryRepositoryTest {
 
         // then
         assertThat(result).containsExactly(doneResume.getId());
+    }
+
+    @DisplayName("findRecommendableResumeIds는 제안서 작성자의 이력서를 fallback 후보에서 제외한다")
+    @Test
+    void findRecommendableResumeIds_excludesProposalOwnerResume() {
+        // given
+        Resume proposalOwnerResume = saveResume("recommend-owner", (byte) 10, true, true, true);
+        Resume otherResume = saveResume("recommend-other", (byte) 7, true, true, true);
+
+        // when
+        List<Long> result = resumeQueryRepository.findRecommendableResumeIds(
+                createProposalPosition(null, proposalOwnerResume.getMember()),
+                10
+        );
+
+        // then
+        assertThat(result).containsExactly(otherResume.getId());
     }
 
     @DisplayName("findRecommendableResumeIds는 fallback 조회 경로에서도 근무 형태 정책 조합을 적용한다")
@@ -454,8 +510,12 @@ class ResumeQueryRepositoryTest {
     }
 
     private ProposalPosition createProposalPosition(ProposalWorkType workType) {
+        return createProposalPosition(workType, saveProposalOwnerMember(UUID.randomUUID().toString()));
+    }
+
+    private ProposalPosition createProposalPosition(ProposalWorkType workType, Member proposalOwner) {
         Proposal proposal = Proposal.create(
-                createMember(),
+                proposalOwner,
                 "추천 요청",
                 "raw-input",
                 null,
@@ -477,6 +537,17 @@ class ResumeQueryRepositoryTest {
                 null,
                 workPlace
         );
+    }
+
+    private Member saveProposalOwnerMember(String suffix) {
+        String phone = "010-2222-" + String.format("%04d", Math.abs(suffix.hashCode() % 10_000));
+        return memberRepository.save(createMember(
+                "proposal-owner-" + suffix + "@example.com",
+                "hashed-password",
+                "proposal-owner-" + suffix,
+                "proposal-owner-" + suffix,
+                phone
+        ));
     }
 
     private record SkillAssignment(Skill skill, Proficiency proficiency) {
