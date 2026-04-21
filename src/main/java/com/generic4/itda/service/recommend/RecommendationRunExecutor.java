@@ -13,22 +13,19 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class RecommendationRunExecutor {
 
-    private static final PageRequest NEXT_PENDING_RUN = PageRequest.of(0, 1);
+    private static final PageRequest NEXT_PENDING_RUN = PageRequest.of(0, 10);
     private final RecommendationRunRepository recommendationRunRepository;
 
     public Optional<Long> claimNextPendingRun() {
         List<Long> pendingRunIds = recommendationRunRepository.findPendingRunIds(NEXT_PENDING_RUN);
-        if (pendingRunIds.isEmpty()) {
-            return Optional.empty();
+
+        for (Long runId : pendingRunIds) {
+            int updated = recommendationRunRepository.claimAsRunning(runId);
+            if (updated > 0) {
+                return Optional.of(runId);
+            }
         }
 
-        Long runId = pendingRunIds.get(0);
-        int updated = recommendationRunRepository.claimAsRunning(runId);
-
-        if (updated == 0) {
-            return Optional.empty();
-        }
-
-        return Optional.of(runId);
+        return Optional.empty();
     }
 }
