@@ -176,6 +176,19 @@ public class ProposalService {
     }
 
     @Transactional(readOnly = true)
+    public Proposal findProposalForFreelancer(Long proposalId, String freelancerEmail) {
+        boolean hasAccess = matchingRepository.existsByProposalPosition_Proposal_IdAndFreelancerMember_Email_Value(
+                proposalId, freelancerEmail);
+        if (!hasAccess) {
+            throw new AccessDeniedException("매칭 이력이 없는 제안서입니다.");
+        }
+        Proposal proposal = proposalRepository.findWithPositionsById(proposalId)
+                .orElseThrow(() -> new ProposalNotFoundException("제안서를 찾을 수 없습니다. id=" + proposalId));
+        proposalRepository.findPositionsWithSkillsByProposalId(proposalId);
+        return proposal;
+    }
+
+    @Transactional(readOnly = true)
     public ProposalForm findOwnedProposalForm(Long proposalId, String memberEmail) {
         Proposal proposal = findOwnedProposal(proposalId, memberEmail);
         return ProposalForm.from(proposal);

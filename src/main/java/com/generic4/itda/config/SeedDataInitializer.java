@@ -1,5 +1,7 @@
 package com.generic4.itda.config;
 
+import com.generic4.itda.domain.matching.Matching;
+import com.generic4.itda.domain.matching.constant.MatchingStatus;
 import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
@@ -17,6 +19,7 @@ import com.generic4.itda.domain.resume.ResumeStatus;
 import com.generic4.itda.domain.resume.ResumeWritingStatus;
 import com.generic4.itda.domain.resume.WorkType;
 import com.generic4.itda.domain.skill.Skill;
+import com.generic4.itda.repository.MatchingRepository;
 import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.PositionRepository;
 import com.generic4.itda.repository.ProposalRepository;
@@ -59,6 +62,7 @@ public class SeedDataInitializer implements ApplicationRunner {
     private final SkillRepository skillRepository;
     private final ResumeRepository resumeRepository;
     private final ProposalRepository proposalRepository;
+    private final MatchingRepository matchingRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Value("${app.seed.default-password:demo1234}")
@@ -202,12 +206,12 @@ public class SeedDataInitializer implements ApplicationRunner {
                 추천 설명, 필터링, 결과 비교 흐름까지 한 번에 다듬을 수 있는 팀이 필요합니다.
                 """,
                 "추천 엔진 MVP를 운영 가능한 수준으로 끌어올리는 고도화 프로젝트",
-                19_500_000L,
-                25_500_000L,
+                19_000_000L,
+                25_000_000L,
                 16L,
                 true
         );
-        ensureProposalPosition(
+        ProposalPosition backendPos1 = ensureProposalPosition(
                 matchingProposal,
                 positions.get("백엔드 개발자"),
                 "추천 API 백엔드 개발자",
@@ -227,27 +231,7 @@ public class SeedDataInitializer implements ApplicationRunner {
                 ),
                 skills
         );
-        ensureProposalPosition(
-                matchingProposal,
-                positions.get("백엔드 개발자"),
-                "LLM 워크플로 백엔드 개발자",
-                ProposalWorkType.REMOTE,
-                1L,
-                6_500_000L,
-                8_500_000L,
-                12L,
-                3,
-                6,
-                null,
-                skillRequirements(
-                        skillRequirement("Java", ProposalPositionSkillImportance.ESSENTIAL),
-                        skillRequirement("Spring", ProposalPositionSkillImportance.ESSENTIAL),
-                        skillRequirement("Docker", ProposalPositionSkillImportance.PREFERENCE),
-                        skillRequirement("Redis", ProposalPositionSkillImportance.PREFERENCE)
-                ),
-                skills
-        );
-        ensureProposalPosition(
+        ProposalPosition aiPos = ensureProposalPosition(
                 matchingProposal,
                 positions.get("AI 엔지니어"),
                 "추천 모델/프롬프트 AI 엔지니어",
@@ -300,11 +284,21 @@ public class SeedDataInitializer implements ApplicationRunner {
                 skills
         );
 
+        // ── Matching 시드 ────────────────────────────────────
+        // matchingProposal의 포지션에 프리랜서 매칭 이력 생성
+        // → seed.backend / seed.ai 로그인 시 해당 제안서 상세 페이지 접근 가능
+        Resume backendResume = resumeRepository.findByMemberId(backend.getId()).orElseThrow();
+        Resume aiResume      = resumeRepository.findByMemberId(aiEngineer.getId()).orElseThrow();
+
+        ensureMatching(backendResume, backendPos1, client, backend,    MatchingStatus.PROPOSED);
+        ensureMatching(aiResume,      aiPos,       client, aiEngineer, MatchingStatus.ACCEPTED);
+
         log.info(
                 """
                 Seed data is ready.
                 Seed client email={} matchingProposalId={} writingProposalId={}
                 Seed freelancer emails=[{}, {}, {}, {}]
+                Matching seeds: backend→backendPos1(PROPOSED), ai→aiPos(ACCEPTED)
                 """,
                 client.getEmail().getValue(),
                 matchingProposal.getId(),
@@ -423,6 +417,9 @@ public class SeedDataInitializer implements ApplicationRunner {
             boolean matching
     ) {
         Proposal proposal = proposalRepository.findByMemberIdAndTitle(member.getId(), title)
+                // Proposal.positions is LAZY. To make the seed idempotent we must ensure positions are loaded,
+                // otherwise `proposal.getPositions()` may look empty and we would try to insert duplicates.
+                .map(existing -> proposalRepository.findWithPositionsById(existing.getId()).orElse(existing))
                 .orElseGet(() -> proposalRepository.save(
                         Proposal.create(
                                 member,
@@ -502,14 +499,51 @@ public class SeedDataInitializer implements ApplicationRunner {
             proposalPosition.addSkill(skill, requirement.importance());
         }
 
-        proposalRepository.save(proposal);
-        return proposalPosition;
+        // ProposalPosition은 Proposal에 의해 생성되지만, Matching 생성 시점에는 proposalPosition.id가 필요하다.
+        // saveAndFlush가 merge로 동작하면 반환된 엔티티가 영속 상태가 되므로,
+        // 반환값 기준으로 다시 ProposalPosition을 찾아 id가 채워진 인스턴스를 리턴한다.
+        Proposal savedProposal = proposalRepository.saveAndFlush(proposal);
+        Proposal hydrated = proposalRepository.findWithPositionsById(savedProposal.getId()).orElse(savedProposal);
+
+        return hydrated.getPositions().stream()
+                .filter(existing -> hasSamePositionIdentity(existing, position, title))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("시드 포지션 저장에 실패했습니다. proposalId=" + savedProposal.getId()));
     }
 
     private boolean hasSamePositionIdentity(ProposalPosition existing, Position position, String title) {
-        return existing.getPosition().getId() != null && position.getId() != null
+        boolean samePosition = existing.getPosition().getId() != null && position.getId() != null
                 ? existing.getPosition().getId().equals(position.getId())
                 : existing.getPosition().getName().equals(position.getName());
+        // DB unique constraint is (proposal_id, position_id). One proposal cannot contain multiple
+        // ProposalPositions with the same Position, so treat "same Position" as identity and update
+        // the rest of fields (title, budgets, skills...) in-place.
+        return samePosition;
+    }
+
+    private Matching ensureMatching(
+            Resume resume,
+            ProposalPosition proposalPosition,
+            Member clientMember,
+            Member freelancerMember,
+            MatchingStatus desiredStatus
+    ) {
+        Matching matching = matchingRepository
+                .findByProposalPosition_Proposal_IdAndFreelancerMember_Email_Value(
+                        proposalPosition.getProposal().getId(),
+                        freelancerMember.getEmail().getValue())
+                .stream()
+                .filter(m -> m.getProposalPosition().getId().equals(proposalPosition.getId()))
+                .findFirst()
+                .orElseGet(() -> matchingRepository.save(
+                        Matching.create(resume, proposalPosition, clientMember, freelancerMember)
+                ));
+
+        // 저장된 매칭 상태가 PROPOSED이고 원하는 상태가 ACCEPTED인 경우 수락 처리
+        if (matching.getStatus() == MatchingStatus.PROPOSED && desiredStatus == MatchingStatus.ACCEPTED) {
+            matching.accept();
+        }
+        return matching;
     }
 
     private Position ensurePosition(String name) {

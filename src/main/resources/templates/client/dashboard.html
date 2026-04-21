@@ -139,16 +139,12 @@
                             th:attr="data-href=@{/proposals/{id}(id=${project.proposalId})}"
                             class="project-row cursor-pointer transition hover:bg-slate-50/70">
                             <td class="px-8 py-7">
-                                <div class="max-w-[320px]">
-                                    <p class="text-xl font-black tracking-tight text-slate-900" th:text="${project.title}">
-                                        AI 프리랜서 추천 플랫폼 고도화
-                                    </p>
-                                    <p class="mt-2 text-xs font-semibold uppercase tracking-widest text-slate-400"
-                                       th:text="'Proposal #' + ${project.proposalId}">
-                                        Proposal #1
-                                    </p>
-                                </div>
-                            </td>
+                                 <div class="max-w-[320px]">
+                                     <p class="text-xl font-black tracking-tight text-slate-900" th:text="${project.title}">
+                                         AI 프리랜서 추천 플랫폼 고도화
+                                     </p>
+                                 </div>
+                             </td>
                             <td class="px-6 py-7">
                                 <span th:classappend="${
                                         project.statusKey == 'WRITING' ? 'border-slate-200 bg-slate-100 text-slate-600' :

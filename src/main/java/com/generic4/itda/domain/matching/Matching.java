@@ -61,4 +61,18 @@ public class Matching extends BaseTimeEntity {
                 .status(MatchingStatus.PROPOSED)
                 .build();
     }
+
+    public void accept() {
+        if (this.status != MatchingStatus.PROPOSED) {
+            throw new IllegalStateException("제안 상태의 매칭만 수락할 수 있습니다.");
+        }
+        this.status = MatchingStatus.ACCEPTED;
+    }
+
+    public void reject() {
+        if (this.status != MatchingStatus.PROPOSED) {
+            throw new IllegalStateException("제안 상태의 매칭만 거절할 수 있습니다.");
+        }
+        this.status = MatchingStatus.REJECTED;
+    }
 }

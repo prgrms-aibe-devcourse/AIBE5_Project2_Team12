@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+    <th:block th:fragment="positionCard(pos, viewerRole, matchingByPositionId)">
+
+        <div class="flex flex-wrap items-start justify-between gap-4">
+            <div class="space-y-1">
+                <h4 class="text-lg font-bold tracking-tight text-slate-900"
+                    th:text="${pos.title}">Node.js 백엔드 개발자</h4>
+                <p class="text-sm font-medium text-slate-500"
+                   th:text="${pos.position.name}">백엔드 개발자</p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+                <!-- 포지션 모집 상태 배지 -->
+                <span th:classappend="${
+                          pos.status.name() == 'OPEN'   ? 'border-blue-200 bg-blue-50 text-blue-600' :
+                          (pos.status.name() == 'FULL'  ? 'border-amber-200 bg-amber-50 text-amber-600' :
+                                                           'border-slate-200 bg-slate-100 text-slate-500')
+                      }"
+                      class="inline-flex rounded-full border px-4 py-1.5 text-xs font-bold"
+                      th:text="${pos.status.name() == 'OPEN' ? '모집 중' :
+                                 (pos.status.name() == 'FULL' ? '정원 충족' : '모집 종료')}">
+                    모집 중
+                </span>
+
+                <!-- 프리랜서: 이 포지션에 매칭 요청이 온 경우 상태 배지 (수락/거절은 상단 액션바에서 처리) -->
+                <th:block th:if="${viewerRole == 'FREELANCER' and matchingByPositionId != null and matchingByPositionId[pos.id] != null}">
+                    <th:block th:with="myMatching=${matchingByPositionId[pos.id]}">
+                        <!-- 매칭 상태 배지 -->
+                        <span th:classappend="${
+                                  myMatching.status.name() == 'PROPOSED'    ? 'border-yellow-200 bg-yellow-50 text-yellow-700' :
+                                  (myMatching.status.name() == 'ACCEPTED'   ? 'border-emerald-200 bg-emerald-50 text-emerald-700' :
+                                  (myMatching.status.name() == 'REJECTED'   ? 'border-red-200 bg-red-50 text-red-600' :
+                                  (myMatching.status.name() == 'IN_PROGRESS'? 'border-blue-200 bg-blue-50 text-blue-600' :
+                                  (myMatching.status.name() == 'COMPLETED'  ? 'border-slate-200 bg-slate-100 text-slate-600' :
+                                                                               'border-slate-200 bg-slate-100 text-slate-500'))))
+                              }"
+                              class="inline-flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-xs font-bold"
+                              th:text="${myMatching.status.description}">
+                            제안됨
+                        </span>
+                    </th:block>
+                </th:block>
+            </div>
+        </div>
+
+        <!-- 수치 정보 -->
+        <div class="mt-5 grid gap-4 sm:grid-cols-3">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">인원</p>
+                <p class="mt-1.5 text-lg font-bold tracking-tight text-slate-900">
+                    <span th:text="${pos.headCount != null ? pos.headCount + '명' : '미정'}">1명</span>
+                </p>
+            </div>
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">예산 (인당)</p>
+                <p class="mt-1.5 text-lg font-bold tracking-tight text-slate-900">
+                    <span th:if="${pos.unitBudgetMin != null and pos.unitBudgetMax != null}"
+                          th:text="${#numbers.formatInteger(pos.unitBudgetMin, 3, 'COMMA') + ' ~ ' + #numbers.formatInteger(pos.unitBudgetMax, 3, 'COMMA') + '원'}">
+                        3,000,000 ~ 4,000,000원
+                    </span>
+                    <span th:unless="${pos.unitBudgetMin != null and pos.unitBudgetMax != null}">미정</span>
+                </p>
+            </div>
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">기간</p>
+                <p class="mt-1.5 text-lg font-bold tracking-tight text-slate-900"
+                   th:text="${pos.expectedPeriod != null ? pos.expectedPeriod + '주' : '미정'}">4주</p>
+            </div>
+        </div>
+
+        <!-- 상세 정보 -->
+        <div class="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+
+            <!-- 스킬 영역 -->
+            <div class="space-y-4">
+                <!-- 필수 스킬 -->
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">필수 기술</p>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        <th:block th:each="skill : ${pos.skills}">
+                            <span th:if="${skill.importance.name() == 'ESSENTIAL'}"
+                                  class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700"
+                                  th:text="${skill.skill.name}">React</span>
+                        </th:block>
+                        <span th:if="${!#lists.isEmpty(pos.skills) and #lists.isEmpty(pos.skills.?[importance.name() == 'ESSENTIAL'])}"
+                              class="rounded-full border border-dashed border-slate-200 px-3 py-1.5 text-sm text-slate-400">없음</span>
+                        <span th:if="${#lists.isEmpty(pos.skills)}"
+                              class="rounded-full border border-dashed border-slate-200 px-3 py-1.5 text-sm text-slate-400">없음</span>
+                    </div>
+                </div>
+
+                <!-- 우대 스킬 -->
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">우대 기술</p>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        <th:block th:each="skill : ${pos.skills}">
+                            <span th:if="${skill.importance.name() == 'PREFERENCE'}"
+                                  class="rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-600"
+                                  th:text="${skill.skill.name}">TypeScript</span>
+                        </th:block>
+                        <span th:if="${!#lists.isEmpty(pos.skills) and #lists.isEmpty(pos.skills.?[importance.name() == 'PREFERENCE'])}"
+                              class="rounded-full border border-dashed border-slate-200 px-3 py-1.5 text-sm text-slate-400">없음</span>
+                        <span th:if="${#lists.isEmpty(pos.skills)}"
+                              class="rounded-full border border-dashed border-slate-200 px-3 py-1.5 text-sm text-slate-400">없음</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 근무 조건 카드 -->
+            <div class="rounded-[24px] border border-white bg-white px-5 py-5">
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">근무 형태</p>
+                        <p class="mt-1.5 text-sm font-semibold text-slate-800"
+                           th:text="${pos.workType != null ? pos.workType.description : '미정'}">원격</p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">근무지</p>
+                        <p class="mt-1.5 text-sm font-semibold text-slate-800"
+                           th:text="${#strings.isEmpty(pos.workPlace) ? '미정' : pos.workPlace}">서울 강남구</p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">경력 범위</p>
+                        <p class="mt-1.5 text-sm font-semibold text-slate-800">
+                            <span th:if="${pos.careerMinYears != null and pos.careerMaxYears != null}"
+                                  th:text="${pos.careerMinYears + '년 ~ ' + pos.careerMaxYears + '년'}">3년 ~ 5년</span>
+                            <span th:if="${pos.careerMinYears != null and pos.careerMaxYears == null}"
+                                  th:text="${pos.careerMinYears + '년 이상'}">3년 이상</span>
+                            <span th:if="${pos.careerMinYears == null and pos.careerMaxYears != null}"
+                                  th:text="${pos.careerMaxYears + '년 이하'}">5년 이하</span>
+                            <span th:if="${pos.careerMinYears == null and pos.careerMaxYears == null}">미정</span>
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">모집 상태</p>
+                        <p class="mt-1.5 text-sm font-semibold text-slate-800"
+                           th:text="${pos.status.name() == 'OPEN' ? '모집 중' :
+                                      (pos.status.name() == 'FULL' ? '정원 충족' : '모집 종료')}">모집 중</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </th:block>
+</body>
+</html>

@@ -93,7 +93,9 @@
             </div>
 
             <div th:if="${not items.isEmpty()}" class="divide-y divide-slate-100">
-                <div th:each="item : ${items}" class="grid grid-cols-1 md:grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_80px] gap-4 items-center px-6 py-5 hover:bg-slate-50 transition-colors">
+                <div th:each="item : ${items}"
+                     th:attr="data-href=@{/proposals/{id}(id=${item.proposalId()})}"
+                     class="grid grid-cols-1 md:grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_80px] gap-4 items-center px-6 py-5 hover:bg-slate-50 transition-colors cursor-pointer">
                     <div class="space-y-1">
                         <p class="text-sm font-bold text-slate-900" th:text="${item.proposalTitle()}">프로젝트명</p>
                         <div class="flex items-center gap-1.5 text-xs text-slate-500">
@@ -101,10 +103,6 @@
                             <span th:text="${item.companyName()}">기업명</span>
                             <span class="text-slate-300">·</span>
                             <span th:text="${item.positionName()}">포지션</span>
-                        </div>
-                        <div class="flex flex-wrap gap-1 pt-0.5">
-                            <span th:each="skill : ${item.skillNames()}" th:text="${skill}"
-                                  class="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-medium rounded-lg">스킬</span>
                         </div>
                     </div>
                     <div>
@@ -122,7 +120,7 @@
                     <div class="flex justify-end">
                         <a th:href="@{/proposals/{id}(id=${item.proposalId()})}"
                            class="flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-700 whitespace-nowrap">
-                            보기<i data-lucide="chevron-right" class="w-4 h-4"></i>
+                            상세 보기<i data-lucide="chevron-right" class="w-4 h-4"></i>
                         </a>
                     </div>
                 </div>
@@ -156,6 +154,18 @@
     var form = document.getElementById('searchForm');
     var inp  = document.getElementById('searchInput');
     if (form) form.addEventListener('submit', function() { cur_query = inp ? inp.value.trim() : ''; loadList(cur_status, cur_query); });
+
+    // Row click navigation (works for both initial render and AJAX-replaced list).
+    document.addEventListener('click', function (e) {
+        var row = e.target.closest('#listSection [data-href]');
+        if (!row) return;
+
+        // Let explicit interactive elements handle their own clicks.
+        if (e.target.closest('a, button, input, select, textarea, label')) return;
+
+        var href = row.dataset.href;
+        if (href) window.location.href = href;
+    });
 
     function loadList(status, q) {
         var p = new URLSearchParams();

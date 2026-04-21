@@ -1,6 +1,8 @@
 package com.generic4.itda.controller;
 
+import com.generic4.itda.domain.matching.Matching;
 import com.generic4.itda.domain.proposal.Proposal;
+import com.generic4.itda.domain.proposal.ProposalPosition;
 import com.generic4.itda.domain.proposal.ProposalStatus;
 import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.dto.proposal.AiInterviewMessageResponse;
@@ -8,13 +10,16 @@ import com.generic4.itda.dto.proposal.ProposalForm;
 import com.generic4.itda.dto.proposal.ProposalPositionForm;
 import com.generic4.itda.dto.security.ItDaPrincipal;
 import com.generic4.itda.exception.ProposalNotFoundException;
+import com.generic4.itda.repository.MatchingRepository;
 import com.generic4.itda.repository.PositionRepository;
 import com.generic4.itda.service.ProposalAiInterviewService;
 import com.generic4.itda.service.ProposalService;
 import jakarta.validation.Valid;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
@@ -42,6 +47,7 @@ public class ProposalController {
     private final ProposalService proposalService;
     private final ProposalAiInterviewService proposalAiInterviewService;
     private final PositionRepository positionRepository;
+    private final MatchingRepository matchingRepository;
 
     @GetMapping("/new")
     public String newForm(@AuthenticationPrincipal ItDaPrincipal principal, Model model) {
@@ -106,17 +112,52 @@ public class ProposalController {
             Model model,
             RedirectAttributes redirectAttributes
     ) {
+        // 1) 클라이언트(소유자) 접근 시도
         try {
             Proposal proposal = proposalService.findOwnedProposal(proposalId, principal.getEmail());
             model.addAttribute("proposal", proposal);
+            model.addAttribute("viewerRole", "CLIENT");
             addMemberAttributes(model, principal);
             return "client/proposalDetail";
         } catch (ProposalNotFoundException e) {
             redirectAttributes.addFlashAttribute("errorMessage", "존재하지 않는 제안서입니다.");
-            return "redirect:/client/dashboard";
+            return "redirect:/";
+        } catch (AccessDeniedException ignored) {
+            // 소유자가 아닌 경우 → 프리랜서 접근 시도
+        }
+
+        // 2) 프리랜서(매칭 이력 기반) 접근 시도
+        // - findOwnedProposal에서 AccessDeniedException이 났다는 것은 제안서가 존재한다는 의미
+        //   이므로 ProposalNotFoundException은 실질적으로 발생하지 않지만 방어적으로 처리
+        try {
+            Proposal proposal = proposalService.findProposalForFreelancer(proposalId, principal.getEmail());
+
+            List<Matching> myMatchings = matchingRepository
+                    .findByProposalPosition_Proposal_IdAndFreelancerMember_Email_Value(
+                            proposalId, principal.getEmail());
+            Map<Long, Matching> matchingByPositionId = myMatchings.stream()
+                    .collect(Collectors.toMap(
+                            m -> m.getProposalPosition().getId(),
+                            m -> m,
+                            (a, b) -> a)); // 포지션당 첫 번째 매칭 유지
+
+            // 프리랜서가 제안받은 포지션만 뷰에 노출
+            List<ProposalPosition> proposedPositions = proposal.getPositions().stream()
+                    .filter(pos -> matchingByPositionId.containsKey(pos.getId()))
+                    .toList();
+
+            model.addAttribute("proposal", proposal);
+            model.addAttribute("viewerRole", "FREELANCER");
+            model.addAttribute("matchingByPositionId", matchingByPositionId);
+            model.addAttribute("proposedPositions", proposedPositions);
+            addMemberAttributes(model, principal);
+            return "client/proposalDetail";
+        } catch (ProposalNotFoundException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", "존재하지 않는 제안서입니다.");
+            return "redirect:/";
         } catch (AccessDeniedException e) {
-            redirectAttributes.addFlashAttribute("errorMessage", "본인 제안서만 조회할 수 있습니다.");
-            return "redirect:/client/dashboard";
+            redirectAttributes.addFlashAttribute("errorMessage", "접근 권한이 없는 제안서입니다.");
+            return "redirect:/";
         }
     }
 
