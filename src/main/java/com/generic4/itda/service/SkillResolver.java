@@ -3,7 +3,9 @@ package com.generic4.itda.service;
 import com.generic4.itda.domain.skill.Skill;
 import com.generic4.itda.exception.UnresolvedSkillException;
 import com.generic4.itda.repository.SkillRepository;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -33,6 +35,58 @@ public class SkillResolver {
     public Skill resolveRequired(String input) {
         return resolve(input)
                 .orElseThrow(() -> new UnresolvedSkillException("등록되지 않은 스킬입니다: " + input));
+    }
+
+    public List<Skill> search(String query) {
+        String normalizedQuery = normalizeQuery(query);
+
+        return skillRepository.findAll().stream()
+                .filter(skill -> matchesSearch(skill, normalizedQuery))
+                .sorted(Comparator
+                        .comparingInt((Skill skill) -> searchScore(skill, normalizedQuery))
+                        .thenComparing(Skill::getName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
+
+    private boolean matchesSearch(Skill skill, String normalizedQuery) {
+        if (!StringUtils.hasText(normalizedQuery)) {
+            return true;
+        }
+
+        return searchScore(skill, normalizedQuery) < Integer.MAX_VALUE;
+    }
+
+    private int searchScore(Skill skill, String normalizedQuery) {
+        if (!StringUtils.hasText(normalizedQuery)) {
+            return 0;
+        }
+
+        String skillName = skill.getName();
+        String normalizedSkillName = normalize(skillName);
+        String resolvedCanonicalName = CANONICAL_NAMES.get(normalizedQuery);
+
+        if (skillName.equals(resolvedCanonicalName) || normalizedSkillName.equals(normalizedQuery)) {
+            return 0;
+        }
+
+        for (Map.Entry<String, String> entry : CANONICAL_NAMES.entrySet()) {
+            if (!entry.getValue().equals(skillName)) {
+                continue;
+            }
+
+            String alias = entry.getKey();
+            if (alias.equals(normalizedQuery)) {
+                return 0;
+            }
+            if (alias.startsWith(normalizedQuery) || normalizedSkillName.startsWith(normalizedQuery)) {
+                return 1;
+            }
+            if (alias.contains(normalizedQuery) || normalizedSkillName.contains(normalizedQuery)) {
+                return 2;
+            }
+        }
+
+        return Integer.MAX_VALUE;
     }
 
     private static Map<String, String> createCanonicalNames() {
@@ -97,6 +151,10 @@ public class SkillResolver {
         for (String alias : aliases) {
             names.put(normalize(alias), canonicalName);
         }
+    }
+
+    private static String normalizeQuery(String value) {
+        return StringUtils.hasText(value) ? normalize(value) : "";
     }
 
     private static String normalize(String value) {

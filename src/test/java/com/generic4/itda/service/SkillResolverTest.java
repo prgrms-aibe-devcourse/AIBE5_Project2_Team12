@@ -10,6 +10,7 @@ import static org.mockito.Mockito.never;
 import com.generic4.itda.domain.skill.Skill;
 import com.generic4.itda.exception.UnresolvedSkillException;
 import com.generic4.itda.repository.SkillRepository;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
@@ -110,6 +111,79 @@ class SkillResolverTest {
         assertThatThrownBy(() -> skillResolver.resolveRequired("Unknown Skill"))
                 .isInstanceOf(UnresolvedSkillException.class)
                 .hasMessage("등록되지 않은 스킬입니다: Unknown Skill");
+    }
+
+    @Test
+    @DisplayName("검색어가 비어 있으면 전체 Skill을 이름순으로 반환한다")
+    void search_returnsAllSkillsWhenQueryIsBlank() {
+        Skill spring = Skill.create("Spring", null);
+        Skill react = Skill.create("React", null);
+        given(skillRepository.findAll()).willReturn(List.of(spring, react));
+
+        List<Skill> skills = skillResolver.search(" ");
+
+        assertThat(skills)
+                .extracting(Skill::getName)
+                .containsExactly("React", "Spring");
+        then(skillRepository).should().findAll();
+    }
+
+    @Test
+    @DisplayName("검색어가 정규 Skill 이름과 일치하면 해당 Skill을 반환한다")
+    void search_returnsSkillWhenCanonicalNameMatches() {
+        Skill react = Skill.create("React", null);
+        Skill vue = Skill.create("Vue", null);
+        given(skillRepository.findAll()).willReturn(List.of(react, vue));
+
+        List<Skill> skills = skillResolver.search("react");
+
+        assertThat(skills)
+                .extracting(Skill::getName)
+                .containsExactly("React");
+        then(skillRepository).should().findAll();
+    }
+
+    @Test
+    @DisplayName("검색어가 별칭과 일치하면 정규 Skill을 반환한다")
+    void search_returnsSkillWhenAliasMatches() {
+        Skill react = Skill.create("React", null);
+        Skill vue = Skill.create("Vue", null);
+        given(skillRepository.findAll()).willReturn(List.of(react, vue));
+
+        List<Skill> skills = skillResolver.search("리액트");
+
+        assertThat(skills)
+                .extracting(Skill::getName)
+                .containsExactly("React");
+        then(skillRepository).should().findAll();
+    }
+
+    @Test
+    @DisplayName("검색어의 대소문자와 구분자를 정규화해 검색한다")
+    void search_normalizesCaseAndSeparators() {
+        Skill springBoot = Skill.create("Spring Boot", null);
+        Skill spring = Skill.create("Spring", null);
+        given(skillRepository.findAll()).willReturn(List.of(spring, springBoot));
+
+        List<Skill> skills = skillResolver.search("spring-boot");
+
+        assertThat(skills)
+                .extracting(Skill::getName)
+                .containsExactly("Spring Boot");
+        then(skillRepository).should().findAll();
+    }
+
+    @Test
+    @DisplayName("검색어가 매칭되지 않으면 빈 목록을 반환한다")
+    void search_returnsEmptyWhenNoSkillMatches() {
+        Skill react = Skill.create("React", null);
+        Skill vue = Skill.create("Vue", null);
+        given(skillRepository.findAll()).willReturn(List.of(react, vue));
+
+        List<Skill> skills = skillResolver.search("Unknown Skill");
+
+        assertThat(skills).isEmpty();
+        then(skillRepository).should().findAll();
     }
 
     private static Stream<Arguments> blankInputSource() {
