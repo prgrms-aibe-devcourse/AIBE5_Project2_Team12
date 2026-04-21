@@ -1,6 +1,8 @@
 package com.generic4.itda.service.recommend.scoring;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 
 import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.position.Position;
@@ -137,5 +139,38 @@ class RecommendationQueryTextGeneratorTest {
         );
 
         assertThat(result).contains("preferred skills: AWS, Docker");
+    }
+
+    @Test
+    @DisplayName("position/workType가 없고 텍스트에 공백이 있어도 null 없이 정규화한다.")
+    void generate_NormalizesBlankAndNullFields() {
+        // given
+        Proposal proposal = mock(Proposal.class);
+        ProposalPosition proposalPosition = mock(ProposalPosition.class);
+
+        given(proposal.getTitle()).willReturn("  Title  ");
+        given(proposal.getDescription()).willReturn("  Description  ");
+        given(proposalPosition.getPosition()).willReturn(null);
+        given(proposalPosition.getWorkType()).willReturn(null);
+        given(proposalPosition.getCareerMinYears()).willReturn(null);
+        given(proposalPosition.getCareerMaxYears()).willReturn(null);
+
+        // when
+        String result = generator.generate(
+                proposal,
+                proposalPosition,
+                Set.of(" Java "),
+                Set.of(" Java ", " Docker ")
+        );
+
+        // then
+        assertThat(result).contains("position: ");
+        assertThat(result).contains("workType: ");
+        assertThat(result).contains("career: ");
+        assertThat(result).contains("required skills: Java");
+        assertThat(result).contains("preferred skills: Docker");
+        assertThat(result).contains("title: Title");
+        assertThat(result).contains("description: Description");
+        assertThat(result).doesNotContain("null");
     }
 }
