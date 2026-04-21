@@ -40,6 +40,12 @@ ai:
     api-key: ${AI_BRIEF_API_KEY:}
     model: ${AI_BRIEF_MODEL:gpt-5-mini}
     max-output-tokens: ${AI_BRIEF_MAX_OUTPUT_TOKENS:4000}
+  embedding:
+    enabled: true
+    api-url: https://api.openai.com/v1/embeddings
+    api-key: ${OPENAI_API_KEY}
+    model: text-embedding-3-small
+    timeout-millis: 5000
 
 app:
   seed:
