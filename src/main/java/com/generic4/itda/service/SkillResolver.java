@@ -27,7 +27,11 @@ public class SkillResolver {
         }
 
         String normalizedInput = normalize(input);
-        String canonicalName = CANONICAL_NAMES.getOrDefault(normalizedInput, input.trim());
+        String canonicalName = CANONICAL_NAMES.get(normalizedInput);
+
+        if (canonicalName == null) {
+            return Optional.empty();
+        }
 
         return skillRepository.findByName(canonicalName);
     }
@@ -49,20 +53,21 @@ public class SkillResolver {
     }
 
     private boolean matchesSearch(Skill skill, String normalizedQuery) {
-        if (!StringUtils.hasText(normalizedQuery)) {
-            return true;
-        }
-
         return searchScore(skill, normalizedQuery) < Integer.MAX_VALUE;
     }
 
     private int searchScore(Skill skill, String normalizedQuery) {
+        String skillName = skill.getName();
+        String normalizedSkillName = normalize(skillName);
+
+        if (!CANONICAL_NAMES.containsValue(skillName)) {
+            return Integer.MAX_VALUE;
+        }
+
         if (!StringUtils.hasText(normalizedQuery)) {
             return 0;
         }
 
-        String skillName = skill.getName();
-        String normalizedSkillName = normalize(skillName);
         String resolvedCanonicalName = CANONICAL_NAMES.get(normalizedQuery);
 
         if (skillName.equals(resolvedCanonicalName) || normalizedSkillName.equals(normalizedQuery)) {

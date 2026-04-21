@@ -70,15 +70,12 @@ class SkillResolverTest {
     }
 
     @Test
-    @DisplayName("별칭 목록에 없는 입력은 trim한 원문으로 조회한다")
-    void resolve_fallsBackToTrimmedInputWhenAliasDoesNotExist() {
-        Skill skill = Skill.create("Unknown Skill", null);
-        given(skillRepository.findByName("Unknown Skill")).willReturn(Optional.of(skill));
+    @DisplayName("별칭 목록에 없는 입력은 DB에 존재해도 매핑하지 않는다")
+    void resolve_returnsEmptyWhenInputIsNotCanonicalAliasEvenIfSkillExists() {
+        Optional<Skill> resolvedSkill = skillResolver.resolve("웹 접근성");
 
-        Optional<Skill> resolvedSkill = skillResolver.resolve("  Unknown Skill  ");
-
-        assertThat(resolvedSkill).contains(skill);
-        then(skillRepository).should().findByName("Unknown Skill");
+        assertThat(resolvedSkill).isEmpty();
+        then(skillRepository).should(never()).findByName(anyString());
     }
 
     @DisplayName("입력값이 비어 있으면 Optional.empty를 반환하고 저장소를 조회하지 않는다")
@@ -106,19 +103,30 @@ class SkillResolverTest {
     @Test
     @DisplayName("resolveRequired는 매핑에 실패하면 예외를 던진다")
     void resolveRequired_throwsWhenSkillCannotBeResolved() {
-        given(skillRepository.findByName("Unknown Skill")).willReturn(Optional.empty());
-
         assertThatThrownBy(() -> skillResolver.resolveRequired("Unknown Skill"))
                 .isInstanceOf(UnresolvedSkillException.class)
                 .hasMessage("등록되지 않은 스킬입니다: Unknown Skill");
+
+        then(skillRepository).should(never()).findByName(anyString());
     }
 
     @Test
-    @DisplayName("검색어가 비어 있으면 전체 Skill을 이름순으로 반환한다")
-    void search_returnsAllSkillsWhenQueryIsBlank() {
+    @DisplayName("resolveRequired는 별칭 목록에 없는 입력이면 DB 조회 없이 예외를 던진다")
+    void resolveRequired_throwsWhenInputIsNotCanonicalAlias() {
+        assertThatThrownBy(() -> skillResolver.resolveRequired("웹 접근성"))
+                .isInstanceOf(UnresolvedSkillException.class)
+                .hasMessage("등록되지 않은 스킬입니다: 웹 접근성");
+
+        then(skillRepository).should(never()).findByName(anyString());
+    }
+
+    @Test
+    @DisplayName("검색어가 비어 있으면 정규 Skill만 이름순으로 반환한다")
+    void search_returnsCanonicalSkillsWhenQueryIsBlank() {
         Skill spring = Skill.create("Spring", null);
         Skill react = Skill.create("React", null);
-        given(skillRepository.findAll()).willReturn(List.of(spring, react));
+        Skill webAccessibility = Skill.create("웹 접근성", null);
+        given(skillRepository.findAll()).willReturn(List.of(spring, react, webAccessibility));
 
         List<Skill> skills = skillResolver.search(" ");
 
@@ -148,7 +156,8 @@ class SkillResolverTest {
     void search_returnsSkillWhenAliasMatches() {
         Skill react = Skill.create("React", null);
         Skill vue = Skill.create("Vue", null);
-        given(skillRepository.findAll()).willReturn(List.of(react, vue));
+        Skill webAccessibility = Skill.create("웹 접근성", null);
+        given(skillRepository.findAll()).willReturn(List.of(react, vue, webAccessibility));
 
         List<Skill> skills = skillResolver.search("리액트");
 
@@ -178,11 +187,27 @@ class SkillResolverTest {
     void search_returnsEmptyWhenNoSkillMatches() {
         Skill react = Skill.create("React", null);
         Skill vue = Skill.create("Vue", null);
-        given(skillRepository.findAll()).willReturn(List.of(react, vue));
+        Skill webAccessibility = Skill.create("웹 접근성", null);
+        given(skillRepository.findAll()).willReturn(List.of(react, vue, webAccessibility));
 
-        List<Skill> skills = skillResolver.search("Unknown Skill");
+        List<Skill> skills = skillResolver.search("웹 접근성");
 
         assertThat(skills).isEmpty();
+        then(skillRepository).should().findAll();
+    }
+
+    @Test
+    @DisplayName("검색 결과에서 정규 Skill 목록에 없는 DB 스킬은 제외한다")
+    void search_excludesNonCanonicalDbSkills() {
+        Skill react = Skill.create("React", null);
+        Skill webAccessibility = Skill.create("웹 접근성", null);
+        given(skillRepository.findAll()).willReturn(List.of(react, webAccessibility));
+
+        List<Skill> skills = skillResolver.search("");
+
+        assertThat(skills)
+                .extracting(Skill::getName)
+                .containsExactly("React");
         then(skillRepository).should().findAll();
     }
 
