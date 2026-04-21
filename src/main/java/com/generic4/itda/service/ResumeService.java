@@ -8,6 +8,7 @@ import com.generic4.itda.domain.resume.Proficiency;
 import com.generic4.itda.domain.resume.Resume;
 import com.generic4.itda.domain.skill.Skill;
 import com.generic4.itda.dto.resume.ResumeForm;
+import com.generic4.itda.dto.resume.ResumeSkillItemForm;
 import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.ResumeRepository;
 import com.generic4.itda.repository.SkillRepository;
@@ -49,6 +50,16 @@ public class ResumeService {
                 form.getWritingStatus(),
                 form.getPortfolioUrl()
         );
+
+        if (form.getSkillItems() != null) {
+            for (ResumeSkillItemForm item : form.getSkillItems()) {
+                if (item == null) {
+                    continue;
+                }
+                Skill skill = getSkillById(item.getSkillId());
+                resume.addSkill(skill, item.getProficiency());
+            }
+        }
 
         return resumeRepository.save(resume);
     }
