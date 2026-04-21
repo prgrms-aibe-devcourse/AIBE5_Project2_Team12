@@ -85,7 +85,7 @@
 
                                     <template x-if="aiInterviewMessages.length > 0">
                                         <div class="space-y-5">
-                                            <template x-for="message in aiInterviewMessages" :key="message.id || `${message.role}-${message.sequence}`">
+                                            <template x-for="message in aiInterviewMessages" :key="message.id || message.tempId || `${message.role}-${message.sequence}`">
                                                 <div class="flex" :class="message.role === 'USER' ? 'justify-end' : 'justify-start'">
                                                     <div class="max-w-[88%] whitespace-pre-line rounded-[24px] px-5 py-4 text-sm leading-7 shadow-sm"
                                                          :class="message.role === 'USER'
@@ -813,8 +813,12 @@
                         return;
                     }
 
+                    const pendingMessage = this.createPendingUserMessage(message);
+
                     this.aiBriefLoading = true;
                     this.aiBriefErrorMessage = '';
+                    this.aiInterviewMessages.push(pendingMessage);
+                    this.scrollChatToBottom();
                     this.refreshIcons();
 
                     try {
@@ -839,11 +843,43 @@
                         this.aiBriefNoticeMessage = '';
                         this.scrollChatToBottom();
                     } catch (error) {
+                        this.removePendingMessage(pendingMessage.tempId);
                         this.aiBriefErrorMessage = error.message || 'AI 인터뷰 메시지 전송에 실패했습니다. 잠시 후 다시 시도해주세요.';
+                        this.scrollChatToBottom();
                     } finally {
                         this.aiBriefLoading = false;
                         this.refreshIcons();
                     }
+                },
+
+                createPendingUserMessage(content) {
+                    return {
+                        id: null,
+                        tempId: this.generateKey(),
+                        role: 'USER',
+                        content,
+                        sequence: this.nextMessageSequence()
+                    };
+                },
+
+                nextMessageSequence() {
+                    if (this.aiInterviewMessages.length === 0) {
+                        return 1;
+                    }
+
+                    const sequences = this.aiInterviewMessages
+                        .map(message => Number(message.sequence))
+                        .filter(sequence => !Number.isNaN(sequence));
+
+                    if (sequences.length === 0) {
+                        return this.aiInterviewMessages.length + 1;
+                    }
+
+                    return Math.max(...sequences) + 1;
+                },
+
+                removePendingMessage(tempId) {
+                    this.aiInterviewMessages = this.aiInterviewMessages.filter(message => message.tempId !== tempId);
                 },
 
                 async saveCurrentDraftBeforeInterview() {
@@ -989,6 +1025,7 @@
                 normalizeMessage(message) {
                     return {
                         id: message.id ?? null,
+                        tempId: message.tempId ?? null,
                         role: message.role || 'ASSISTANT',
                         content: message.content || '',
                         sequence: message.sequence ?? null
