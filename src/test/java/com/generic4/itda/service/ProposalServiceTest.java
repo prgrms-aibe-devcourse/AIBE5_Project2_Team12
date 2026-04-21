@@ -492,4 +492,42 @@ class ProposalServiceTest {
         then(proposalRepository).should().findWithPositionsById(1L);
         then(proposalRepository).should(never()).findPositionsWithSkillsByProposalId(1L);
     }
+
+    @Test
+    @DisplayName("매칭 이력이 있는 프리랜서는 findProposalForFreelancer로 제안서를 조회할 수 있다")
+    void findProposalForFreelancer_returnsProposal_whenMatchingExists() {
+        Proposal proposal = Proposal.create(member, "클라이언트 프로젝트", "원본", "설명", null, null, 6L);
+        ReflectionTestUtils.setField(proposal, "id", 1L);
+        when(matchingRepository.existsByProposalPosition_Proposal_IdAndFreelancerMember_Email_Value(1L, OTHER_EMAIL))
+                .thenReturn(true);
+        when(proposalRepository.findWithPositionsById(1L)).thenReturn(Optional.of(proposal));
+
+        Proposal result = proposalService.findProposalForFreelancer(1L, OTHER_EMAIL);
+
+        assertThat(result).isSameAs(proposal);
+        then(proposalRepository).should().findWithPositionsById(1L);
+        then(proposalRepository).should().findPositionsWithSkillsByProposalId(1L);
+    }
+
+    @Test
+    @DisplayName("매칭 이력이 없는 프리랜서는 findProposalForFreelancer에서 접근 거부 예외가 발생한다")
+    void findProposalForFreelancer_throws_whenNoMatchingHistory() {
+        when(matchingRepository.existsByProposalPosition_Proposal_IdAndFreelancerMember_Email_Value(1L, OTHER_EMAIL))
+                .thenReturn(false);
+
+        assertThatThrownBy(() -> proposalService.findProposalForFreelancer(1L, OTHER_EMAIL))
+                .isInstanceOf(AccessDeniedException.class);
+        then(proposalRepository).should(never()).findWithPositionsById(any());
+    }
+
+    @Test
+    @DisplayName("매칭 이력은 있지만 존재하지 않는 제안서는 findProposalForFreelancer에서 예외가 발생한다")
+    void findProposalForFreelancer_throws_whenProposalNotFound() {
+        when(matchingRepository.existsByProposalPosition_Proposal_IdAndFreelancerMember_Email_Value(99L, OTHER_EMAIL))
+                .thenReturn(true);
+        when(proposalRepository.findWithPositionsById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> proposalService.findProposalForFreelancer(99L, OTHER_EMAIL))
+                .isInstanceOf(ProposalNotFoundException.class);
+    }
 }
