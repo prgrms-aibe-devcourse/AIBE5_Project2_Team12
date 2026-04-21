@@ -120,8 +120,22 @@
                                     </template>
 
                                     <template x-if="aiBriefLoading">
-                                        <div class="max-w-[92%] rounded-[24px] border border-blue-100 bg-blue-50 px-5 py-4 text-sm leading-7 text-blue-700">
-                                            AI가 답변을 분석하고 제안서 초안을 갱신하고 있습니다. 잠시만 기다려주세요.
+                                        <div class="flex max-w-[92%] items-start gap-3 rounded-[24px] border border-blue-100 bg-blue-50 px-5 py-4 text-sm leading-7 text-blue-700">
+                                            <svg class="mt-1.5 h-4 w-4 shrink-0 animate-spin"
+                                                 xmlns="http://www.w3.org/2000/svg"
+                                                 fill="none"
+                                                 viewBox="0 0 24 24">
+                                                <circle class="opacity-25"
+                                                        cx="12"
+                                                        cy="12"
+                                                        r="10"
+                                                        stroke="currentColor"
+                                                        stroke-width="4"></circle>
+                                                <path class="opacity-75"
+                                                      fill="currentColor"
+                                                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                            </svg>
+                                            <span>AI가 답변을 분석하고 제안서 초안을 갱신하고 있습니다. 잠시만 기다려주세요.</span>
                                         </div>
                                     </template>
 
