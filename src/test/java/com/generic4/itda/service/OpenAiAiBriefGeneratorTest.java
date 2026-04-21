@@ -99,6 +99,10 @@ class OpenAiAiBriefGeneratorTest {
                 .andExpect(jsonPath("$.input").value("프로젝트 원본 입력"))
                 .andExpect(jsonPath("$.instructions").value(containsString("근거가 부족한 값은 추측하지 말고 null로 반환한다.")))
                 .andExpect(jsonPath("$.instructions").value(containsString("expectedPeriod는 주 단위 기준 정수로 반환한다.")))
+                .andExpect(jsonPath("$.instructions").value(containsString("skills.skillName은 반드시 아래 정규 Skill 목록 중 하나만 사용한다.")))
+                .andExpect(jsonPath("$.instructions").value(containsString("정규 Skill 목록에 없는 스킬은 절대 생성, 제안, 추가, 반환하지 않는다.")))
+                .andExpect(jsonPath("$.instructions").value(containsString("- React")))
+                .andExpect(jsonPath("$.instructions").value(containsString("- Spring Boot")))
                 .andExpect(jsonPath("$.text.format.type").value("json_schema"))
                 .andExpect(jsonPath("$.text.format.schema.required[*]").value(containsInAnyOrder(
                         "title",

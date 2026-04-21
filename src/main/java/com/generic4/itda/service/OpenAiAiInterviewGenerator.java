@@ -12,7 +12,6 @@ import com.generic4.itda.dto.proposal.AiBriefSkillResult;
 import com.generic4.itda.dto.proposal.AiInterviewGenerateRequest;
 import com.generic4.itda.dto.proposal.AiInterviewResult;
 import com.generic4.itda.dto.proposal.ProposalForm;
-import com.generic4.itda.dto.proposal.ProposalPositionForm;
 import com.generic4.itda.exception.AiBriefGenerationException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -49,18 +48,83 @@ public class OpenAiAiInterviewGenerator implements AiInterviewGenerator {
             - 사용자가 제거/삭제/빼달라고 한 포지션은 positions에서 제외한다.
             - totalBudgetMin, totalBudgetMax, unitBudgetMin, unitBudgetMax는 원화 기준 정수로 반환한다.
             - expectedPeriod는 주 단위 기준 정수로 반환한다.
+            - positions는 실제 모집 단위 배열이다.
             - position별 workType은 SITE, REMOTE, HYBRID 중 하나만 사용한다.
             - REMOTE인 경우 workPlace는 null로 둔다.
             - SITE 또는 HYBRID인데 근무지를 알 수 없으면 workPlace는 "협의"로 둔다.
             - headCount가 명확하지 않으면 1로 둔다.
-            - skills.importance는 ESSENTIAL 또는 PREFERENCE만 사용한다.
-            - importance를 확신할 수 없으면 PREFERENCE를 사용한다.
-            - skillName은 짧고 일반적인 명칭으로 정리한다.
-            - position별 skills는 최대 4개까지만 반환한다.
-            - 같은 positionCategoryName을 중복 생성하지 않는다.
-            - 같은 직무 안에서 역할이 나뉘는 경우 하나의 모집 단위 title/description에 통합해서 표현한다.
             - positionCategoryName은 공용 직무 마스터에 대응하는 큰 분류명이다. 예: 백엔드 개발자, 프론트엔드 개발자, 앱 개발자
             - title은 사용자가 화면에서 보게 될 구체 포지션 제목이다. 예: Java Spring 백엔드 개발자, React 프론트엔드 개발자
+            - 같은 positionCategoryName을 중복 생성하지 않는다.
+            - 같은 positionCategoryName 아래에서도 title이 다르면 별도 position으로 분리할 수 있다.
+            - 동일한 title을 불필요하게 중복 생성하지 않는다.
+            - 같은 직무 안에서 역할이 나뉘는 경우 하나의 모집 단위 title/description에 통합해서 표현한다.
+            - 정보가 부족하면 positions는 1~3개 이내로 생성한다.
+            - 사용자가 명시하지 않은 포지션은 과도하게 늘리지 않는다.
+
+            스킬 규칙:
+            - skills.importance는 ESSENTIAL 또는 PREFERENCE만 사용한다.
+            - importance를 확신할 수 없으면 PREFERENCE를 사용한다.
+            - position별 skills는 최대 4개까지만 반환한다.
+            - skills.skillName은 반드시 아래 정규 Skill 목록 중 하나만 사용한다.
+            - 정규 Skill 목록에 없는 스킬은 절대 생성, 제안, 추가, 반환하지 않는다.
+            - 사용자가 정규 Skill 목록에 없는 스킬을 요청해도 skills에는 포함하지 않는다.
+            - 사용자가 정규 Skill 목록에 없는 스킬을 요청하면 description에 억지로 넣지 않는다.
+            - 비슷한 표현은 가장 가까운 정규 Skill 이름으로 변환한다. 예: 리액트, React.js, reactjs는 React로 반환한다.
+            - assistantMessage에서도 정규 Skill 목록에 없는 스킬을 먼저 제안하거나 추가해드릴지 묻지 않는다.
+            - 사용자가 정규 Skill 목록에 없는 스킬 추가를 요청한 경우, assistantMessage에는 등록된 스킬 목록에 없어 추가하지 않았다고 짧게 안내한다.
+
+            정규 Skill 목록:
+            - React
+            - Vue
+            - Angular
+            - Next.js
+            - TypeScript
+            - JavaScript
+            - HTML
+            - CSS
+            - Tailwind CSS
+            - Java
+            - Spring
+            - Spring Boot
+            - Node.js
+            - Express
+            - NestJS
+            - Python
+            - Django
+            - FastAPI
+            - JPA
+            - Querydsl
+            - REST API
+            - GraphQL
+            - MySQL
+            - PostgreSQL
+            - MongoDB
+            - Redis
+            - Oracle
+            - MsSQL
+            - Elasticsearch
+            - AWS
+            - Docker
+            - Kubernetes
+            - GitHub Actions
+            - Nginx
+            - Git
+            - CI/CD
+            - Kafka
+            - Jenkins
+            - GCP
+            - Azure
+            - Linux
+            - Flutter
+            - React Native
+            - Swift
+            - Kotlin
+            - PyTorch
+            - TensorFlow
+            - LangChain
+            - LLM
+            - Figma
 
             질문 방식:
             - 폼에 비어 있는 필드를 전부 한 번에 나열해서 묻지 않는다.
