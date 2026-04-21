@@ -139,8 +139,7 @@
                                               x-model="draftInput"
                                               rows="2"
                                               :disabled="aiBriefLoading"
-                                              @keydown.enter.meta.prevent="sendPrompt()"
-                                              @keydown.enter.ctrl.prevent="sendPrompt()"
+                                              @keydown.enter="handleDraftInputEnter($event)"
                                               placeholder="예: 온라인 쇼핑몰 앱을 만들고 싶어요. 결제와 관리자 화면이 필요합니다."
                                               class="min-h-[72px] flex-1 rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"></textarea>
                                     <button type="button"
@@ -740,6 +739,15 @@
                 toggleChat() {
                     this.chatOpen = !this.chatOpen;
                     this.refreshIcons();
+                },
+
+                handleDraftInputEnter(event) {
+                    if (event.shiftKey || event.isComposing) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    this.sendPrompt();
                 },
 
                 async sendPrompt() {
