@@ -64,7 +64,7 @@ public class ResumeController {
     public String newForm(@AuthenticationPrincipal ItDaPrincipal principal, Model model) {
         try {
             resumeService.findByEmail(principal.getEmail());
-            return "redirect:/resumes/edit";
+            return "redirect:/resumes/me";
         } catch (IllegalStateException ignored) {
         }
 
@@ -105,7 +105,7 @@ public class ResumeController {
             return "freelancer/resumeForm";
         }
 
-        return "redirect:/resumes/edit";
+        return "redirect:/resumes/me";
     }
 
     @GetMapping("/edit")
