@@ -7,6 +7,8 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -39,6 +41,9 @@ public class ResumeForm {
     private boolean publiclyVisible = true;
 
     private boolean aiMatchingEnabled = true;
+
+    @Valid
+    private List<ResumeSkillItemForm> skillItems = new ArrayList<>();
 
     public static ResumeForm from(Resume resume) {
         ResumeForm form = new ResumeForm();
