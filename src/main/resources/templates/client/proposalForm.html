@@ -85,7 +85,7 @@
 
                                     <template x-if="aiInterviewMessages.length > 0">
                                         <div class="space-y-5">
-                                            <template x-for="message in aiInterviewMessages" :key="message.id || `${message.role}-${message.sequence}`">
+                                            <template x-for="message in aiInterviewMessages" :key="message.id || message.tempId || `${message.role}-${message.sequence}`">
                                                 <div class="flex" :class="message.role === 'USER' ? 'justify-end' : 'justify-start'">
                                                     <div class="max-w-[88%] whitespace-pre-line rounded-[24px] px-5 py-4 text-sm leading-7 shadow-sm"
                                                          :class="message.role === 'USER'
@@ -120,8 +120,22 @@
                                     </template>
 
                                     <template x-if="aiBriefLoading">
-                                        <div class="max-w-[92%] rounded-[24px] border border-blue-100 bg-blue-50 px-5 py-4 text-sm leading-7 text-blue-700">
-                                            AI가 답변을 분석하고 제안서 초안을 갱신하고 있습니다. 잠시만 기다려주세요.
+                                        <div class="flex max-w-[92%] items-start gap-3 rounded-[24px] border border-blue-100 bg-blue-50 px-5 py-4 text-sm leading-7 text-blue-700">
+                                            <svg class="mt-1.5 h-4 w-4 shrink-0 animate-spin"
+                                                 xmlns="http://www.w3.org/2000/svg"
+                                                 fill="none"
+                                                 viewBox="0 0 24 24">
+                                                <circle class="opacity-25"
+                                                        cx="12"
+                                                        cy="12"
+                                                        r="10"
+                                                        stroke="currentColor"
+                                                        stroke-width="4"></circle>
+                                                <path class="opacity-75"
+                                                      fill="currentColor"
+                                                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                            </svg>
+                                            <span>AI가 답변을 분석하고 제안서 초안을 갱신하고 있습니다. 잠시만 기다려주세요.</span>
                                         </div>
                                     </template>
 
@@ -139,8 +153,7 @@
                                               x-model="draftInput"
                                               rows="2"
                                               :disabled="aiBriefLoading"
-                                              @keydown.enter.meta.prevent="sendPrompt()"
-                                              @keydown.enter.ctrl.prevent="sendPrompt()"
+                                              @keydown.enter="handleDraftInputEnter($event)"
                                               placeholder="예: 온라인 쇼핑몰 앱을 만들고 싶어요. 결제와 관리자 화면이 필요합니다."
                                               class="min-h-[72px] flex-1 rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"></textarea>
                                     <button type="button"
@@ -171,40 +184,43 @@
                     <section class="relative flex-1 bg-slate-50/70">
                         <button type="button"
                                 @click="toggleChat()"
-                                class="absolute left-0 top-8 z-20 hidden h-12 w-12 -translate-x-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-blue-300 hover:text-blue-600 lg:flex">
+                                class="absolute left-0 top-1/2 z-20 hidden h-12 w-8 -translate-y-1/2 items-center justify-center rounded-r-2xl border border-l-0 border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-blue-300 hover:text-blue-600 lg:flex">
                             <i x-show="chatOpen" x-cloak data-lucide="panel-left-close" class="h-4 w-4"></i>
                             <i x-show="!chatOpen" x-cloak data-lucide="panel-left-open" class="h-4 w-4"></i>
                         </button>
 
                         <div class="h-full overflow-y-auto">
-                            <div class="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-6 py-5 backdrop-blur lg:px-8">
+                            <div class="sticky top-0 z-10 relative border-b border-slate-200 bg-white/95 px-6 py-5 pb-8 backdrop-blur lg:px-8">
                                 <div class="max-w-5xl">
                                     <p class="text-xs font-black uppercase tracking-widest text-slate-400">Proposal Editor</p>
                                     <h2 class="mt-2 text-3xl font-black tracking-tight text-slate-950">제안서 작성</h2>
-                                    <p class="mt-2 text-sm leading-7 text-slate-500">
-                                        AI가 자동으로 작성하거나 직접 수정할 수 있습니다. 현재 단계에서는 편집기 구조와 포지션 편집 흐름을 먼저 맞춥니다.
-                                    </p>
-                                    <div class="mt-4 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-400">
-                                        <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">
-                                            <i data-lucide="user-round" class="h-3.5 w-3.5"></i>
-                                            <span th:text="${memberName}">클라이언트</span>
-                                        </span>
-                                        <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">
-                                            <i data-lucide="mail" class="h-3.5 w-3.5"></i>
-                                            <span th:text="${memberEmail}">seed.client@itda.local</span>
-                                        </span>
-                                        <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">
-                                            <i data-lucide="badge-check" class="h-3.5 w-3.5"></i>
-                                            <span th:text="${proposalForm.status != null ? proposalForm.status.description : '작성 중'}">작성 중</span>
-                                        </span>
-                                        <span th:if="${proposalId != null}"
-                                              class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">
-                                            <i data-lucide="hash" class="h-3.5 w-3.5"></i>
-                                            <span th:text="'Proposal #' + ${proposalId}">Proposal #1</span>
-                                        </span>
+                                    <div x-show="proposalHeaderOpen"
+                                         x-transition>
+                                        <p class="mt-2 text-sm leading-7 text-slate-500">
+                                            AI가 자동으로 작성하거나 직접 수정할 수 있습니다. 현재 단계에서는 편집기 구조와 포지션 편집 흐름을 먼저 맞춥니다.
+                                        </p>
+                                        <div class="mt-4 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-400">
+                                            <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">
+                                                <i data-lucide="user-round" class="h-3.5 w-3.5"></i>
+                                                <span th:text="${memberName}">클라이언트</span>
+                                            </span>
+                                            <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">
+                                                <i data-lucide="mail" class="h-3.5 w-3.5"></i>
+                                                <span th:text="${memberEmail}">seed.client@itda.local</span>
+                                            </span>
+                                            <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">
+                                                <i data-lucide="badge-check" class="h-3.5 w-3.5"></i>
+                                                <span th:text="${proposalForm.status != null ? proposalForm.status.description : '작성 중'}">작성 중</span>
+                                            </span>
+                                            <span th:if="${proposalId != null}"
+                                                  class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">
+                                                <i data-lucide="hash" class="h-3.5 w-3.5"></i>
+                                                <span th:text="'Proposal #' + ${proposalId}">Proposal #1</span>
+                                            </span>
+                                        </div>
                                     </div>
 
-                                    <div class="mt-5 flex flex-wrap items-center gap-3">
+                                    <div class="mt-2.5 flex flex-wrap items-center gap-3">
                                         <a th:href="@{/client/dashboard}"
                                            class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600">
                                             <i data-lucide="arrow-left" class="h-4 w-4"></i>
@@ -223,10 +239,19 @@
                                             제안서 등록
                                         </button>
                                     </div>
-                                    <p class="mt-3 text-xs font-semibold text-slate-400">
+                                    <p x-show="proposalHeaderOpen"
+                                       x-transition
+                                       class="mt-3 text-xs font-semibold text-slate-400">
                                         임시저장은 작성 중 상태로 저장되고, 제안서 등록은 검증을 통과하면 MATCHING 상태로 전환됩니다.
                                     </p>
                                 </div>
+
+                                <button type="button"
+                                        @click="toggleProposalHeader()"
+                                        class="absolute left-1/2 bottom-0 z-20 hidden h-8 w-12 -translate-x-1/2 translate-y-1/2 items-center justify-center rounded-b-2xl border border-t-0 border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-blue-300 hover:text-blue-600 lg:flex">
+                                    <i x-show="proposalHeaderOpen" x-cloak data-lucide="chevron-up" class="h-4 w-4"></i>
+                                    <i x-show="!proposalHeaderOpen" x-cloak data-lucide="chevron-down" class="h-4 w-4"></i>
+                                </button>
                             </div>
 
                             <div class="space-y-6 px-6 py-6 lg:px-8 lg:py-8">
@@ -254,11 +279,15 @@
                                             </label>
                                             <textarea id="description"
                                                       name="description"
-                                                      rows="8"
+                                                      rows="4"
+                                                      x-ref="descriptionTextarea"
                                                       th:text="*{description}"
                                                       x-model="description"
+                                                      @input="resizeDescriptionTextarea()"
+                                                      @mousedown="rememberDescriptionTextareaHeight()"
+                                                      @mouseup="markDescriptionTextareaAsManuallyResized()"
                                                       placeholder="프리랜서에게 전달하고 싶은 배경, 주요 기능, 기대 산출물, 협업 방식 등을 적어주세요."
-                                                      class="mt-3 w-full rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"></textarea>
+                                                      class="mt-3 max-h-[260px] w-full resize-y overflow-auto rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"></textarea>
                                             <p th:if="${#fields.hasErrors('description')}" th:errors="*{description}" class="mt-2 text-xs font-semibold text-red-500"></p>
                                         </div>
 
@@ -699,6 +728,7 @@
             return {
                 loaded: false,
                 chatOpen: true,
+                proposalHeaderOpen: false,
                 submitAction: 'save',
                 aiBriefRequested: Boolean(bootstrap.aiBriefRequested),
                 aiBriefNoticeMessage: '',
@@ -718,6 +748,8 @@
                 editingIndex: null,
                 currentPosition: null,
                 positionErrors: [],
+                descriptionTextareaManuallyResized: false,
+                descriptionTextareaHeightBeforeResize: null,
 
                 init() {
                     this.aiInterviewMessages = (bootstrap.aiInterviewMessages || []).map(message => this.normalizeMessage(message));
@@ -729,6 +761,7 @@
                     this.loaded = true;
                     this.refreshIcons();
                     this.scrollChatToBottom();
+                    this.resizeDescriptionTextarea();
 
                     if (this.aiBriefRequested && bootstrap.proposalId) {
                         this.$nextTick(() => {
@@ -740,6 +773,20 @@
                 toggleChat() {
                     this.chatOpen = !this.chatOpen;
                     this.refreshIcons();
+                },
+
+                toggleProposalHeader() {
+                    this.proposalHeaderOpen = !this.proposalHeaderOpen;
+                    this.refreshIcons();
+                },
+
+                handleDraftInputEnter(event) {
+                    if (event.shiftKey || event.isComposing) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    this.sendPrompt();
                 },
 
                 async sendPrompt() {
@@ -805,8 +852,12 @@
                         return;
                     }
 
+                    const pendingMessage = this.createPendingUserMessage(message);
+
                     this.aiBriefLoading = true;
                     this.aiBriefErrorMessage = '';
+                    this.aiInterviewMessages.push(pendingMessage);
+                    this.scrollChatToBottom();
                     this.refreshIcons();
 
                     try {
@@ -831,11 +882,43 @@
                         this.aiBriefNoticeMessage = '';
                         this.scrollChatToBottom();
                     } catch (error) {
+                        this.removePendingMessage(pendingMessage.tempId);
                         this.aiBriefErrorMessage = error.message || 'AI 인터뷰 메시지 전송에 실패했습니다. 잠시 후 다시 시도해주세요.';
+                        this.scrollChatToBottom();
                     } finally {
                         this.aiBriefLoading = false;
                         this.refreshIcons();
                     }
+                },
+
+                createPendingUserMessage(content) {
+                    return {
+                        id: null,
+                        tempId: this.generateKey(),
+                        role: 'USER',
+                        content,
+                        sequence: this.nextMessageSequence()
+                    };
+                },
+
+                nextMessageSequence() {
+                    if (this.aiInterviewMessages.length === 0) {
+                        return 1;
+                    }
+
+                    const sequences = this.aiInterviewMessages
+                        .map(message => Number(message.sequence))
+                        .filter(sequence => !Number.isNaN(sequence));
+
+                    if (sequences.length === 0) {
+                        return this.aiInterviewMessages.length + 1;
+                    }
+
+                    return Math.max(...sequences) + 1;
+                },
+
+                removePendingMessage(tempId) {
+                    this.aiInterviewMessages = this.aiInterviewMessages.filter(message => message.tempId !== tempId);
                 },
 
                 async saveCurrentDraftBeforeInterview() {
@@ -976,11 +1059,14 @@
                         ...position,
                         clientKey: position.id ? `position-${position.id}` : `ai-${Date.now()}-${index}`
                     }));
+                    this.descriptionTextareaManuallyResized = false;
+                    this.resizeDescriptionTextarea();
                 },
 
                 normalizeMessage(message) {
                     return {
                         id: message.id ?? null,
+                        tempId: message.tempId ?? null,
                         role: message.role || 'ASSISTANT',
                         content: message.content || '',
                         sequence: message.sequence ?? null
@@ -992,6 +1078,59 @@
                         if (this.$refs.chatScroll) {
                             this.$refs.chatScroll.scrollTop = this.$refs.chatScroll.scrollHeight;
                         }
+                    });
+                },
+
+                rememberDescriptionTextareaHeight() {
+                    const textarea = this.$refs.descriptionTextarea;
+                    if (!textarea) {
+                        return;
+                    }
+
+                    this.descriptionTextareaHeightBeforeResize = textarea.offsetHeight;
+                },
+
+                markDescriptionTextareaAsManuallyResized() {
+                    const textarea = this.$refs.descriptionTextarea;
+                    if (!textarea || this.descriptionTextareaHeightBeforeResize === null) {
+                        return;
+                    }
+
+                    if (textarea.offsetHeight !== this.descriptionTextareaHeightBeforeResize) {
+                        this.descriptionTextareaManuallyResized = true;
+                        this.updateDescriptionTextareaOverflow();
+                    }
+
+                    this.descriptionTextareaHeightBeforeResize = null;
+                },
+
+                resizeDescriptionTextarea() {
+                    this.$nextTick(() => {
+                        const textarea = this.$refs.descriptionTextarea;
+                        if (!textarea) {
+                            return;
+                        }
+
+                        if (this.descriptionTextareaManuallyResized) {
+                            this.updateDescriptionTextareaOverflow();
+                            return;
+                        }
+
+                        const maxHeight = 260;
+                        textarea.style.height = 'auto';
+                        textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
+                        textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
+                    });
+                },
+
+                updateDescriptionTextareaOverflow() {
+                    this.$nextTick(() => {
+                        const textarea = this.$refs.descriptionTextarea;
+                        if (!textarea) {
+                            return;
+                        }
+
+                        textarea.style.overflowY = textarea.scrollHeight > textarea.clientHeight ? 'auto' : 'hidden';
                     });
                 },
 
