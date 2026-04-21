@@ -18,7 +18,6 @@ import com.generic4.itda.dto.proposal.AiBriefPositionResult;
 import com.generic4.itda.dto.proposal.AiBriefResult;
 import com.generic4.itda.dto.proposal.AiBriefSkillResult;
 import com.generic4.itda.repository.PositionRepository;
-import com.generic4.itda.repository.SkillRepository;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -35,7 +34,7 @@ class AiBriefProposalMapperTest {
     private PositionRepository positionRepository;
 
     @Mock
-    private SkillRepository skillRepository;
+    private SkillResolver skillResolver;
 
     @InjectMocks
     private AiBriefProposalMapper aiBriefProposalMapper;
@@ -46,6 +45,7 @@ class AiBriefProposalMapperTest {
         Proposal proposal = createProposal();
         Position oldPosition = Position.create("디자이너");
         Skill oldSkill = Skill.create("Figma", null);
+        Skill java = Skill.create("Java", null);
         ProposalPosition oldProposalPosition = proposal.addPosition(
                 oldPosition,
                 "기존 디자이너",
@@ -62,8 +62,7 @@ class AiBriefProposalMapperTest {
 
         given(positionRepository.findByName("백엔드 개발자")).willReturn(Optional.empty());
         given(positionRepository.save(any(Position.class))).willAnswer(invocation -> invocation.getArgument(0));
-        given(skillRepository.findByName("Java")).willReturn(Optional.empty());
-        given(skillRepository.save(any(Skill.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(skillResolver.resolve("Java")).willReturn(Optional.of(java));
 
         AiBriefResult aiBriefResult = AiBriefResult.of(
                 "AI가 정리한 제목",
@@ -105,7 +104,7 @@ class AiBriefProposalMapperTest {
         assertThat(backendPosition.getCareerMaxYears()).isEqualTo(6);
         assertThat(backendPosition.getWorkPlace()).isEqualTo("판교");
         assertThat(backendPosition.getSkills()).hasSize(1);
-        assertThat(backendPosition.getSkills().get(0).getSkill().getName()).isEqualTo("Java");
+        assertThat(backendPosition.getSkills().get(0).getSkill()).isSameAs(java);
         assertThat(backendPosition.getSkills().get(0).getImportance())
                 .isEqualTo(ProposalPositionSkillImportance.PREFERENCE);
     }
@@ -132,7 +131,7 @@ class AiBriefProposalMapperTest {
         existingPosition.addSkill(oldSkill, ProposalPositionSkillImportance.ESSENTIAL);
 
         given(positionRepository.findByName("백엔드 개발자")).willReturn(Optional.of(backend));
-        given(skillRepository.findByName("Java")).willReturn(Optional.of(newSkill));
+        given(skillResolver.resolve("Java")).willReturn(Optional.of(newSkill));
 
         AiBriefResult aiBriefResult = AiBriefResult.of(
                 "새 제목",
@@ -199,7 +198,7 @@ class AiBriefProposalMapperTest {
         existingPosition.addSkill(java, ProposalPositionSkillImportance.PREFERENCE);
 
         given(positionRepository.findByName("백엔드 개발자")).willReturn(Optional.of(backend));
-        given(skillRepository.findByName("Java")).willReturn(Optional.of(java));
+        given(skillResolver.resolve("Java")).willReturn(Optional.of(java));
 
         AiBriefResult aiBriefResult = AiBriefResult.of(
                 "새 제목",
@@ -346,7 +345,7 @@ class AiBriefProposalMapperTest {
         Skill java = Skill.create("Java", null);
 
         given(positionRepository.findByName("백엔드 개발자")).willReturn(Optional.of(backend));
-        given(skillRepository.findByName("Java")).willReturn(Optional.of(java));
+        given(skillResolver.resolve("Java")).willReturn(Optional.of(java));
 
         AiBriefResult aiBriefResult = AiBriefResult.of(
                 "새 제목",
@@ -378,7 +377,88 @@ class AiBriefProposalMapperTest {
         assertThat(proposal.getPositions().get(0).getSkills()).hasSize(1);
         assertThat(proposal.getPositions().get(0).getSkills().get(0).getSkill()).isSameAs(java);
         then(positionRepository).should(never()).save(any(Position.class));
-        then(skillRepository).should(never()).save(any(Skill.class));
+    }
+
+    @Test
+    @DisplayName("AI 브리프 스킬 문자열은 SkillResolver로 정규 Skill에 매핑해 저장한다")
+    void apply_resolvesAiSkillAliasToCanonicalSkill() {
+        Proposal proposal = createProposal();
+        Position frontend = Position.create("프론트엔드 개발자");
+        Skill react = Skill.create("React", null);
+
+        given(positionRepository.findByName("프론트엔드 개발자")).willReturn(Optional.of(frontend));
+        given(skillResolver.resolve("React.js")).willReturn(Optional.of(react));
+
+        AiBriefResult aiBriefResult = AiBriefResult.of(
+                "새 제목",
+                "새 설명",
+                null,
+                null,
+                null,
+                List.of(
+                        AiBriefPositionResult.of(
+                                "프론트엔드 개발자",
+                                "React 프론트엔드 개발자",
+                                ProposalWorkType.REMOTE,
+                                1L,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                List.of(AiBriefSkillResult.of("React.js", ProposalPositionSkillImportance.ESSENTIAL))
+                        )
+                )
+        );
+
+        aiBriefProposalMapper.apply(proposal, aiBriefResult);
+
+        ProposalPosition proposalPosition = proposal.getPositions().get(0);
+        assertThat(proposalPosition.getSkills()).hasSize(1);
+        assertThat(proposalPosition.getSkills().get(0).getSkill()).isSameAs(react);
+        assertThat(proposalPosition.getSkills().get(0).getSkill().getName()).isEqualTo("React");
+        assertThat(proposalPosition.getSkills().get(0).getImportance())
+                .isEqualTo(ProposalPositionSkillImportance.ESSENTIAL);
+    }
+
+    @Test
+    @DisplayName("AI 브리프 스킬이 기존 Skill에 매핑되지 않으면 저장하지 않는다")
+    void apply_skipsUnresolvedAiSkillWithoutCreatingSkill() {
+        Proposal proposal = createProposal();
+        Position backend = Position.create("백엔드 개발자");
+
+        given(positionRepository.findByName("백엔드 개발자")).willReturn(Optional.of(backend));
+        given(skillResolver.resolve("Unknown Skill")).willReturn(Optional.empty());
+
+        AiBriefResult aiBriefResult = AiBriefResult.of(
+                "새 제목",
+                "새 설명",
+                null,
+                null,
+                null,
+                List.of(
+                        AiBriefPositionResult.of(
+                                "백엔드 개발자",
+                                "백엔드 개발자",
+                                ProposalWorkType.REMOTE,
+                                1L,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                List.of(AiBriefSkillResult.of("Unknown Skill", ProposalPositionSkillImportance.ESSENTIAL))
+                        )
+                )
+        );
+
+        aiBriefProposalMapper.apply(proposal, aiBriefResult);
+
+        ProposalPosition proposalPosition = proposal.getPositions().get(0);
+        assertThat(proposalPosition.getSkills()).isEmpty();
+        then(skillResolver).should().resolve("Unknown Skill");
     }
 
     @Test

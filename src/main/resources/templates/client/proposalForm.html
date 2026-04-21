@@ -595,17 +595,38 @@
                                         </span>
                                     </template>
                                 </div>
-                                <div class="mt-4 flex flex-col gap-3 sm:flex-row">
+                                <div class="relative mt-4">
                                     <input type="text"
                                            x-model="currentPosition.essentialSkillDraft"
-                                           @keydown.enter.prevent="addSkill('essential')"
-                                           placeholder="기술 이름 입력"
-                                           class="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100">
-                                    <button type="button"
-                                            @click="addSkill('essential')"
-                                            class="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600">
-                                        추가
-                                    </button>
+                                           @focus="openSkillSearch('essential')"
+                                           @input.debounce.250ms="searchSkills('essential')"
+                                           @keydown.enter.prevent="selectFirstSkill('essential')"
+                                           @keydown.escape.prevent="closeSkillSearch('essential')"
+                                           @blur="closeSkillSearchWithDelay('essential')"
+                                           placeholder="기술 이름 검색"
+                                           autocomplete="off"
+                                           class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100">
+                                    <div x-show="skillSearchOpen.essential"
+                                         x-cloak
+                                         class="absolute left-0 right-0 top-full z-20 mt-2 max-h-56 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/10">
+                                        <div x-show="skillSearchLoading.essential"
+                                             class="px-4 py-3 text-sm font-semibold text-slate-400">
+                                            검색 중입니다.
+                                        </div>
+                                        <template x-if="!skillSearchLoading.essential && skillSearchResults.essential.length === 0">
+                                            <div class="px-4 py-3 text-sm font-semibold text-slate-400">
+                                                선택할 수 있는 스킬이 없습니다.
+                                            </div>
+                                        </template>
+                                        <template x-for="skill in skillSearchResults.essential" :key="`essential-option-${skill.id || skill.name}`">
+                                            <button type="button"
+                                                    @mousedown.prevent="selectSkill('essential', skill)"
+                                                    class="flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm font-bold text-slate-700 transition hover:bg-blue-50 hover:text-blue-700">
+                                                <span x-text="skill.name"></span>
+                                                <i data-lucide="plus" class="h-4 w-4"></i>
+                                            </button>
+                                        </template>
+                                    </div>
                                 </div>
                             </section>
 
@@ -621,17 +642,38 @@
                                         </span>
                                     </template>
                                 </div>
-                                <div class="mt-4 flex flex-col gap-3 sm:flex-row">
+                                <div class="relative mt-4">
                                     <input type="text"
                                            x-model="currentPosition.preferredSkillDraft"
-                                           @keydown.enter.prevent="addSkill('preferred')"
-                                           placeholder="기술 이름 입력"
-                                           class="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100">
-                                    <button type="button"
-                                            @click="addSkill('preferred')"
-                                            class="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600">
-                                        추가
-                                    </button>
+                                           @focus="openSkillSearch('preferred')"
+                                           @input.debounce.250ms="searchSkills('preferred')"
+                                           @keydown.enter.prevent="selectFirstSkill('preferred')"
+                                           @keydown.escape.prevent="closeSkillSearch('preferred')"
+                                           @blur="closeSkillSearchWithDelay('preferred')"
+                                           placeholder="기술 이름 검색"
+                                           autocomplete="off"
+                                           class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100">
+                                    <div x-show="skillSearchOpen.preferred"
+                                         x-cloak
+                                         class="absolute left-0 right-0 top-full z-20 mt-2 max-h-56 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/10">
+                                        <div x-show="skillSearchLoading.preferred"
+                                             class="px-4 py-3 text-sm font-semibold text-slate-400">
+                                            검색 중입니다.
+                                        </div>
+                                        <template x-if="!skillSearchLoading.preferred && skillSearchResults.preferred.length === 0">
+                                            <div class="px-4 py-3 text-sm font-semibold text-slate-400">
+                                                선택할 수 있는 스킬이 없습니다.
+                                            </div>
+                                        </template>
+                                        <template x-for="skill in skillSearchResults.preferred" :key="`preferred-option-${skill.id || skill.name}`">
+                                            <button type="button"
+                                                    @mousedown.prevent="selectSkill('preferred', skill)"
+                                                    class="flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm font-bold text-slate-700 transition hover:bg-blue-50 hover:text-blue-700">
+                                                <span x-text="skill.name"></span>
+                                                <i data-lucide="plus" class="h-4 w-4"></i>
+                                            </button>
+                                        </template>
+                                    </div>
                                 </div>
                             </section>
                         </div>
@@ -748,6 +790,22 @@
                 editingIndex: null,
                 currentPosition: null,
                 positionErrors: [],
+                skillSearchResults: {
+                    essential: [],
+                    preferred: []
+                },
+                skillSearchOpen: {
+                    essential: false,
+                    preferred: false
+                },
+                skillSearchLoading: {
+                    essential: false,
+                    preferred: false
+                },
+                skillSearchRequestSequence: {
+                    essential: 0,
+                    preferred: 0
+                },
                 descriptionTextareaManuallyResized: false,
                 descriptionTextareaHeightBeforeResize: null,
 
@@ -1138,6 +1196,7 @@
                     this.editingIndex = null;
                     this.currentPosition = this.blankPosition();
                     this.positionErrors = [];
+                    this.resetSkillSearchState();
                     this.positionModalOpen = true;
                     this.refreshIcons();
                 },
@@ -1146,6 +1205,7 @@
                     this.editingIndex = index;
                     this.currentPosition = this.normalizePosition(JSON.parse(JSON.stringify(this.positions[index])));
                     this.positionErrors = [];
+                    this.resetSkillSearchState();
                     this.positionModalOpen = true;
                     this.refreshIcons();
                 },
@@ -1154,6 +1214,7 @@
                     this.positionModalOpen = false;
                     this.currentPosition = this.blankPosition();
                     this.positionErrors = [];
+                    this.resetSkillSearchState();
                     this.refreshIcons();
                 },
 
@@ -1179,26 +1240,132 @@
                     this.refreshIcons();
                 },
 
-                addSkill(type) {
-                    const draftKey = type === 'essential' ? 'essentialSkillDraft' : 'preferredSkillDraft';
-                    const listKey = type === 'essential' ? 'essentialSkillNames' : 'preferredSkillNames';
-                    const draft = (this.currentPosition[draftKey] || '').trim();
+                openSkillSearch(type) {
+                    this.skillSearchOpen[type] = true;
+                    this.searchSkills(type);
+                },
 
-                    if (!draft) {
+                closeSkillSearch(type) {
+                    this.skillSearchOpen[type] = false;
+                },
+
+                closeSkillSearchWithDelay(type) {
+                    window.setTimeout(() => {
+                        this.closeSkillSearch(type);
+                    }, 150);
+                },
+
+                async searchSkills(type) {
+                    if (!this.currentPosition) {
                         return;
                     }
 
-                    if (!this.currentPosition[listKey].includes(draft)) {
-                        const otherListKey = type === 'essential' ? 'preferredSkillNames' : 'essentialSkillNames';
-                        if (this.currentPosition[otherListKey].includes(draft)) {
-                            this.positionErrors = ['필수 기술과 우대 기술에는 같은 값을 넣을 수 없습니다.'];
+                    const draftKey = this.skillDraftKey(type);
+                    const query = (this.currentPosition[draftKey] || '').trim();
+                    const requestSequence = ++this.skillSearchRequestSequence[type];
+
+                    this.skillSearchOpen[type] = true;
+                    this.skillSearchLoading[type] = true;
+
+                    try {
+                        const response = await fetch(`/api/skills?query=${encodeURIComponent(query)}`, {
+                            headers: {
+                                'Accept': 'application/json'
+                            }
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('스킬 목록을 불러오지 못했습니다.');
+                        }
+
+                        const skills = await response.json();
+                        if (requestSequence !== this.skillSearchRequestSequence[type]) {
                             return;
                         }
-                        this.currentPosition[listKey].push(draft);
+
+                        this.skillSearchResults[type] = (skills || [])
+                            .filter(skill => skill && skill.name)
+                            .filter(skill => !this.isSkillAlreadySelected(type, skill.name));
+                    } catch (error) {
+                        if (requestSequence === this.skillSearchRequestSequence[type]) {
+                            this.skillSearchResults[type] = [];
+                            this.positionErrors = [error.message || '스킬 목록을 불러오지 못했습니다.'];
+                        }
+                    } finally {
+                        if (requestSequence === this.skillSearchRequestSequence[type]) {
+                            this.skillSearchLoading[type] = false;
+                            this.refreshIcons();
+                        }
                     }
-                    this.currentPosition[draftKey] = '';
+                },
+
+                selectFirstSkill(type) {
+                    if (this.skillSearchResults[type].length > 0) {
+                        this.selectSkill(type, this.skillSearchResults[type][0]);
+                        return;
+                    }
+
+                    const draftKey = this.skillDraftKey(type);
+                    const draft = (this.currentPosition[draftKey] || '').trim();
+                    if (draft) {
+                        this.positionErrors = ['검색 결과에서 스킬을 선택해주세요.'];
+                    }
+                },
+
+                selectSkill(type, skill) {
+                    if (!skill || !skill.name) {
+                        return;
+                    }
+
+                    const skillName = skill.name.trim();
+                    const listKey = this.skillListKey(type);
+                    const otherListKey = type === 'essential' ? 'preferredSkillNames' : 'essentialSkillNames';
+
+                    if (this.currentPosition[otherListKey].includes(skillName)) {
+                        this.positionErrors = ['필수 기술과 우대 기술에는 같은 값을 넣을 수 없습니다.'];
+                        return;
+                    }
+
+                    if (!this.currentPosition[listKey].includes(skillName)) {
+                        this.currentPosition[listKey].push(skillName);
+                    }
+
+                    this.currentPosition[this.skillDraftKey(type)] = '';
+                    this.skillSearchResults[type] = [];
+                    this.skillSearchOpen[type] = false;
                     this.positionErrors = [];
                     this.refreshIcons();
+                },
+
+                isSkillAlreadySelected(type, skillName) {
+                    return this.currentPosition[this.skillListKey(type)].includes(skillName);
+                },
+
+                skillDraftKey(type) {
+                    return type === 'essential' ? 'essentialSkillDraft' : 'preferredSkillDraft';
+                },
+
+                skillListKey(type) {
+                    return type === 'essential' ? 'essentialSkillNames' : 'preferredSkillNames';
+                },
+
+                resetSkillSearchState() {
+                    this.skillSearchResults = {
+                        essential: [],
+                        preferred: []
+                    };
+                    this.skillSearchOpen = {
+                        essential: false,
+                        preferred: false
+                    };
+                    this.skillSearchLoading = {
+                        essential: false,
+                        preferred: false
+                    };
+                    this.skillSearchRequestSequence = {
+                        essential: 0,
+                        preferred: 0
+                    };
                 },
 
                 removeSkill(type, index) {

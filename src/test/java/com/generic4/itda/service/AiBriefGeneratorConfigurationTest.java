@@ -12,8 +12,8 @@ import com.generic4.itda.repository.SkillRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.web.client.RestClient;
@@ -78,6 +78,7 @@ class AiBriefGeneratorConfigurationTest {
             DisabledAiInterviewGenerator.class,
             OpenAiAiBriefGenerator.class,
             OpenAiAiInterviewGenerator.class,
+            SkillResolver.class,
             AiBriefProposalMapper.class,
             ProposalAiBriefService.class
     })
