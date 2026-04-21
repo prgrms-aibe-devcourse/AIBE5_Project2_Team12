@@ -11,6 +11,7 @@ import com.generic4.itda.domain.proposal.ProposalPositionSkill;
 import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
 import com.generic4.itda.domain.proposal.ProposalStatus;
 import com.generic4.itda.domain.skill.Skill;
+import com.generic4.itda.dto.proposal.AiInterviewDraftSaveRequest;
 import com.generic4.itda.dto.proposal.ProposalForm;
 import com.generic4.itda.dto.proposal.ProposalPositionForm;
 import com.generic4.itda.exception.ProposalNotFoundException;
@@ -110,6 +111,23 @@ public class ProposalService {
                 calculateTotalBudgetMin(positionForms),
                 calculateTotalBudgetMax(positionForms),
                 form.getExpectedPeriod()
+        );
+
+        replacePositions(proposal, positionForms);
+        return proposal;
+    }
+
+    public Proposal saveInterviewDraft(Long proposalId, String memberEmail, AiInterviewDraftSaveRequest request) {
+        Proposal proposal = getWritableProposal(proposalId, memberEmail);
+        List<ProposalPositionForm> positionForms = getPositionForms(request);
+
+        proposal.update(
+                request.getTitle(),
+                proposal.getRawInputText(),
+                request.getDescription(),
+                calculateTotalBudgetMin(positionForms),
+                calculateTotalBudgetMax(positionForms),
+                request.getExpectedPeriod()
         );
 
         replacePositions(proposal, positionForms);
@@ -442,6 +460,10 @@ public class ProposalService {
 
     private List<ProposalPositionForm> getPositionForms(ProposalForm form) {
         return form.getPositions() == null ? List.of() : form.getPositions();
+    }
+
+    private List<ProposalPositionForm> getPositionForms(AiInterviewDraftSaveRequest request) {
+        return request.getPositions() == null ? List.of() : request.getPositions();
     }
 
     private Member getMemberByEmail(String memberEmail) {
