@@ -14,6 +14,7 @@ import com.generic4.itda.annotation.ControllerTest;
 import com.generic4.itda.dto.recommend.RecommendationCandidateItem;
 import com.generic4.itda.dto.recommend.RecommendationResultsViewModel;
 import com.generic4.itda.dto.security.ItDaPrincipal;
+import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.service.recommend.RecommendationEntryService;
 import com.generic4.itda.service.recommend.RecommendationRunQueryService;
 import com.generic4.itda.service.recommend.RecommendationRunService;
@@ -43,6 +44,9 @@ class RecommendationControllerTest {
 
     @MockitoBean
     private RecommendationRunQueryService recommendationRunQueryService;
+
+    @MockitoBean
+    private MemberRepository memberRepository;
 
     @Test
     @DisplayName("추천 결과 조회가 성공하면 results 화면을 렌더링한다")
