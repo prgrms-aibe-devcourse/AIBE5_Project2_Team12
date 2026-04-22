@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface MatchingRepository extends JpaRepository<Matching, Long>, MatchingRepositoryCustom {
 
@@ -25,6 +26,16 @@ public interface MatchingRepository extends JpaRepository<Matching, Long>, Match
     long countByProposalPosition_IdAndStatusIn(Long proposalPositionId, Collection<MatchingStatus> statuses);
 
     List<Matching> findByProposalPosition_Proposal_IdAndFreelancerMember_Email_Value(Long proposalId, String freelancerEmail);
+
+    /**
+     * 주어진 포지션에 대해 resume ID 목록에 해당하는 매칭 상태를 한 번에 조회한다.
+     * 추천 결과 페이지에서 후보별 매칭 상태를 N+1 없이 표시하기 위해 사용한다.
+     */
+    @Query("select m from Matching m where m.proposalPosition.id = :positionId and m.resume.id in :resumeIds")
+    List<Matching> findByProposalPositionIdAndResumeIdIn(
+            @Param("positionId") Long positionId,
+            @Param("resumeIds") Collection<Long> resumeIds
+    );
 
     @Query("""
             select m
