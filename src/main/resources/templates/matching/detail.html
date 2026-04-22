@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/base}">
+<head>
+    <title th:text="${view.header.proposalTitle} + ' | 매칭 결과'">매칭 결과 | IT-da</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <main class="min-h-screen bg-slate-50 px-4 py-6 lg:px-8 lg:py-8">
+        <div class="mx-auto max-w-5xl space-y-6">
+            <section class="rounded-[28px] border border-slate-200 bg-white px-6 py-5 shadow-sm shadow-slate-200/60">
+                <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">MATCHING DETAIL</p>
+                <h1 class="mt-2 text-2xl font-black tracking-tight text-slate-950"
+                    th:text="${view.header.proposalTitle}">제안서 제목</h1>
+                <p class="mt-1 text-sm text-slate-500"
+                   th:text="${view.header.positionTitle} + ' · ' + ${view.header.statusLabel}">포지션 제목 · 상태</p>
+            </section>
+
+            <section class="rounded-[28px] border border-dashed border-slate-200 bg-white px-6 py-6 shadow-sm shadow-slate-200/40">
+                <h2 class="text-base font-bold text-slate-900">매칭 결과 페이지 준비 중</h2>
+                <p class="mt-2 text-sm leading-relaxed text-slate-500">
+                    1차 작업 단위에서는 조회 백엔드와 모델 바인딩을 먼저 연결했습니다.
+                    다음 작업 단위에서 실제 카드/스텝퍼/타임라인 UI를 이 구조 위에 얹을 예정입니다.
+                </p>
+
+                <dl class="mt-6 grid gap-4 md:grid-cols-2">
+                    <div class="rounded-2xl bg-slate-50 px-4 py-3">
+                        <dt class="text-xs font-semibold uppercase tracking-widest text-slate-400">매칭 ID</dt>
+                        <dd class="mt-1 text-sm font-bold text-slate-900" th:text="${view.matchingId}">1</dd>
+                    </div>
+                    <div class="rounded-2xl bg-slate-50 px-4 py-3">
+                        <dt class="text-xs font-semibold uppercase tracking-widest text-slate-400">뷰어 역할</dt>
+                        <dd class="mt-1 text-sm font-bold text-slate-900" th:text="${view.viewerRole}">CLIENT</dd>
+                    </div>
+                    <div class="rounded-2xl bg-slate-50 px-4 py-3">
+                        <dt class="text-xs font-semibold uppercase tracking-widest text-slate-400">현재 상태</dt>
+                        <dd class="mt-1 text-sm font-bold text-slate-900" th:text="${view.status.description}">수락됨</dd>
+                    </div>
+                    <div class="rounded-2xl bg-slate-50 px-4 py-3">
+                        <dt class="text-xs font-semibold uppercase tracking-widest text-slate-400">연락처 공개 여부</dt>
+                        <dd class="mt-1 text-sm font-bold text-slate-900" th:text="${view.contactVisible ? '공개됨' : '비공개'}">공개됨</dd>
+                    </div>
+                </dl>
+            </section>
+        </div>
+    </main>
+</div>
+</body>
+</html>

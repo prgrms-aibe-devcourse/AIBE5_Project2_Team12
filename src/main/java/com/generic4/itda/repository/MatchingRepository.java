@@ -38,9 +38,12 @@ public interface MatchingRepository extends JpaRepository<Matching, Long>, Match
     );
 
     @Query("""
-            select m
+            select distinct m
             from Matching m
             join fetch m.proposalPosition pp
+            join fetch pp.position position
+            left join fetch pp.skills pps
+            left join fetch pps.skill skill
             join fetch pp.proposal p
             join fetch p.member proposalOwner
             join fetch m.resume resume

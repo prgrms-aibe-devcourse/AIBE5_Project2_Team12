@@ -20,6 +20,7 @@ import com.generic4.itda.domain.proposal.ProposalPosition;
 import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.dto.security.ItDaPrincipal;
 import com.generic4.itda.repository.MemberRepository;
+import com.generic4.itda.service.MatchingQueryService;
 import com.generic4.itda.service.MatchingService;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -40,6 +41,9 @@ class MatchingControllerTest {
 
     @MockitoBean
     private MatchingService matchingService;
+
+    @MockitoBean
+    private MatchingQueryService matchingQueryService;
 
     @MockitoBean
     private MemberRepository memberRepository;
