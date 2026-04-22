@@ -20,6 +20,4 @@ public class RecommendationReasonProperties {
     private String model = "gpt-5-mini";
 
     private Integer maxOutputTokens = 500;
-
-    private Double temperature = 0.2;
 }
