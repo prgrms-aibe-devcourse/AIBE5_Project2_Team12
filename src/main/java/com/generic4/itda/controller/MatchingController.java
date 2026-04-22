@@ -52,19 +52,20 @@ public class MatchingController {
     public String request(
             @PathVariable Long recommendationResultId,
             @RequestParam(name = "redirectTo", required = false) String redirectTo,
+            @RequestParam(name = "errorRedirectTo", required = false) String errorRedirectTo,
             @AuthenticationPrincipal ItDaPrincipal principal,
             RedirectAttributes redirectAttributes
     ) {
         try {
             Matching matching = matchingService.request(recommendationResultId, principal.getEmail());
             redirectAttributes.addFlashAttribute("noticeMessage", "매칭 요청을 보냈습니다.");
-            String fallback = "/proposals/" + matching.getProposalPosition().getProposal().getId();
+            String fallback = "/matchings/" + matching.getId();
             return redirectTo(redirectTo, fallback);
         } catch (IllegalArgumentException | AccessDeniedException | IllegalStateException e) {
             log.warn("매칭 요청 생성 실패. recommendationResultId={}, email={}",
                     recommendationResultId, principal.getEmail(), e);
             redirectAttributes.addFlashAttribute("errorMessage", toRequestUserMessage(e));
-            return redirectTo(redirectTo, "/client/dashboard");
+            return redirectTo(errorRedirectTo, "/client/dashboard");
         }
     }
 
@@ -72,19 +73,20 @@ public class MatchingController {
     public String accept(
             @PathVariable Long matchingId,
             @RequestParam(name = "redirectTo", required = false) String redirectTo,
+            @RequestParam(name = "errorRedirectTo", required = false) String errorRedirectTo,
             @AuthenticationPrincipal ItDaPrincipal principal,
             RedirectAttributes redirectAttributes
     ) {
         try {
             Matching matching = matchingService.accept(matchingId, principal.getEmail());
             redirectAttributes.addFlashAttribute("noticeMessage", "매칭 요청을 수락했습니다.");
-            String fallback = "/proposals/" + matching.getProposalPosition().getProposal().getId();
+            String fallback = "/matchings/" + matching.getId();
             return redirectTo(redirectTo, fallback);
         } catch (IllegalArgumentException | AccessDeniedException | IllegalStateException e) {
             log.warn("매칭 요청 수락 실패. matchingId={}, email={}",
                     matchingId, principal.getEmail(), e);
             redirectAttributes.addFlashAttribute("errorMessage", toResponseUserMessage(e));
-            return redirectTo(redirectTo, "/freelancers/dashboard");
+            return redirectTo(errorRedirectTo, "/freelancers/dashboard");
         }
     }
 
@@ -92,19 +94,20 @@ public class MatchingController {
     public String reject(
             @PathVariable Long matchingId,
             @RequestParam(name = "redirectTo", required = false) String redirectTo,
+            @RequestParam(name = "errorRedirectTo", required = false) String errorRedirectTo,
             @AuthenticationPrincipal ItDaPrincipal principal,
             RedirectAttributes redirectAttributes
     ) {
         try {
             Matching matching = matchingService.reject(matchingId, principal.getEmail());
             redirectAttributes.addFlashAttribute("noticeMessage", "매칭 요청을 거절했습니다.");
-            String fallback = "/proposals/" + matching.getProposalPosition().getProposal().getId();
+            String fallback = "/matchings/" + matching.getId();
             return redirectTo(redirectTo, fallback);
         } catch (IllegalArgumentException | AccessDeniedException | IllegalStateException e) {
             log.warn("매칭 요청 거절 실패. matchingId={}, email={}",
                     matchingId, principal.getEmail(), e);
             redirectAttributes.addFlashAttribute("errorMessage", toResponseUserMessage(e));
-            return redirectTo(redirectTo, "/freelancers/dashboard");
+            return redirectTo(errorRedirectTo, "/freelancers/dashboard");
         }
     }
 
