@@ -17,6 +17,7 @@ import com.generic4.itda.domain.proposal.ProposalPosition;
 import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
 import com.generic4.itda.domain.recommendation.RecommendationResult;
 import com.generic4.itda.domain.recommendation.RecommendationRun;
+import com.generic4.itda.domain.recommendation.constant.LlmStatus;
 import com.generic4.itda.domain.recommendation.constant.RecommendationAlgorithm;
 import com.generic4.itda.domain.recommendation.constant.RecommendationRunStatus;
 import com.generic4.itda.domain.recommendation.vo.HardFilterStat;
@@ -30,6 +31,7 @@ import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.ProposalRepository;
 import com.generic4.itda.repository.RecommendationResultRepository;
 import com.generic4.itda.repository.RecommendationRunRepository;
+import com.generic4.itda.service.recommend.reason.RecommendationReasonGenerator;
 import com.generic4.itda.service.recommend.scoring.HeuristicV1RecommendationScorer;
 import com.generic4.itda.service.recommend.scoring.model.RecommendationScorableCandidate;
 import com.generic4.itda.service.recommend.scoring.model.ScoreBreakdown;
@@ -42,10 +44,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
 @IntegrationTest
 @Transactional
+@TestPropertySource(properties = "ai.recommend-reason.enabled=true")
 class RecommendationRunProcessorIntegrationTest {
 
     private static final RecommendationAlgorithm DEFAULT_ALGORITHM = RecommendationAlgorithm.HEURISTIC_V1;
@@ -78,44 +82,23 @@ class RecommendationRunProcessorIntegrationTest {
     @MockitoBean
     private RecommendationResultCreator recommendationResultCreator;
 
+    @MockitoBean
+    private RecommendationReasonGenerator recommendationReasonGenerator;
+
     @Test
-    @DisplayName("RUNNING 상태 run 처리 완료 후 RecommendationResult가 DB에 저장되고 status가 COMPUTED로 변경된다")
+    @DisplayName("RUNNING 상태 run 처리 완료 후 RecommendationResult가 DB에 저장되고 추천 이유까지 반영되며 status가 COMPUTED로 변경된다")
     void process_happyPath_savesResultsAndMarksComputed() {
         // given
         RunFixture fixture = createRunningRunFixture("proc-happy@test.com", "fp-happy");
-
-        Member resumeOwner = memberRepository.save(createMember("resume-owner-happy@test.com", "pw", "이력서소유자", "010-1111-2222"));
-        Resume resume = persist(Resume.create(resumeOwner, "백엔드 개발 경험", (byte) 3, new CareerPayload(), null, ResumeWritingStatus.DONE, null));
-        RecommendationCandidate stubbedCandidate = new RecommendationCandidate(
-                resume.getId(),
-                ResumeStatus.ACTIVE,
-                true,
-                true,
-                (byte) 3,
-                List.of(new RecommendationCandidate.CandidateSkill(1L, "Java", com.generic4.itda.domain.resume.Proficiency.ADVANCED))
-        );
-        RecommendationScorableCandidate stubbedScorableCandidate = new RecommendationScorableCandidate(
-                resume.getId(),
-                3,
-                Set.of("Java")
-        );
-        ScoredCandidate stubbedScoredCandidate = new ScoredCandidate(
-                stubbedScorableCandidate,
-                new ScoreBreakdown(0.7000, 0.1000, 0.0500, 0.8500)
+        PreparedRecommendationFixture prepared = createSingleCandidateResultFixture(
+                fixture,
+                "resume-owner-happy@test.com"
         );
 
-        RecommendationResult stubbedResult = RecommendationResult.create(
-                fixture.run(),
-                resume,
-                1,
-                BigDecimal.valueOf(0.8500),
-                BigDecimal.valueOf(0.7000),
-                new ReasonFacts(List.of("Java"), List.of(), 3, List.of())
-        );
-
-        given(recommendationCandidateFinder.findCandidates(any(), anyInt())).willReturn(List.of(stubbedCandidate));
-        given(recommendationScorer.score(any(), any(), anySet(), anySet(), anyList())).willReturn(List.of(stubbedScoredCandidate));
-        given(recommendationResultCreator.create(any(), anyList(), anyInt(), anySet())).willReturn(List.of(stubbedResult));
+        given(recommendationCandidateFinder.findCandidates(any(), anyInt())).willReturn(List.of(prepared.candidate()));
+        given(recommendationScorer.score(any(), any(), anySet(), anySet(), anyList())).willReturn(List.of(prepared.scoredCandidate()));
+        given(recommendationResultCreator.create(any(), anyList(), anyInt(), anySet())).willReturn(List.of(prepared.result()));
+        given(recommendationReasonGenerator.generate(any())).willReturn("  Java 경험이 적합합니다.  ");
 
         entityManager.flush();
         entityManager.clear();
@@ -144,8 +127,10 @@ class RecommendationRunProcessorIntegrationTest {
         assertThat(savedResults).hasSize(1);
         RecommendationResult savedResult = savedResults.get(0);
         assertThat(savedResult.getRecommendationRun().getId()).isEqualTo(fixture.runId());
-        assertThat(savedResult.getResume().getId()).isEqualTo(resume.getId());
+        assertThat(savedResult.getResume().getId()).isEqualTo(prepared.resume().getId());
         assertThat(savedResult.getRank()).isEqualTo(1);
+        assertThat(savedResult.getLlmStatus()).isEqualTo(LlmStatus.READY);
+        assertThat(savedResult.getLlmReason()).isEqualTo("Java 경험이 적합합니다.");
     }
 
     @Test
@@ -176,6 +161,45 @@ class RecommendationRunProcessorIntegrationTest {
         assertThat(recommendationResultRepository.count()).isZero();
     }
 
+    @Test
+    @DisplayName("추천 이유 생성에 실패해도 RecommendationResult는 저장되고 run status는 COMPUTED로 유지된다")
+    void process_reasonGenerationFails_savesResultAndKeepsComputed() {
+        // given
+        RunFixture fixture = createRunningRunFixture("proc-reason-fail@test.com", "fp-reason-fail");
+        PreparedRecommendationFixture prepared = createSingleCandidateResultFixture(
+                fixture,
+                "resume-owner-reason-fail@test.com"
+        );
+
+        given(recommendationCandidateFinder.findCandidates(any(), anyInt())).willReturn(List.of(prepared.candidate()));
+        given(recommendationScorer.score(any(), any(), anySet(), anySet(), anyList())).willReturn(List.of(prepared.scoredCandidate()));
+        given(recommendationResultCreator.create(any(), anyList(), anyInt(), anySet())).willReturn(List.of(prepared.result()));
+        given(recommendationReasonGenerator.generate(any())).willThrow(new RuntimeException("추천 이유 생성 실패"));
+
+        entityManager.flush();
+        entityManager.clear();
+
+        // when
+        assertThatCode(() -> recommendationRunProcessor.process(fixture.runId()))
+                .doesNotThrowAnyException();
+
+        entityManager.flush();
+        entityManager.clear();
+
+        // then
+        RecommendationRun persistedRun = recommendationRunRepository.findById(fixture.runId()).orElseThrow();
+        assertThat(persistedRun.getStatus()).isEqualTo(RecommendationRunStatus.COMPUTED);
+        assertThat(persistedRun.getErrorMessage()).isNull();
+        assertThat(persistedRun.getHardFilterStats()).isEqualTo(new HardFilterStat(1, 1));
+
+        List<RecommendationResult> savedResults = recommendationResultRepository.findAll();
+        assertThat(savedResults).hasSize(1);
+        RecommendationResult savedResult = savedResults.get(0);
+        assertThat(savedResult.getResume().getId()).isEqualTo(prepared.resume().getId());
+        assertThat(savedResult.getLlmStatus()).isEqualTo(LlmStatus.FAILED);
+        assertThat(savedResult.getLlmReason()).isNull();
+    }
+
     private RunFixture createRunningRunFixture(String ownerEmail, String fingerprint) {
         Member owner = memberRepository.save(createMember(ownerEmail, "pw", "제안자", "010-0000-0001"));
         Position position = persist(Position.create("백엔드 개발자"));
@@ -194,10 +218,58 @@ class RecommendationRunProcessorIntegrationTest {
         return new RunFixture(run.getId(), run);
     }
 
+    private PreparedRecommendationFixture createSingleCandidateResultFixture(RunFixture fixture, String resumeOwnerEmail) {
+        Member resumeOwner = memberRepository.save(createMember(resumeOwnerEmail, "pw", "이력서소유자", "010-1111-2222"));
+        Resume resume = persist(Resume.create(
+                resumeOwner,
+                "백엔드 개발 경험",
+                (byte) 3,
+                new CareerPayload(),
+                null,
+                ResumeWritingStatus.DONE,
+                null
+        ));
+
+        RecommendationCandidate candidate = new RecommendationCandidate(
+                resume.getId(),
+                ResumeStatus.ACTIVE,
+                true,
+                true,
+                (byte) 3,
+                List.of(new RecommendationCandidate.CandidateSkill(1L, "Java", com.generic4.itda.domain.resume.Proficiency.ADVANCED))
+        );
+        RecommendationScorableCandidate scorableCandidate = new RecommendationScorableCandidate(
+                resume.getId(),
+                3,
+                Set.of("Java")
+        );
+        ScoredCandidate scoredCandidate = new ScoredCandidate(
+                scorableCandidate,
+                new ScoreBreakdown(0.7000, 0.1000, 0.0500, 0.8500)
+        );
+        RecommendationResult result = RecommendationResult.create(
+                fixture.run(),
+                resume,
+                1,
+                BigDecimal.valueOf(0.8500),
+                BigDecimal.valueOf(0.7000),
+                new ReasonFacts(List.of("Java"), List.of(), 3, List.of())
+        );
+
+        return new PreparedRecommendationFixture(resume, candidate, scoredCandidate, result);
+    }
+
     private <T> T persist(T entity) {
         entityManager.persist(entity);
         return entity;
     }
 
     private record RunFixture(Long runId, RecommendationRun run) {}
+
+    private record PreparedRecommendationFixture(
+            Resume resume,
+            RecommendationCandidate candidate,
+            ScoredCandidate scoredCandidate,
+            RecommendationResult result
+    ) {}
 }

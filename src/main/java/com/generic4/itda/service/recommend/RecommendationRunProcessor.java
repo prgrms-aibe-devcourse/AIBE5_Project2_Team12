@@ -8,6 +8,7 @@ import com.generic4.itda.domain.recommendation.vo.HardFilterStat;
 import com.generic4.itda.repository.RecommendationResultRepository;
 import com.generic4.itda.repository.RecommendationRunRepository;
 import com.generic4.itda.service.recommend.RecommendationCandidate.CandidateSkill;
+import com.generic4.itda.service.recommend.reason.RecommendationReasonProcessor;
 import com.generic4.itda.service.recommend.scoring.HeuristicV1RecommendationScorer;
 import com.generic4.itda.service.recommend.scoring.model.RecommendationScorableCandidate;
 import com.generic4.itda.service.recommend.scoring.model.ScoredCandidate;
@@ -30,6 +31,7 @@ public class RecommendationRunProcessor {
     private final RecommendationCandidateFinder recommendationCandidateFinder;
     private final HeuristicV1RecommendationScorer recommendationScorer;
     private final RecommendationResultCreator recommendationResultCreator;
+    private final RecommendationReasonProcessor recommendationReasonProcessor;
 
     public void process(Long runId) {
         RecommendationRun run = recommendationRunRepository.findById(runId)
@@ -79,8 +81,18 @@ public class RecommendationRunProcessor {
         );
 
         recommendationResultRepository.saveAll(results);
+        processRecommendationReasonsSafely(results);
+
         HardFilterStat hardFilterStat = new HardFilterStat(candidates.size(), results.size());
         run.markCompleted(hardFilterStat);
+    }
+
+    private void processRecommendationReasonsSafely(List<RecommendationResult> results) {
+        try {
+            recommendationReasonProcessor.process(results);
+        } catch (Exception e) {
+            log.warn("추천 이유 생성 중 오류가 발생했지만 추천 실행은 계속 진행합니다.", e);
+        }
     }
 
     private String resolveErrorMessage(Exception e) {
