@@ -61,8 +61,8 @@
             <p class="text-3xl font-bold text-slate-900 mt-0.5" th:text="${inProgressCount} + '건'">0건</p></div>
             <p class="text-xs text-slate-400">클라이언트와 협의 중인 프로젝트</p>
         </div>
-        <div data-stat-card data-status="MATCHED"
-             th:class="${statusFilter == 'MATCHED'} ? 'rounded-3xl p-6 flex flex-col gap-3 border-2 border-blue-500 bg-white shadow-md cursor-pointer transition-all' : 'rounded-3xl p-6 flex flex-col gap-3 border border-slate-200 bg-white shadow-sm hover:border-slate-300 cursor-pointer transition-all'">
+        <div data-stat-card data-status="COMPLETED"
+             th:class="${statusFilter == 'COMPLETED'} ? 'rounded-3xl p-6 flex flex-col gap-3 border-2 border-blue-500 bg-white shadow-md cursor-pointer transition-all' : 'rounded-3xl p-6 flex flex-col gap-3 border border-slate-200 bg-white shadow-sm hover:border-slate-300 cursor-pointer transition-all'">
             <div class="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center">
                 <i data-lucide="check-circle" class="w-5 h-5 text-slate-500"></i>
             </div>
