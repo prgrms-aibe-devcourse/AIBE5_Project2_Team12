@@ -1,6 +1,5 @@
 package com.generic4.itda.service.recommend;
 
-import com.generic4.itda.domain.matching.Matching;
 import com.generic4.itda.domain.matching.constant.MatchingStatus;
 import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.proposal.Proposal;
@@ -25,7 +24,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -109,10 +107,7 @@ public class RecommendationRunQueryService {
 
         // 해당 후보의 매칭 상태 조회
         MatchingStatus matchingStatus = matchingRepository
-                .findByProposalPositionIdAndResumeIdIn(proposalPosition.getId(), List.of(resume.getId()))
-                .stream()
-                .findFirst()
-                .map(Matching::getStatus)
+                .getLatestMatchingStatus(proposalPosition.getId(), resume.getId())
                 .orElse(null);
 
         return new RecommendationResumeDetailViewModel(
@@ -133,13 +128,7 @@ public class RecommendationRunQueryService {
         if (resumeIds.isEmpty()) {
             return Map.of();
         }
-        return matchingRepository.findByProposalPositionIdAndResumeIdIn(positionId, resumeIds)
-                .stream()
-                .collect(Collectors.toMap(
-                        m -> m.getResume().getId(),
-                        Matching::getStatus,
-                        (a, b) -> a  // 동일 resume에 매칭이 여러 개면 첫 번째 유지
-                ));
+        return matchingRepository.getLatestMatchingStatusMap(positionId, resumeIds);
     }
 
     private RecommendationCandidateItem toCandidateItem(RecommendationResult result, MatchingStatus matchingStatus) {
