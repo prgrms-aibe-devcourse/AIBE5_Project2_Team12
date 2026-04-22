@@ -177,6 +177,135 @@ class MatchingServiceTest {
         verify(matchingRepository, never()).save(any(Matching.class));
     }
 
+    @Test
+    @DisplayName("프리랜서는 본인에게 온 PROPOSED 매칭을 수락할 수 있다")
+    void accept_marksMatchingAcceptedAndPositionFullWhenCapacityReached() {
+        Matching matching = createMatching(
+                MatchingStatus.PROPOSED,
+                ProposalPositionStatus.OPEN,
+                1L
+        );
+
+        given(matchingRepository.findDetailById(401L)).willReturn(Optional.of(matching));
+        given(matchingRepository.countByProposalPosition_IdAndStatusIn(
+                eq(201L),
+                eq(EnumSet.of(MatchingStatus.ACCEPTED, MatchingStatus.IN_PROGRESS))
+        )).willReturn(0L, 1L);
+
+        Matching accepted = matchingService.accept(401L, "freelancer@example.com");
+
+        assertThat(accepted.getStatus()).isEqualTo(MatchingStatus.ACCEPTED);
+        assertThat(accepted.getProposalPosition().getStatus()).isEqualTo(ProposalPositionStatus.FULL);
+    }
+
+    @Test
+    @DisplayName("정원이 남아 있으면 수락 후에도 모집 포지션은 OPEN 상태를 유지한다")
+    void accept_keepsPositionOpenWhenCapacityRemains() {
+        Matching matching = createMatching(
+                MatchingStatus.PROPOSED,
+                ProposalPositionStatus.OPEN,
+                2L
+        );
+
+        given(matchingRepository.findDetailById(401L)).willReturn(Optional.of(matching));
+        given(matchingRepository.countByProposalPosition_IdAndStatusIn(
+                eq(201L),
+                eq(EnumSet.of(MatchingStatus.ACCEPTED, MatchingStatus.IN_PROGRESS))
+        )).willReturn(0L, 1L);
+
+        Matching accepted = matchingService.accept(401L, "freelancer@example.com");
+
+        assertThat(accepted.getStatus()).isEqualTo(MatchingStatus.ACCEPTED);
+        assertThat(accepted.getProposalPosition().getStatus()).isEqualTo(ProposalPositionStatus.OPEN);
+    }
+
+    @Test
+    @DisplayName("이미 정원이 찬 포지션의 매칭은 수락할 수 없다")
+    void accept_throwsWhenCapacityAlreadyFull() {
+        Matching matching = createMatching(
+                MatchingStatus.PROPOSED,
+                ProposalPositionStatus.OPEN,
+                1L
+        );
+
+        given(matchingRepository.findDetailById(401L)).willReturn(Optional.of(matching));
+        given(matchingRepository.countByProposalPosition_IdAndStatusIn(
+                eq(201L),
+                eq(EnumSet.of(MatchingStatus.ACCEPTED, MatchingStatus.IN_PROGRESS))
+        )).willReturn(1L);
+
+        assertThatThrownBy(() -> matchingService.accept(401L, "freelancer@example.com"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("정원이 이미 찬 모집 포지션입니다.");
+
+        assertThat(matching.getStatus()).isEqualTo(MatchingStatus.PROPOSED);
+    }
+
+    @Test
+    @DisplayName("FULL 상태 포지션의 매칭은 수락할 수 없다")
+    void accept_throwsWhenPositionStatusIsFull() {
+        Matching matching = createMatching(
+                MatchingStatus.PROPOSED,
+                ProposalPositionStatus.FULL,
+                1L
+        );
+
+        given(matchingRepository.findDetailById(401L)).willReturn(Optional.of(matching));
+
+        assertThatThrownBy(() -> matchingService.accept(401L, "freelancer@example.com"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("정원이 이미 찬 모집 포지션입니다.");
+    }
+
+    @Test
+    @DisplayName("다른 프리랜서는 매칭 요청을 수락할 수 없다")
+    void accept_throwsWhenFreelancerDoesNotOwnMatching() {
+        Matching matching = createMatching(
+                MatchingStatus.PROPOSED,
+                ProposalPositionStatus.OPEN,
+                1L
+        );
+
+        given(matchingRepository.findDetailById(401L)).willReturn(Optional.of(matching));
+
+        assertThatThrownBy(() -> matchingService.accept(401L, "other@example.com"))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessage("본인에게 온 매칭 요청에만 응답할 수 있습니다.");
+    }
+
+    @Test
+    @DisplayName("프리랜서는 본인에게 온 PROPOSED 매칭을 거절할 수 있다")
+    void reject_marksMatchingRejected() {
+        Matching matching = createMatching(
+                MatchingStatus.PROPOSED,
+                ProposalPositionStatus.OPEN,
+                1L
+        );
+
+        given(matchingRepository.findDetailById(401L)).willReturn(Optional.of(matching));
+
+        Matching rejected = matchingService.reject(401L, "freelancer@example.com");
+
+        assertThat(rejected.getStatus()).isEqualTo(MatchingStatus.REJECTED);
+        assertThat(rejected.getProposalPosition().getStatus()).isEqualTo(ProposalPositionStatus.OPEN);
+    }
+
+    @Test
+    @DisplayName("다른 프리랜서는 매칭 요청을 거절할 수 없다")
+    void reject_throwsWhenFreelancerDoesNotOwnMatching() {
+        Matching matching = createMatching(
+                MatchingStatus.PROPOSED,
+                ProposalPositionStatus.OPEN,
+                1L
+        );
+
+        given(matchingRepository.findDetailById(401L)).willReturn(Optional.of(matching));
+
+        assertThatThrownBy(() -> matchingService.reject(401L, "other@example.com"))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessage("본인에게 온 매칭 요청에만 응답할 수 있습니다.");
+    }
+
     private RecommendationResult createRecommendationResult(
             ProposalStatus proposalStatus,
             ProposalPositionStatus positionStatus,
@@ -253,5 +382,30 @@ class MatchingServiceTest {
         );
         ReflectionTestUtils.setField(recommendationResult, "id", RESULT_ID);
         return recommendationResult;
+    }
+
+    private Matching createMatching(
+            MatchingStatus matchingStatus,
+            ProposalPositionStatus positionStatus,
+            Long headCount
+    ) {
+        RecommendationResult recommendationResult = createRecommendationResult(
+                ProposalStatus.MATCHING,
+                positionStatus,
+                CLIENT_EMAIL
+        );
+
+        ProposalPosition proposalPosition = recommendationResult.getRecommendationRun().getProposalPosition();
+        ReflectionTestUtils.setField(proposalPosition, "headCount", headCount);
+
+        Matching matching = Matching.create(
+                recommendationResult.getResume(),
+                proposalPosition,
+                proposalPosition.getProposal().getMember(),
+                recommendationResult.getResume().getMember()
+        );
+        ReflectionTestUtils.setField(matching, "id", 401L);
+        ReflectionTestUtils.setField(matching, "status", matchingStatus);
+        return matching;
     }
 }

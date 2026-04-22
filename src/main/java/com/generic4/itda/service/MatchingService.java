@@ -26,6 +26,10 @@ public class MatchingService {
             MatchingStatus.ACCEPTED,
             MatchingStatus.IN_PROGRESS
     );
+    private static final EnumSet<MatchingStatus> OCCUPIED_MATCHING_STATUSES = EnumSet.of(
+            MatchingStatus.ACCEPTED,
+            MatchingStatus.IN_PROGRESS
+    );
 
     private final RecommendationResultRepository recommendationResultRepository;
     private final MatchingRepository matchingRepository;
@@ -50,6 +54,28 @@ public class MatchingService {
                 resume.getMember()
         );
         return matchingRepository.save(matching);
+    }
+
+    public Matching accept(Long matchingId, String freelancerEmail) {
+        Matching matching = matchingRepository.findDetailById(matchingId)
+                .orElseThrow(() -> new IllegalArgumentException("매칭 요청을 찾을 수 없습니다. id=" + matchingId));
+
+        validateFreelancerOwnership(matching, freelancerEmail);
+        validatePositionRespondable(matching.getProposalPosition());
+        validateCapacityAvailable(matching.getProposalPosition());
+
+        matching.accept();
+        updatePositionStatusAfterAccept(matching.getProposalPosition());
+        return matching;
+    }
+
+    public Matching reject(Long matchingId, String freelancerEmail) {
+        Matching matching = matchingRepository.findDetailById(matchingId)
+                .orElseThrow(() -> new IllegalArgumentException("매칭 요청을 찾을 수 없습니다. id=" + matchingId));
+
+        validateFreelancerOwnership(matching, freelancerEmail);
+        matching.reject();
+        return matching;
     }
 
     private void validateOwnership(Proposal proposal, String clientEmail) {
@@ -79,6 +105,53 @@ public class MatchingService {
 
         if (hasActiveMatching) {
             throw new IllegalStateException("이미 요청했거나 진행 중인 매칭입니다.");
+        }
+    }
+
+    private void validateFreelancerOwnership(Matching matching, String freelancerEmail) {
+        if (!matching.getFreelancerMember().getEmail().getValue().equals(freelancerEmail)) {
+            throw new AccessDeniedException("본인에게 온 매칭 요청에만 응답할 수 있습니다.");
+        }
+    }
+
+    private void validatePositionRespondable(ProposalPosition proposalPosition) {
+        if (proposalPosition.getStatus() == ProposalPositionStatus.CLOSED) {
+            throw new IllegalStateException("종료된 모집 포지션에는 응답할 수 없습니다.");
+        }
+        if (proposalPosition.getStatus() == ProposalPositionStatus.FULL) {
+            throw new IllegalStateException("정원이 이미 찬 모집 포지션입니다.");
+        }
+    }
+
+    private void validateCapacityAvailable(ProposalPosition proposalPosition) {
+        Long headCount = proposalPosition.getHeadCount();
+        if (headCount == null) {
+            return;
+        }
+
+        long occupiedCount = matchingRepository.countByProposalPosition_IdAndStatusIn(
+                proposalPosition.getId(),
+                OCCUPIED_MATCHING_STATUSES
+        );
+
+        if (occupiedCount >= headCount) {
+            throw new IllegalStateException("정원이 이미 찬 모집 포지션입니다.");
+        }
+    }
+
+    private void updatePositionStatusAfterAccept(ProposalPosition proposalPosition) {
+        Long headCount = proposalPosition.getHeadCount();
+        if (headCount == null) {
+            return;
+        }
+
+        long occupiedCount = matchingRepository.countByProposalPosition_IdAndStatusIn(
+                proposalPosition.getId(),
+                OCCUPIED_MATCHING_STATUSES
+        );
+
+        if (occupiedCount >= headCount) {
+            proposalPosition.changeStatus(ProposalPositionStatus.FULL);
         }
     }
 }
