@@ -77,7 +77,7 @@ class MatchingControllerTest {
                         .param("redirectTo", "/proposals/200/recommendations/results?runId=501"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/proposals/200/recommendations/results?runId=501"))
-                .andExpect(flash().attribute("errorMessage", "이미 요청했거나 진행 중인 매칭입니다."));
+                .andExpect(flash().attribute("errorMessage", "이미 요청했거나 진행 중인 후보입니다."));
     }
 
     @Test
@@ -140,6 +140,20 @@ class MatchingControllerTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/freelancers/dashboard"))
                 .andExpect(flash().attribute("errorMessage", "본인에게 온 매칭 요청에만 응답할 수 있습니다."));
+    }
+
+    @Test
+    @DisplayName("정원이 찬 포지션 수락 실패는 사용자용 메시지로 변환한다")
+    void redirectDashboardWithMappedMessageWhenCapacityFull() throws Exception {
+        given(matchingService.accept(401L, "freelancer@example.com"))
+                .willThrow(new IllegalStateException("정원이 이미 찬 모집 포지션입니다."));
+
+        mockMvc.perform(post("/matchings/401/accept")
+                        .with(authentication(authToken("freelancer@example.com", "프리랜서")))
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/freelancers/dashboard"))
+                .andExpect(flash().attribute("errorMessage", "이미 정원이 마감된 포지션입니다."));
     }
 
     @Test

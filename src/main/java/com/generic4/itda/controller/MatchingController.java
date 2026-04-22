@@ -4,6 +4,7 @@ import com.generic4.itda.domain.matching.Matching;
 import com.generic4.itda.dto.security.ItDaPrincipal;
 import com.generic4.itda.service.MatchingService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -15,6 +16,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
 @RequiredArgsConstructor
+@Slf4j
 public class MatchingController {
 
     private final MatchingService matchingService;
@@ -31,14 +33,10 @@ public class MatchingController {
             redirectAttributes.addFlashAttribute("noticeMessage", "매칭 요청을 보냈습니다.");
             String fallback = "/proposals/" + matching.getProposalPosition().getProposal().getId();
             return redirectTo(redirectTo, fallback);
-        } catch (IllegalArgumentException e) {
-            redirectAttributes.addFlashAttribute("errorMessage", "요청한 추천 결과를 찾을 수 없습니다.");
-            return redirectTo(redirectTo, "/client/dashboard");
-        } catch (AccessDeniedException e) {
-            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
-            return redirectTo(redirectTo, "/client/dashboard");
-        } catch (IllegalStateException e) {
-            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
+        } catch (IllegalArgumentException | AccessDeniedException | IllegalStateException e) {
+            log.warn("매칭 요청 생성 실패. recommendationResultId={}, email={}",
+                    recommendationResultId, principal.getEmail(), e);
+            redirectAttributes.addFlashAttribute("errorMessage", toRequestUserMessage(e));
             return redirectTo(redirectTo, "/client/dashboard");
         }
     }
@@ -55,14 +53,10 @@ public class MatchingController {
             redirectAttributes.addFlashAttribute("noticeMessage", "매칭 요청을 수락했습니다.");
             String fallback = "/proposals/" + matching.getProposalPosition().getProposal().getId();
             return redirectTo(redirectTo, fallback);
-        } catch (IllegalArgumentException e) {
-            redirectAttributes.addFlashAttribute("errorMessage", "응답할 매칭 요청을 찾을 수 없습니다.");
-            return redirectTo(redirectTo, "/freelancers/dashboard");
-        } catch (AccessDeniedException e) {
-            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
-            return redirectTo(redirectTo, "/freelancers/dashboard");
-        } catch (IllegalStateException e) {
-            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
+        } catch (IllegalArgumentException | AccessDeniedException | IllegalStateException e) {
+            log.warn("매칭 요청 수락 실패. matchingId={}, email={}",
+                    matchingId, principal.getEmail(), e);
+            redirectAttributes.addFlashAttribute("errorMessage", toResponseUserMessage(e));
             return redirectTo(redirectTo, "/freelancers/dashboard");
         }
     }
@@ -79,16 +73,55 @@ public class MatchingController {
             redirectAttributes.addFlashAttribute("noticeMessage", "매칭 요청을 거절했습니다.");
             String fallback = "/proposals/" + matching.getProposalPosition().getProposal().getId();
             return redirectTo(redirectTo, fallback);
-        } catch (IllegalArgumentException e) {
-            redirectAttributes.addFlashAttribute("errorMessage", "응답할 매칭 요청을 찾을 수 없습니다.");
-            return redirectTo(redirectTo, "/freelancers/dashboard");
-        } catch (AccessDeniedException e) {
-            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
-            return redirectTo(redirectTo, "/freelancers/dashboard");
-        } catch (IllegalStateException e) {
-            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
+        } catch (IllegalArgumentException | AccessDeniedException | IllegalStateException e) {
+            log.warn("매칭 요청 거절 실패. matchingId={}, email={}",
+                    matchingId, principal.getEmail(), e);
+            redirectAttributes.addFlashAttribute("errorMessage", toResponseUserMessage(e));
             return redirectTo(redirectTo, "/freelancers/dashboard");
         }
+    }
+
+    private static String toRequestUserMessage(RuntimeException e) {
+        if (e instanceof IllegalArgumentException) {
+            return "요청한 추천 결과를 찾을 수 없습니다.";
+        }
+        if (e instanceof AccessDeniedException) {
+            return "본인 제안서에 대해서만 매칭 요청을 보낼 수 있습니다.";
+        }
+        if (e instanceof IllegalStateException) {
+            return switch (e.getMessage()) {
+                case "MATCHING 상태의 제안서에 대해서만 매칭 요청을 보낼 수 있습니다." ->
+                        "추천이 진행 중인 제안서에서만 매칭 요청을 보낼 수 있습니다.";
+                case "OPEN 상태의 모집 포지션에 대해서만 매칭 요청을 보낼 수 있습니다." ->
+                        "모집 중인 포지션에서만 매칭 요청을 보낼 수 있습니다.";
+                case "이미 요청했거나 진행 중인 매칭입니다." ->
+                        "이미 요청했거나 진행 중인 후보입니다.";
+                default -> "현재 상태에서는 매칭 요청을 보낼 수 없습니다.";
+            };
+        }
+        return "매칭 요청 처리 중 문제가 발생했습니다.";
+    }
+
+    private static String toResponseUserMessage(RuntimeException e) {
+        if (e instanceof IllegalArgumentException) {
+            return "응답할 매칭 요청을 찾을 수 없습니다.";
+        }
+        if (e instanceof AccessDeniedException) {
+            return "본인에게 온 매칭 요청에만 응답할 수 있습니다.";
+        }
+        if (e instanceof IllegalStateException) {
+            return switch (e.getMessage()) {
+                case "정원이 이미 찬 모집 포지션입니다." ->
+                        "이미 정원이 마감된 포지션입니다.";
+                case "종료된 모집 포지션에는 응답할 수 없습니다." ->
+                        "모집이 종료된 포지션에는 응답할 수 없습니다.";
+                case "제안 상태의 매칭만 수락할 수 있습니다.",
+                        "제안 상태의 매칭만 거절할 수 있습니다." ->
+                        "이미 처리된 매칭 요청입니다.";
+                default -> "현재 상태에서는 매칭 요청에 응답할 수 없습니다.";
+            };
+        }
+        return "매칭 요청 응답 처리 중 문제가 발생했습니다.";
     }
 
     private String redirectTo(String redirectTo, String fallback) {
