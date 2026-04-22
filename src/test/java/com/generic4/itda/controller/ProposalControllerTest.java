@@ -21,12 +21,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import com.generic4.itda.annotation.ControllerTest;
+import com.generic4.itda.domain.matching.Matching;
 import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
+import com.generic4.itda.domain.proposal.ProposalPosition;
+import com.generic4.itda.domain.proposal.ProposalPositionStatus;
 import com.generic4.itda.domain.proposal.ProposalStatus;
+import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.dto.proposal.ProposalForm;
 import com.generic4.itda.dto.security.ItDaPrincipal;
 import com.generic4.itda.exception.ProposalNotFoundException;
+import java.time.LocalDateTime;
 import org.springframework.security.access.AccessDeniedException;
 import com.generic4.itda.repository.MatchingRepository;
 import com.generic4.itda.repository.MemberRepository;
@@ -712,6 +717,87 @@ class ProposalControllerTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/"))
                 .andExpect(flash().attributeExists("errorMessage"));
+    }
+
+    @Test
+    @DisplayName("프리랜서가 선택된 포지션 컨텍스트로 제안서 상세를 조회하면 해당 포지션을 모델에 담는다")
+    void renderProposalDetailForFreelancerWithSelectedPositionContext() throws Exception {
+        var freelancer = createMember("freelancer@example.com", "hashed-password", "프리랜서", "010-3333-4444");
+
+        Proposal proposal = org.mockito.Mockito.mock(Proposal.class);
+        ProposalPosition backendPosition = org.mockito.Mockito.mock(ProposalPosition.class);
+        ProposalPosition aiPosition = org.mockito.Mockito.mock(ProposalPosition.class);
+        Matching backendMatching = org.mockito.Mockito.mock(Matching.class);
+        Position backendCategory = Position.create("백엔드 개발자");
+        Position aiCategory = Position.create("AI 엔지니어");
+
+        given(proposal.getPositions()).willReturn(List.of(backendPosition, aiPosition));
+        given(proposal.getId()).willReturn(1L);
+        given(proposal.getTitle()).willReturn("핀테크 앱 고도화 프로젝트");
+        given(proposal.getDescription()).willReturn("설명");
+        given(proposal.getStatus()).willReturn(ProposalStatus.MATCHING);
+        given(proposal.getExpectedPeriod()).willReturn(8L);
+        given(proposal.getTotalBudgetMin()).willReturn(3_000_000L);
+        given(proposal.getTotalBudgetMax()).willReturn(4_000_000L);
+        given(proposal.getModifiedAt()).willReturn(LocalDateTime.of(2026, 4, 22, 12, 0));
+
+        given(backendPosition.getId()).willReturn(10L);
+        given(backendPosition.getTitle()).willReturn("API 백엔드 개발자");
+        given(backendPosition.getPosition()).willReturn(backendCategory);
+        given(backendPosition.getStatus()).willReturn(ProposalPositionStatus.OPEN);
+        given(backendPosition.getHeadCount()).willReturn(1L);
+        given(backendPosition.getUnitBudgetMin()).willReturn(3_000_000L);
+        given(backendPosition.getUnitBudgetMax()).willReturn(4_000_000L);
+        given(backendPosition.getExpectedPeriod()).willReturn(4L);
+        given(backendPosition.getSkills()).willReturn(List.of());
+        given(backendPosition.getWorkType()).willReturn(ProposalWorkType.REMOTE);
+        given(backendPosition.getWorkPlace()).willReturn(null);
+        given(backendPosition.getCareerMinYears()).willReturn(null);
+        given(backendPosition.getCareerMaxYears()).willReturn(null);
+
+        given(aiPosition.getId()).willReturn(20L);
+        given(aiPosition.getTitle()).willReturn("모델/프롬프트 AI 엔지니어");
+        given(aiPosition.getPosition()).willReturn(aiCategory);
+        given(aiPosition.getStatus()).willReturn(ProposalPositionStatus.OPEN);
+        given(aiPosition.getHeadCount()).willReturn(1L);
+        given(aiPosition.getUnitBudgetMin()).willReturn(4_000_000L);
+        given(aiPosition.getUnitBudgetMax()).willReturn(5_000_000L);
+        given(aiPosition.getExpectedPeriod()).willReturn(6L);
+        given(aiPosition.getSkills()).willReturn(List.of());
+        given(aiPosition.getWorkType()).willReturn(ProposalWorkType.REMOTE);
+        given(aiPosition.getWorkPlace()).willReturn(null);
+        given(aiPosition.getCareerMinYears()).willReturn(null);
+        given(aiPosition.getCareerMaxYears()).willReturn(null);
+
+        given(backendMatching.getProposalPosition()).willReturn(backendPosition);
+        given(backendMatching.getStatus()).willReturn(com.generic4.itda.domain.matching.constant.MatchingStatus.PROPOSED);
+        given(backendMatching.getId()).willReturn(101L);
+
+        given(proposalService.findOwnedProposal(1L, "freelancer@example.com"))
+                .willThrow(new AccessDeniedException("본인 제안서만 조회할 수 있습니다."));
+        given(proposalService.findProposalForFreelancer(1L, "freelancer@example.com"))
+                .willReturn(proposal);
+        given(matchingRepository.findByProposalPosition_Proposal_IdAndFreelancerMember_Email_Value(
+                1L, "freelancer@example.com"))
+                .willReturn(List.of(backendMatching));
+
+        ItDaPrincipal principal = ItDaPrincipal.from(freelancer);
+
+        mockMvc.perform(get("/proposals/1")
+                        .param("proposalPositionId", "10")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("client/proposalDetail"))
+                .andExpect(model().attribute("viewerRole", "FREELANCER"))
+                .andExpect(model().attribute("selectedProposalPositionId", 10L))
+                .andExpect(model().attributeExists(
+                        "proposal",
+                        "selectedProposalPosition",
+                        "matchingByPositionId",
+                        "proposedPositions"
+                ));
     }
 
     @Test
