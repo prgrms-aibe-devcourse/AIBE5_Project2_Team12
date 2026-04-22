@@ -1,5 +1,6 @@
 package com.generic4.itda.service.recommend.reason;
 
+import com.generic4.itda.config.ai.RecommendationReasonProperties;
 import com.generic4.itda.domain.recommendation.RecommendationResult;
 import com.generic4.itda.domain.recommendation.constant.LlmStatus;
 import java.util.List;
@@ -13,9 +14,14 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class RecommendationReasonProcessor {
 
+    private final RecommendationReasonProperties properties;
     private final RecommendationReasonGenerator recommendationReasonGenerator;
 
     public void process(List<RecommendationResult> results) {
+        if (!properties.isEnabled()) {
+            return;
+        }
+
         if (results == null || results.isEmpty()) {
             return;
         }
