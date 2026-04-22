@@ -6,6 +6,8 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
+import com.generic4.itda.domain.matching.Matching;
+import com.generic4.itda.domain.matching.constant.MatchingStatus;
 import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
@@ -19,14 +21,24 @@ import com.generic4.itda.domain.recommendation.constant.RecommendationRunStatus;
 import com.generic4.itda.domain.recommendation.vo.ReasonFacts;
 import com.generic4.itda.domain.recommendation.vo.HardFilterStat;
 import com.generic4.itda.domain.resume.Resume;
+import com.generic4.itda.domain.resume.CareerItemPayload;
+import com.generic4.itda.domain.resume.CareerPayload;
+import com.generic4.itda.domain.resume.Proficiency;
 import com.generic4.itda.domain.resume.WorkType;
+import com.generic4.itda.domain.resume.ResumeSkill;
+import com.generic4.itda.domain.skill.Skill;
+import com.generic4.itda.dto.recommend.RecommendationResumeDetailViewModel;
 import com.generic4.itda.dto.recommend.RecommendationResultsViewModel;
 import com.generic4.itda.dto.recommend.RecommendationRunStatusViewModel;
+import com.generic4.itda.repository.MatchingRepository;
 import com.generic4.itda.repository.RecommendationResultRepository;
 import com.generic4.itda.repository.RecommendationRunRepository;
 import java.math.BigDecimal;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -47,6 +59,7 @@ class RecommendationRunQueryServiceTest {
 
     private static final Long PROPOSAL_ID = 10L;
     private static final Long RUN_ID = 301L;
+    private static final Long RESULT_ID = 100L;
     private static final Long OWNER_ID = 1L;
     private static final String OWNER_EMAIL = "owner@example.com";
 
@@ -55,6 +68,9 @@ class RecommendationRunQueryServiceTest {
 
     @Mock
     private RecommendationResultRepository recommendationResultRepository;
+
+    @Mock
+    private MatchingRepository matchingRepository;
 
     @InjectMocks
     private RecommendationRunQueryService service;
@@ -366,6 +382,8 @@ class RecommendationRunQueryServiceTest {
         result.markLlmReady("추천 사유입니다.");
 
         given(recommendationResultRepository.findByRunIdWithResume(RUN_ID)).willReturn(List.of(result));
+        given(matchingRepository.findByProposalPositionIdAndResumeIdIn(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyCollection()))
+                .willReturn(List.of());
 
         // when
         RecommendationResultsViewModel view = service.getRecommendationResults(PROPOSAL_ID, RUN_ID, OWNER_EMAIL);
@@ -392,9 +410,206 @@ class RecommendationRunQueryServiceTest {
         assertThat(item.llmReason()).isEqualTo("추천 사유입니다.");
         assertThat(item.llmStatusLabel()).isEqualTo(LlmStatus.READY.getDescription());
         assertThat(item.llmReady()).isTrue();
+        assertThat(item.matchingStatus()).isNull();  // 매칭 없음 → null
 
         verify(recommendationRunRepository).findDetailById(RUN_ID);
         verify(recommendationResultRepository).findByRunIdWithResume(RUN_ID);
+        verify(matchingRepository).findByProposalPositionIdAndResumeIdIn(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyCollection());
+        verifyNoMoreInteractions(recommendationRunRepository);
+        verifyNoMoreInteractions(recommendationResultRepository);
+    }
+
+    @Test
+    @DisplayName("매칭이 PROPOSED 상태면 후보의 matchingStatus는 'PROPOSED'이다")
+    void getRecommendationResults_setsMatchingStatusProposedWhenMatchingExists() {
+        // given
+        RecommendationRun run = createOwnedRunWithStatus(RecommendationRunStatus.COMPUTED);
+        given(recommendationRunRepository.findDetailById(RUN_ID)).willReturn(Optional.of(run));
+
+        long resumeId = 500L;
+
+        Member candidateMember = org.mockito.Mockito.mock(Member.class);
+        given(candidateMember.getNickname()).willReturn("테스터");
+
+        Resume candidateResume = org.mockito.Mockito.mock(Resume.class);
+        given(candidateResume.getId()).willReturn(resumeId);
+        given(candidateResume.getMember()).willReturn(candidateMember);
+        given(candidateResume.getIntroduction()).willReturn(null);
+        given(candidateResume.getPreferredWorkType()).willReturn(WorkType.REMOTE);
+
+        RecommendationResult result = RecommendationResult.create(
+                run, candidateResume, 1,
+                new BigDecimal("0.9000"), new BigDecimal("0.8000"),
+                new ReasonFacts(List.of(), List.of(), 3, List.of())
+        );
+
+        given(recommendationResultRepository.findByRunIdWithResume(RUN_ID)).willReturn(List.of(result));
+
+        Resume matchingResume = org.mockito.Mockito.mock(Resume.class);
+        given(matchingResume.getId()).willReturn(resumeId);
+        Matching mockMatching = org.mockito.Mockito.mock(Matching.class);
+        given(mockMatching.getResume()).willReturn(matchingResume);
+        given(mockMatching.getStatus()).willReturn(MatchingStatus.PROPOSED);
+        given(matchingRepository.findByProposalPositionIdAndResumeIdIn(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyCollection()
+        )).willReturn(List.of(mockMatching));
+
+        // when
+        RecommendationResultsViewModel view = service.getRecommendationResults(PROPOSAL_ID, RUN_ID, OWNER_EMAIL);
+
+        // then
+        assertThat(view.candidates()).hasSize(1);
+        assertThat(view.candidates().get(0).matchingStatus()).isEqualTo("PROPOSED");
+    }
+
+    @Test
+    @DisplayName("매칭이 ACCEPTED 상태면 후보의 matchingStatus는 'ACCEPTED'이다")
+    void getRecommendationResults_setsMatchingStatusAcceptedWhenMatchingIsAccepted() {
+        // given
+        RecommendationRun run = createOwnedRunWithStatus(RecommendationRunStatus.COMPUTED);
+        given(recommendationRunRepository.findDetailById(RUN_ID)).willReturn(Optional.of(run));
+
+        long resumeId = 501L;
+
+        Member candidateMember = org.mockito.Mockito.mock(Member.class);
+        given(candidateMember.getNickname()).willReturn("수락자");
+
+        Resume candidateResume = org.mockito.Mockito.mock(Resume.class);
+        given(candidateResume.getId()).willReturn(resumeId);
+        given(candidateResume.getMember()).willReturn(candidateMember);
+        given(candidateResume.getIntroduction()).willReturn(null);
+        given(candidateResume.getPreferredWorkType()).willReturn(WorkType.SITE);
+
+        RecommendationResult result = RecommendationResult.create(
+                run, candidateResume, 1,
+                new BigDecimal("0.8500"), new BigDecimal("0.7500"),
+                new ReasonFacts(List.of(), List.of(), 2, List.of())
+        );
+
+        given(recommendationResultRepository.findByRunIdWithResume(RUN_ID)).willReturn(List.of(result));
+
+        Resume matchingResume = org.mockito.Mockito.mock(Resume.class);
+        given(matchingResume.getId()).willReturn(resumeId);
+        Matching mockMatching = org.mockito.Mockito.mock(Matching.class);
+        given(mockMatching.getResume()).willReturn(matchingResume);
+        given(mockMatching.getStatus()).willReturn(MatchingStatus.ACCEPTED);
+        given(matchingRepository.findByProposalPositionIdAndResumeIdIn(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyCollection()
+        )).willReturn(List.of(mockMatching));
+
+        // when
+        RecommendationResultsViewModel view = service.getRecommendationResults(PROPOSAL_ID, RUN_ID, OWNER_EMAIL);
+
+        // then
+        assertThat(view.candidates()).hasSize(1);
+        assertThat(view.candidates().get(0).matchingStatus()).isEqualTo("ACCEPTED");
+    }
+
+    @Test
+    @DisplayName("COMPUTED 상태면 추천 후보 이력서 상세 ViewModel을 조립하여 반환한다")
+    void getRecommendationCandidateResume_returnsDetailViewModel() {
+        // given
+        RecommendationRun run = createOwnedRunWithStatus(RecommendationRunStatus.COMPUTED);
+
+        Member candidateMember = org.mockito.Mockito.mock(Member.class);
+        given(candidateMember.getNickname()).willReturn(null);
+        given(candidateMember.getName()).willReturn("홍길동");
+
+        Resume candidateResume = org.mockito.Mockito.mock(Resume.class);
+        given(candidateResume.getMember()).willReturn(candidateMember);
+        given(candidateResume.getIntroduction()).willReturn("소개");
+        given(candidateResume.getPreferredWorkType()).willReturn(WorkType.HYBRID);
+        given(candidateResume.getPortfolioUrl()).willReturn("https://example.com");
+
+        SortedSet<ResumeSkill> skills = new TreeSet<>(Comparator.comparing(rs -> rs.getSkill().getName()));
+        skills.add(ResumeSkill.create(candidateResume, Skill.create("Java", null), Proficiency.ADVANCED));
+        skills.add(ResumeSkill.create(candidateResume, Skill.create("Spring", null), Proficiency.INTERMEDIATE));
+        given(candidateResume.getSkills()).willReturn(skills);
+
+        CareerItemPayload item = new CareerItemPayload();
+        item.setCompanyName("ACME");
+        item.setPosition("Backend");
+        item.setEmploymentType(com.generic4.itda.domain.resume.CareerEmploymentType.FULL_TIME);
+        item.setStartYearMonth("2024-01");
+        item.setEndYearMonth("2025-12");
+        item.setCurrentlyWorking(false);
+        item.setSummary("요약");
+        item.setTechStack(List.of("Java", "Spring"));
+
+        CareerPayload career = new CareerPayload();
+        career.setItems(List.of(item));
+        given(candidateResume.getCareer()).willReturn(career);
+
+        ReasonFacts facts = new ReasonFacts(
+                List.of("Java", "Spring"),
+                List.of(),
+                7,
+                List.of("강점")
+        );
+
+        RecommendationResult result = RecommendationResult.create(
+                run,
+                candidateResume,
+                1,
+                new BigDecimal("0.9000"),
+                new BigDecimal("0.8000"),
+                facts
+        );
+        ReflectionTestUtils.setField(result, "id", RESULT_ID);
+        result.markLlmReady("사유");
+
+        given(recommendationResultRepository.findDetailById(RESULT_ID)).willReturn(Optional.of(result));
+        given(matchingRepository.findByProposalPositionIdAndResumeIdIn(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyCollection()))
+                .willReturn(List.of());
+
+        // when
+        RecommendationResumeDetailViewModel view = service.getRecommendationCandidateResume(PROPOSAL_ID, RESULT_ID, OWNER_EMAIL);
+
+        // then
+        assertThat(view.proposalId()).isEqualTo(PROPOSAL_ID);
+        assertThat(view.runId()).isEqualTo(RUN_ID);
+        assertThat(view.resultId()).isEqualTo(RESULT_ID);
+        assertThat(view.backUrl()).isEqualTo("/proposals/10/recommendations/results?runId=301");
+        assertThat(view.candidate().maskedName()).isEqualTo("홍*동");
+        assertThat(view.candidate().matchingStatus()).isNull();  // 매칭 없음 → null
+        assertThat(view.resumeSkills()).extracting("name").contains("Java", "Spring");
+        assertThat(view.careerItems()).hasSize(1);
+        assertThat(view.careerItems().get(0).companyName()).isEqualTo("ACME");
+
+        verify(recommendationResultRepository).findDetailById(RESULT_ID);
+        verify(matchingRepository).findByProposalPositionIdAndResumeIdIn(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyCollection());
+        verifyNoMoreInteractions(recommendationRunRepository);
+        verifyNoMoreInteractions(recommendationResultRepository);
+    }
+
+    @Test
+    @DisplayName("COMPUTED 상태가 아니면 추천 후보 이력서 상세 조회 시 IllegalStateException이 발생한다")
+    void getRecommendationCandidateResume_throwsWhenNotComputed() {
+        // given
+        RecommendationRun run = createOwnedRunWithStatus(RecommendationRunStatus.RUNNING);
+
+        Resume resume = org.mockito.Mockito.mock(Resume.class);
+
+        RecommendationResult result = RecommendationResult.create(
+                run,
+                resume,
+                1,
+                new BigDecimal("0.5000"),
+                new BigDecimal("0.5000"),
+                new ReasonFacts(List.of(), List.of(), 1, List.of())
+        );
+        ReflectionTestUtils.setField(result, "id", RESULT_ID);
+
+        given(recommendationResultRepository.findDetailById(RESULT_ID)).willReturn(Optional.of(result));
+
+        // when / then
+        assertThatThrownBy(() -> service.getRecommendationCandidateResume(PROPOSAL_ID, RESULT_ID, OWNER_EMAIL))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("추천 결과가 아직 준비되지 않았습니다.");
+
+        verify(recommendationResultRepository).findDetailById(RESULT_ID);
         verifyNoMoreInteractions(recommendationRunRepository);
         verifyNoMoreInteractions(recommendationResultRepository);
     }
