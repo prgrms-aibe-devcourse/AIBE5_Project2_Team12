@@ -82,6 +82,9 @@ class MatchingServiceTest {
 
         assertThat(saved.getId()).isEqualTo(401L);
         assertThat(saved.getStatus()).isEqualTo(MatchingStatus.PROPOSED);
+        assertThat(saved.getRequestedAt()).isNotNull();
+        assertThat(saved.getAcceptedAt()).isNull();
+        assertThat(saved.getRejectedAt()).isNull();
         assertThat(saved.getProposalPosition().getId()).isEqualTo(201L);
         assertThat(saved.getResume().getId()).isEqualTo(301L);
         assertThat(saved.getClientMember().getEmail().getValue()).isEqualTo(CLIENT_EMAIL);
@@ -90,6 +93,7 @@ class MatchingServiceTest {
         ArgumentCaptor<Matching> captor = ArgumentCaptor.forClass(Matching.class);
         verify(matchingRepository).save(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(MatchingStatus.PROPOSED);
+        assertThat(captor.getValue().getRequestedAt()).isNotNull();
     }
 
     @Test
@@ -195,6 +199,8 @@ class MatchingServiceTest {
         Matching accepted = matchingService.accept(401L, "freelancer@example.com");
 
         assertThat(accepted.getStatus()).isEqualTo(MatchingStatus.ACCEPTED);
+        assertThat(accepted.getAcceptedAt()).isNotNull();
+        assertThat(accepted.getRejectedAt()).isNull();
         assertThat(accepted.getProposalPosition().getStatus()).isEqualTo(ProposalPositionStatus.FULL);
     }
 
@@ -216,6 +222,8 @@ class MatchingServiceTest {
         Matching accepted = matchingService.accept(401L, "freelancer@example.com");
 
         assertThat(accepted.getStatus()).isEqualTo(MatchingStatus.ACCEPTED);
+        assertThat(accepted.getAcceptedAt()).isNotNull();
+        assertThat(accepted.getRejectedAt()).isNull();
         assertThat(accepted.getProposalPosition().getStatus()).isEqualTo(ProposalPositionStatus.OPEN);
     }
 
@@ -239,6 +247,8 @@ class MatchingServiceTest {
                 .hasMessage("정원이 이미 찬 모집 포지션입니다.");
 
         assertThat(matching.getStatus()).isEqualTo(MatchingStatus.PROPOSED);
+        assertThat(matching.getAcceptedAt()).isNull();
+        assertThat(matching.getRejectedAt()).isNull();
     }
 
     @Test
@@ -255,6 +265,9 @@ class MatchingServiceTest {
         assertThatThrownBy(() -> matchingService.accept(401L, "freelancer@example.com"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("정원이 이미 찬 모집 포지션입니다.");
+
+        assertThat(matching.getAcceptedAt()).isNull();
+        assertThat(matching.getRejectedAt()).isNull();
     }
 
     @Test
@@ -271,6 +284,9 @@ class MatchingServiceTest {
         assertThatThrownBy(() -> matchingService.accept(401L, "other@example.com"))
                 .isInstanceOf(AccessDeniedException.class)
                 .hasMessage("본인에게 온 매칭 요청에만 응답할 수 있습니다.");
+
+        assertThat(matching.getAcceptedAt()).isNull();
+        assertThat(matching.getRejectedAt()).isNull();
     }
 
     @Test
@@ -287,6 +303,8 @@ class MatchingServiceTest {
         Matching rejected = matchingService.reject(401L, "freelancer@example.com");
 
         assertThat(rejected.getStatus()).isEqualTo(MatchingStatus.REJECTED);
+        assertThat(rejected.getRejectedAt()).isNotNull();
+        assertThat(rejected.getAcceptedAt()).isNull();
         assertThat(rejected.getProposalPosition().getStatus()).isEqualTo(ProposalPositionStatus.OPEN);
     }
 
@@ -304,6 +322,9 @@ class MatchingServiceTest {
         assertThatThrownBy(() -> matchingService.reject(401L, "other@example.com"))
                 .isInstanceOf(AccessDeniedException.class)
                 .hasMessage("본인에게 온 매칭 요청에만 응답할 수 있습니다.");
+
+        assertThat(matching.getAcceptedAt()).isNull();
+        assertThat(matching.getRejectedAt()).isNull();
     }
 
     private RecommendationResult createRecommendationResult(

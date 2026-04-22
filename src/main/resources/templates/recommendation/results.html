@@ -164,10 +164,12 @@
 
                                 <!-- 매칭 없음: 요청 버튼 -->
                                 <th:block th:if="${candidate.matchingStatus == null}">
-                                    <form th:action="@{/recommendation-results/{id}/matchings(id=${candidate.resultId})}"
+                                    <form th:action="@{/recommendation-results/{recommendationResultId}/matchings(recommendationResultId=${candidate.resultId})}"
                                           method="post">
                                         <input type="hidden" name="_csrf" th:value="${_csrf.token}">
                                         <input type="hidden" name="redirectTo"
+                                               th:value="@{/proposals/{proposalId}/recommendations/results(proposalId=${view.proposalId}, runId=${view.runId})}">
+                                        <input type="hidden" name="errorRedirectTo"
                                                th:value="@{/proposals/{proposalId}/recommendations/results(proposalId=${view.proposalId}, runId=${view.runId})}">
                                         <button type="submit"
                                                 class="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700">
@@ -189,7 +191,6 @@
                                      class="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-700">
                                     <i data-lucide="check-circle" class="h-4 w-4"></i>
                                     매칭 진행 중
-                                    <!-- TODO : 매칭 결과 페이지로 연결 하면 좋을듯 합니다-->
                                 </div>
 
                                 <!-- 거절됨 (REJECTED) -->

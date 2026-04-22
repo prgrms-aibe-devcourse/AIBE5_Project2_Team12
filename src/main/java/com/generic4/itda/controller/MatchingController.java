@@ -2,6 +2,7 @@ package com.generic4.itda.controller;
 
 import com.generic4.itda.domain.matching.Matching;
 import com.generic4.itda.dto.security.ItDaPrincipal;
+import com.generic4.itda.service.MatchingQueryService;
 import com.generic4.itda.service.MatchingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -9,6 +10,8 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.util.StringUtils;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -20,24 +23,49 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class MatchingController {
 
     private final MatchingService matchingService;
+    private final MatchingQueryService matchingQueryService;
+
+    @GetMapping("/matchings/{matchingId}")
+    public String detail(
+            @PathVariable Long matchingId,
+            @AuthenticationPrincipal ItDaPrincipal principal,
+            Model model,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            model.addAttribute("view", matchingQueryService.getDetail(matchingId, principal.getEmail()));
+            return "matching/detail";
+        } catch (IllegalArgumentException e) {
+            log.warn("매칭 상세 조회 실패. matchingId={}, email={}",
+                    matchingId, principal.getEmail(), e);
+            redirectAttributes.addFlashAttribute("errorMessage", "존재하지 않는 매칭입니다.");
+            return "redirect:/";
+        } catch (AccessDeniedException e) {
+            log.warn("매칭 상세 접근 거부. matchingId={}, email={}",
+                    matchingId, principal.getEmail(), e);
+            redirectAttributes.addFlashAttribute("errorMessage", "해당 매칭 정보에 접근할 수 없습니다.");
+            return "redirect:/";
+        }
+    }
 
     @PostMapping("/recommendation-results/{recommendationResultId}/matchings")
     public String request(
             @PathVariable Long recommendationResultId,
             @RequestParam(name = "redirectTo", required = false) String redirectTo,
+            @RequestParam(name = "errorRedirectTo", required = false) String errorRedirectTo,
             @AuthenticationPrincipal ItDaPrincipal principal,
             RedirectAttributes redirectAttributes
     ) {
         try {
             Matching matching = matchingService.request(recommendationResultId, principal.getEmail());
             redirectAttributes.addFlashAttribute("noticeMessage", "매칭 요청을 보냈습니다.");
-            String fallback = "/proposals/" + matching.getProposalPosition().getProposal().getId();
+            String fallback = "/matchings/" + matching.getId();
             return redirectTo(redirectTo, fallback);
         } catch (IllegalArgumentException | AccessDeniedException | IllegalStateException e) {
             log.warn("매칭 요청 생성 실패. recommendationResultId={}, email={}",
                     recommendationResultId, principal.getEmail(), e);
             redirectAttributes.addFlashAttribute("errorMessage", toRequestUserMessage(e));
-            return redirectTo(redirectTo, "/client/dashboard");
+            return redirectTo(errorRedirectTo, "/client/dashboard");
         }
     }
 
@@ -45,19 +73,20 @@ public class MatchingController {
     public String accept(
             @PathVariable Long matchingId,
             @RequestParam(name = "redirectTo", required = false) String redirectTo,
+            @RequestParam(name = "errorRedirectTo", required = false) String errorRedirectTo,
             @AuthenticationPrincipal ItDaPrincipal principal,
             RedirectAttributes redirectAttributes
     ) {
         try {
             Matching matching = matchingService.accept(matchingId, principal.getEmail());
             redirectAttributes.addFlashAttribute("noticeMessage", "매칭 요청을 수락했습니다.");
-            String fallback = "/proposals/" + matching.getProposalPosition().getProposal().getId();
+            String fallback = "/matchings/" + matching.getId();
             return redirectTo(redirectTo, fallback);
         } catch (IllegalArgumentException | AccessDeniedException | IllegalStateException e) {
             log.warn("매칭 요청 수락 실패. matchingId={}, email={}",
                     matchingId, principal.getEmail(), e);
             redirectAttributes.addFlashAttribute("errorMessage", toResponseUserMessage(e));
-            return redirectTo(redirectTo, "/freelancers/dashboard");
+            return redirectTo(errorRedirectTo, "/freelancers/dashboard");
         }
     }
 
@@ -65,19 +94,20 @@ public class MatchingController {
     public String reject(
             @PathVariable Long matchingId,
             @RequestParam(name = "redirectTo", required = false) String redirectTo,
+            @RequestParam(name = "errorRedirectTo", required = false) String errorRedirectTo,
             @AuthenticationPrincipal ItDaPrincipal principal,
             RedirectAttributes redirectAttributes
     ) {
         try {
             Matching matching = matchingService.reject(matchingId, principal.getEmail());
             redirectAttributes.addFlashAttribute("noticeMessage", "매칭 요청을 거절했습니다.");
-            String fallback = "/proposals/" + matching.getProposalPosition().getProposal().getId();
+            String fallback = "/matchings/" + matching.getId();
             return redirectTo(redirectTo, fallback);
         } catch (IllegalArgumentException | AccessDeniedException | IllegalStateException e) {
             log.warn("매칭 요청 거절 실패. matchingId={}, email={}",
                     matchingId, principal.getEmail(), e);
             redirectAttributes.addFlashAttribute("errorMessage", toResponseUserMessage(e));
-            return redirectTo(redirectTo, "/freelancers/dashboard");
+            return redirectTo(errorRedirectTo, "/freelancers/dashboard");
         }
     }
 

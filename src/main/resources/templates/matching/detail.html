@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/base}">
+<head>
+    <title th:text="${view.header.proposalTitle + ' | 매칭 결과'}">매칭 결과 | IT-da</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <main class="min-h-screen bg-slate-50"
+          th:with="statusName=${view.status.name()},
+                   proposed=${statusName == 'PROPOSED'},
+                   accepted=${statusName == 'ACCEPTED'},
+                   rejected=${statusName == 'REJECTED'},
+                   inProgress=${statusName == 'IN_PROGRESS'},
+                   completed=${statusName == 'COMPLETED'},
+                   canceled=${statusName == 'CANCELED'}">
+
+        <div class="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur">
+            <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4">
+
+                <div class="flex items-center gap-4">
+                    <a th:href="${view.viewerRole == 'CLIENT' ? '/client/dashboard' : '/freelancers/dashboard'}"
+                       onclick="if (window.history.length > 1) { history.back(); return false; }"
+                       class="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700">
+                        <i data-lucide="arrow-left" class="h-4 w-4"></i>
+                    </a>
+
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">MATCHING DETAIL</p>
+                        <div class="mt-1 flex flex-wrap items-center gap-2">
+                            <h1 class="text-xl font-black tracking-tight text-slate-950 sm:text-2xl"
+                                th:text="${view.header.proposalTitle}">핀테크 앱 고도화 프로젝트</h1>
+                            <span th:classappend="${proposed} ? 'border-blue-200 bg-blue-50 text-blue-700' :
+                                                  (${accepted} ? 'border-emerald-200 bg-emerald-50 text-emerald-700' :
+                                                  (${rejected} ? 'border-rose-200 bg-rose-50 text-rose-700' :
+                                                  (${inProgress} ? 'border-indigo-200 bg-indigo-50 text-indigo-700' :
+                                                  (${completed} ? 'border-slate-300 bg-slate-100 text-slate-700' :
+                                                                  'border-amber-200 bg-amber-50 text-amber-700'))))"
+                                  class="inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-bold">
+                                <span th:text="${view.header.statusLabel}">매칭 요청</span>
+                            </span>
+                        </div>
+                        <p class="mt-1 text-sm text-slate-500"
+                           th:text="${view.header.positionTitle + ' · ' + view.header.counterpartDisplayName}">
+                            프론트엔드 개발자 · 김*수 프리랜서
+                        </p>
+                    </div>
+                </div>
+
+                <a th:href="@{/proposals/{id}(id=${view.project.proposalId})}"
+                   class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
+                    <i data-lucide="file-text" class="h-4 w-4"></i>
+                    제안서 보기
+                </a>
+            </div>
+        </div>
+
+        <div class="mx-auto max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
+            <section th:if="${errorMessage != null}"
+                     class="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-600">
+                <p th:text="${errorMessage}">오류 메시지</p>
+            </section>
+            <section th:if="${noticeMessage != null}"
+                     class="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                <p th:text="${noticeMessage}">안내 메시지</p>
+            </section>
+
+            <div class="grid gap-6 xl:grid-cols-[minmax(0,1.8fr)_minmax(320px,0.95fr)]">
+
+                <section class="space-y-6">
+
+                    <section class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/60 lg:p-8">
+                        <div class="flex items-center justify-between gap-4">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">MATCHING FLOW</p>
+                                <h2 class="mt-2 text-lg font-bold tracking-tight text-slate-900">매칭 프로세스 현황</h2>
+                            </div>
+                            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500"
+                                  th:text="${'Matching #' + view.matchingId}">Matching #1</span>
+                        </div>
+
+                        <div class="mt-8 grid gap-4 md:grid-cols-4">
+                            <div class="relative">
+                                <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-white ring-4 ring-blue-100">
+                                    <i data-lucide="send" class="h-5 w-5"></i>
+                                </div>
+                                <div th:classappend="${rejected} ? 'bg-rose-300' :
+                                                     (${canceled} ? 'bg-amber-300' :
+                                                     (${proposed} ? 'bg-blue-400' : 'bg-emerald-400'))"
+                                     class="absolute left-1/2 top-6 hidden h-0.5 w-full md:block"></div>
+                                <div class="mt-4 text-center">
+                                    <p class="text-sm font-bold text-slate-800">매칭 요청</p>
+                                    <p class="mt-1 text-xs text-slate-400"
+                                       th:text="${#temporals.format(view.summary.requestedAt, 'MM.dd HH:mm')}">04.22 14:30</p>
+                                </div>
+                            </div>
+
+                            <div class="relative">
+                                <div th:classappend="${accepted or inProgress or completed} ? 'bg-emerald-500 text-white ring-4 ring-emerald-100' :
+                                                      (${rejected} ? 'bg-rose-500 text-white ring-4 ring-rose-100' :
+                                                      (${canceled} ? 'bg-amber-500 text-white ring-4 ring-amber-100' : 'bg-white text-slate-300 border border-slate-200'))"
+                                     class="mx-auto flex h-12 w-12 items-center justify-center rounded-full">
+                                    <i th:if="${accepted or inProgress or completed}" data-lucide="check" class="h-5 w-5"></i>
+                                    <i th:if="${rejected}" data-lucide="x" class="h-5 w-5"></i>
+                                    <i th:if="${canceled}" data-lucide="ban" class="h-5 w-5"></i>
+                                    <i th:if="${proposed}" data-lucide="clock-3" class="h-5 w-5"></i>
+                                </div>
+                                <div th:classappend="${inProgress or completed} ? 'bg-indigo-300' : 'bg-slate-200'"
+                                     class="absolute left-1/2 top-6 hidden h-0.5 w-full md:block"></div>
+                                <div class="mt-4 text-center">
+                                    <p class="text-sm font-bold"
+                                       th:classappend="${proposed} ? 'text-slate-400' : 'text-slate-800'"
+                                       th:text="${rejected ? '요청 거절' : (canceled ? '매칭 취소' : '매칭 수락')}">매칭 수락</p>
+                                    <p class="mt-1 text-xs text-slate-400"
+                                       th:text="${view.summary.respondedAt != null ? #temporals.format(view.summary.respondedAt, 'MM.dd HH:mm') : (proposed ? '응답 대기 중' : '일시 미기록')}">
+                                        응답 대기 중
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="relative">
+                                <div th:classappend="${inProgress or completed} ? 'bg-indigo-500 text-white ring-4 ring-indigo-100' : 'bg-white text-slate-300 border border-slate-200'"
+                                     class="mx-auto flex h-12 w-12 items-center justify-center rounded-full">
+                                    <i data-lucide="handshake" class="h-5 w-5"></i>
+                                </div>
+                                <div th:classappend="${completed} ? 'bg-slate-400' : 'bg-slate-200'"
+                                     class="absolute left-1/2 top-6 hidden h-0.5 w-full md:block"></div>
+                                <div class="mt-4 text-center">
+                                    <p class="text-sm font-bold"
+                                       th:classappend="${inProgress or completed} ? 'text-slate-800' : 'text-slate-400'">계약 진행</p>
+                                    <p class="mt-1 text-xs text-slate-400"
+                                       th:text="${inProgress ? '진행 중' : (completed ? '진행 완료' : '다음 이슈 예정')}">다음 이슈 예정</p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div th:classappend="${completed} ? 'bg-slate-700 text-white ring-4 ring-slate-200' : 'bg-white text-slate-300 border border-slate-200'"
+                                     class="mx-auto flex h-12 w-12 items-center justify-center rounded-full">
+                                    <i data-lucide="flag" class="h-5 w-5"></i>
+                                </div>
+                                <div class="mt-4 text-center">
+                                    <p class="text-sm font-bold"
+                                       th:classappend="${completed} ? 'text-slate-800' : 'text-slate-400'">프로젝트 완료</p>
+                                    <p class="mt-1 text-xs text-slate-400"
+                                       th:text="${completed ? '완료됨' : '다음 이슈 예정'}">다음 이슈 예정</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section th:classappend="${proposed} ? 'border-blue-200 bg-blue-50/60' :
+                                              (${accepted} ? 'border-emerald-200 bg-emerald-50/60' :
+                                              (${rejected} ? 'border-rose-200 bg-rose-50/60' :
+                                              (${inProgress} ? 'border-indigo-200 bg-indigo-50/60' :
+                                              (${completed} ? 'border-slate-300 bg-slate-100/70' :
+                                                              'border-amber-200 bg-amber-50/60'))))"
+                             class="rounded-[32px] border p-6 shadow-sm shadow-slate-200/60 lg:p-8">
+                        <div class="flex flex-wrap items-start justify-between gap-4">
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <i th:if="${proposed}" data-lucide="send" class="h-5 w-5 text-blue-500"></i>
+                                    <i th:if="${accepted}" data-lucide="circle-check-big" class="h-5 w-5 text-emerald-500"></i>
+                                    <i th:if="${rejected}" data-lucide="circle-x" class="h-5 w-5 text-rose-500"></i>
+                                    <i th:if="${inProgress}" data-lucide="handshake" class="h-5 w-5 text-indigo-500"></i>
+                                    <i th:if="${completed}" data-lucide="flag" class="h-5 w-5 text-slate-600"></i>
+                                    <i th:if="${canceled}" data-lucide="ban" class="h-5 w-5 text-amber-500"></i>
+                                    <h3 class="text-xl font-bold tracking-tight text-slate-900"
+                                        th:text="${view.summary.headline}">프리랜서 응답을 기다리는 중입니다.</h3>
+                                </div>
+                                <p class="mt-3 text-sm leading-relaxed text-slate-600"
+                                   th:text="${view.summary.helperMessage}">
+                                    프리랜서가 요청을 확인하고 응답하면 다음 단계로 넘어갈 수 있습니다.
+                                </p>
+                            </div>
+
+                            <span th:classappend="${view.contactVisible} ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-500'"
+                                  class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-bold">
+                                <i data-lucide="phone" class="h-3.5 w-3.5"></i>
+                                <span th:text="${view.contactVisible ? '연락처 공개됨' : '연락처 비공개'}">연락처 공개됨</span>
+                            </span>
+                        </div>
+
+                        <div class="mt-6 grid gap-4 md:grid-cols-3">
+                            <div class="rounded-2xl border border-white/80 bg-white/90 px-5 py-4">
+                                <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">요청 일시</p>
+                                <p class="mt-2 text-lg font-bold tracking-tight text-slate-900"
+                                   th:text="${#temporals.format(view.summary.requestedAt, 'yyyy.MM.dd HH:mm')}">
+                                    2026.04.22 14:30
+                                </p>
+                            </div>
+
+                            <div class="rounded-2xl border border-white/80 bg-white/90 px-5 py-4">
+                                <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">응답 일시</p>
+                                <p class="mt-2 text-lg font-bold tracking-tight text-slate-900"
+                                   th:text="${view.summary.respondedAt != null ? #temporals.format(view.summary.respondedAt, 'yyyy.MM.dd HH:mm') : (proposed ? '응답 대기 중' : '일시 미기록')}">
+                                    응답 대기 중
+                                </p>
+                            </div>
+
+                            <div class="rounded-2xl border border-white/80 bg-white/90 px-5 py-4">
+                                <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">현재 상태</p>
+                                <p class="mt-2 text-lg font-bold tracking-tight text-slate-900"
+                                   th:text="${view.header.statusLabel}">매칭 요청</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 rounded-2xl border border-white/80 bg-white/90 px-5 py-4">
+                            <div class="flex items-start gap-3">
+                                <i data-lucide="info" class="mt-0.5 h-4 w-4 shrink-0 text-slate-400"></i>
+                                <p class="text-sm leading-relaxed text-slate-600"
+                                   th:text="${view.summary.contactGuideMessage}">
+                                    매칭이 수락되기 전까지는 연락처가 공개되지 않습니다.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/60 lg:p-8">
+                        <div class="flex items-center justify-between gap-4">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">TIMELINE</p>
+                                <h3 class="mt-2 text-xl font-bold tracking-tight text-slate-900">진행 이력</h3>
+                            </div>
+                            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500"
+                                  th:text="${#lists.size(view.timeline) + ' events'}">2 events</span>
+                        </div>
+
+                        <div class="mt-8 space-y-5">
+                            <article th:each="item, itemStat : ${view.timeline}" class="relative pl-8">
+                                <div class="absolute left-2 top-2 h-full w-px bg-slate-200"
+                                     th:if="${!itemStat.last}"></div>
+                                <div th:classappend="${itemStat.index == 0} ? 'bg-blue-500 ring-blue-100' :
+                                                      (${rejected} ? 'bg-rose-500 ring-rose-100' :
+                                                      (${canceled} ? 'bg-amber-500 ring-amber-100' :
+                                                      (${inProgress} ? 'bg-indigo-500 ring-indigo-100' :
+                                                      (${completed} ? 'bg-slate-600 ring-slate-200' :
+                                                                      'bg-emerald-500 ring-emerald-100'))))"
+                                     class="absolute left-0 top-1.5 h-4 w-4 rounded-full ring-4"></div>
+
+                                <div class="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <p class="text-sm font-bold text-slate-900"
+                                           th:text="${item.actorLabel + ' · ' + item.actionLabel}">
+                                            클라이언트 · 매칭 요청 전송
+                                        </p>
+                                        <span class="text-xs text-slate-400"
+                                              th:text="${item.occurredAt != null ? #temporals.format(item.occurredAt, 'yyyy.MM.dd HH:mm') : '일시 미기록'}">
+                                            2026.04.22 14:30
+                                        </span>
+                                    </div>
+                                    <p class="mt-2 text-sm leading-relaxed text-slate-600"
+                                       th:text="${item.description}">
+                                        프리랜서에게 매칭 요청을 보냈습니다.
+                                    </p>
+                                </div>
+                            </article>
+                        </div>
+                    </section>
+                </section>
+
+                <aside class="space-y-6">
+                    <section class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/60">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">ACTIONS</p>
+                            <h3 class="mt-2 text-lg font-bold tracking-tight text-slate-900">현재 가능한 작업</h3>
+                        </div>
+
+                        <div th:if="${proposed and view.viewerRole == 'FREELANCER'}" class="mt-6 space-y-3">
+                            <p class="text-sm leading-relaxed text-slate-600">
+                                요청 내용을 확인한 뒤 이 화면에서 바로 수락하거나 거절할 수 있습니다.
+                            </p>
+
+                            <form th:action="@{/matchings/{id}/accept(id=${view.matchingId})}" method="post">
+                                <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+                                <input type="hidden" name="redirectTo" th:value="@{/matchings/{id}(id=${view.matchingId})}">
+                                <input type="hidden" name="errorRedirectTo" th:value="@{/matchings/{id}(id=${view.matchingId})}">
+                                <button type="submit"
+                                        class="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-700">
+                                    <i data-lucide="check" class="h-4 w-4"></i>
+                                    매칭 요청 수락
+                                </button>
+                            </form>
+
+                            <form th:action="@{/matchings/{id}/reject(id=${view.matchingId})}" method="post">
+                                <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+                                <input type="hidden" name="redirectTo" th:value="@{/matchings/{id}(id=${view.matchingId})}">
+                                <input type="hidden" name="errorRedirectTo" th:value="@{/matchings/{id}(id=${view.matchingId})}">
+                                <button type="submit"
+                                        class="flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-white px-4 py-3 text-sm font-bold text-rose-600 transition hover:bg-rose-50">
+                                    <i data-lucide="x" class="h-4 w-4"></i>
+                                    매칭 요청 거절
+                                </button>
+                            </form>
+                        </div>
+
+                        <div th:if="${proposed and view.viewerRole == 'CLIENT'}"
+                             class="mt-6 rounded-2xl border border-blue-100 bg-blue-50 px-5 py-4">
+                            <p class="text-sm font-bold text-blue-700">프리랜서 응답 대기 중</p>
+                            <p class="mt-2 text-sm leading-relaxed text-blue-600">
+                                상대방이 요청을 확인하는 중입니다. 응답이 오면 이 화면에서 상태를 바로 확인할 수 있습니다.
+                            </p>
+                        </div>
+
+                        <div th:if="${accepted}"
+                             class="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50 px-5 py-4">
+                            <p class="text-sm font-bold text-emerald-700">매칭이 수락되었습니다</p>
+                            <p class="mt-2 text-sm leading-relaxed text-emerald-600">
+                                연락처가 공개된 상태입니다. 제안서 내용을 다시 확인하고 협의를 이어가세요.
+                            </p>
+                        </div>
+
+                        <div th:if="${inProgress}"
+                             class="mt-6 rounded-2xl border border-indigo-100 bg-indigo-50 px-5 py-4">
+                            <p class="text-sm font-bold text-indigo-700">프로젝트가 진행 중입니다</p>
+                            <p class="mt-2 text-sm leading-relaxed text-indigo-600">
+                                연락처와 제안서 정보를 확인하며 협업을 이어가세요. 진행 상태 변경 액션은 후속 이슈에서 제공됩니다.
+                            </p>
+                        </div>
+
+                        <div th:if="${completed}"
+                             class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
+                            <p class="text-sm font-bold text-slate-700">프로젝트가 완료되었습니다</p>
+                            <p class="mt-2 text-sm leading-relaxed text-slate-600">
+                                완료된 매칭입니다. 프로젝트 정보와 진행 이력을 확인할 수 있습니다.
+                            </p>
+                        </div>
+
+                        <div th:if="${canceled}"
+                             class="mt-6 rounded-2xl border border-amber-100 bg-amber-50 px-5 py-4">
+                            <p class="text-sm font-bold text-amber-700">매칭이 취소되었습니다</p>
+                            <p class="mt-2 text-sm leading-relaxed text-amber-600">
+                                취소된 매칭입니다. 필요한 경우 다른 추천 후보를 검토하거나 제안서 상태를 확인해보세요.
+                            </p>
+                        </div>
+
+                        <div th:if="${rejected}"
+                             class="mt-6 rounded-2xl border border-rose-100 bg-rose-50 px-5 py-4">
+                            <p class="text-sm font-bold text-rose-700">매칭 요청이 종료되었습니다</p>
+                            <p class="mt-2 text-sm leading-relaxed text-rose-600">
+                                거절된 요청입니다. 다른 추천 후보를 검토하거나 제안서 상태를 다시 확인해보세요.
+                            </p>
+                        </div>
+
+                        <a th:href="@{/proposals/{id}(id=${view.project.proposalId})}"
+                           class="mt-4 inline-flex items-center gap-2 text-sm font-bold text-slate-500 transition hover:text-slate-700">
+                            <i data-lucide="arrow-right" class="h-4 w-4"></i>
+                            제안서 상세로 이동
+                        </a>
+                    </section>
+
+                    <section class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/60">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">CONTACT</p>
+                                <h3 class="mt-2 text-lg font-bold tracking-tight text-slate-900">연락처 정보</h3>
+                            </div>
+                            <span th:classappend="${view.contactVisible} ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'"
+                                  class="rounded-full px-3 py-1 text-[11px] font-bold">
+                                <span th:text="${view.contactVisible ? '공개됨' : '비공개'}">공개됨</span>
+                            </span>
+                        </div>
+
+                        <div th:if="${view.contactVisible}" class="mt-6 space-y-4">
+                            <div class="rounded-2xl border border-blue-100 bg-blue-50/70 px-5 py-4">
+                                <p class="text-xs font-semibold uppercase tracking-widest text-slate-400"
+                                   th:text="${view.contacts.client.roleLabel}">클라이언트</p>
+                                <p class="mt-2 text-lg font-bold tracking-tight text-slate-900"
+                                   th:text="${view.contacts.client.displayName}">김클라이언트</p>
+                                <div class="mt-4 space-y-2 text-sm text-slate-600">
+                                    <p th:text="${view.contacts.client.email}">client@example.com</p>
+                                    <p th:text="${view.contacts.client.phone}">010-1234-5678</p>
+                                </div>
+                            </div>
+
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
+                                <p class="text-xs font-semibold uppercase tracking-widest text-slate-400"
+                                   th:text="${view.contacts.freelancer.roleLabel}">프리랜서</p>
+                                <p class="mt-2 text-lg font-bold tracking-tight text-slate-900"
+                                   th:text="${view.contacts.freelancer.displayName}">김프리랜서</p>
+                                <div class="mt-4 space-y-2 text-sm text-slate-600">
+                                    <p th:text="${view.contacts.freelancer.email}">freelancer@example.com</p>
+                                    <p th:text="${view.contacts.freelancer.phone}">010-9876-5432</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div th:unless="${view.contactVisible}"
+                             class="mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center">
+                            <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-slate-300 shadow-sm shadow-slate-200/50">
+                                <i data-lucide="phone-off" class="h-5 w-5"></i>
+                            </div>
+                            <p class="mt-4 text-sm font-bold text-slate-700">연락처가 아직 공개되지 않았습니다</p>
+                            <p class="mt-2 text-sm leading-relaxed text-slate-500">
+                                프리랜서가 요청을 수락하면 양측 연락처를 이 영역에서 바로 확인할 수 있습니다.
+                            </p>
+                        </div>
+                    </section>
+
+                    <section class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/60">
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">PROJECT</p>
+                                <h3 class="mt-2 text-lg font-bold tracking-tight text-slate-900">프로젝트 요약</h3>
+                            </div>
+                            <a th:href="@{/proposals/{id}(id=${view.project.proposalId})}"
+                               class="inline-flex items-center gap-1.5 text-sm font-bold text-slate-500 transition hover:text-slate-700">
+                                <i data-lucide="eye" class="h-4 w-4"></i>
+                                제안서 보기
+                            </a>
+                        </div>
+
+                        <div class="mt-6 space-y-5">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">제목</p>
+                                <p class="mt-2 text-lg font-bold tracking-tight text-slate-900"
+                                   th:text="${view.project.proposalTitle}">온라인 쇼핑몰 모바일 앱 개발</p>
+                            </div>
+
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">설명</p>
+                                <p class="mt-2 text-sm leading-relaxed text-slate-600"
+                                   th:text="${#strings.isEmpty(view.project.description) ? '제안서 설명이 없습니다.' : view.project.description}">
+                                    프로젝트 설명입니다.
+                                </p>
+                            </div>
+
+                            <div class="grid gap-4 sm:grid-cols-2">
+                                <div class="rounded-2xl bg-slate-50 px-4 py-4">
+                                    <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">포지션</p>
+                                    <p class="mt-2 text-sm font-bold text-slate-900"
+                                       th:text="${view.project.positionTitle}">프론트엔드 개발자</p>
+                                    <p class="mt-1 text-xs text-slate-500"
+                                       th:text="${view.project.positionCategory}">Frontend Developer</p>
+                                </div>
+                                <div class="rounded-2xl bg-slate-50 px-4 py-4">
+                                    <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">근무 형태</p>
+                                    <p class="mt-2 text-sm font-bold text-slate-900"
+                                       th:text="${view.project.workTypeLabel}">원격</p>
+                                </div>
+                                <div class="rounded-2xl bg-slate-50 px-4 py-4">
+                                    <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">예산</p>
+                                    <p class="mt-2 text-sm font-bold text-slate-900"
+                                       th:text="${view.project.budgetText}">3,000,000원 ~ 4,000,000원</p>
+                                </div>
+                                <div class="rounded-2xl bg-slate-50 px-4 py-4">
+                                    <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">예상 기간</p>
+                                    <p class="mt-2 text-sm font-bold text-slate-900"
+                                       th:text="${view.project.expectedPeriodText}">8주</p>
+                                </div>
+                            </div>
+
+                            <div th:if="${!#lists.isEmpty(view.project.essentialSkills)}">
+                                <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">필수 기술</p>
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                    <span th:each="skill : ${view.project.essentialSkills}"
+                                          class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600"
+                                          th:text="${skill}">React</span>
+                                </div>
+                            </div>
+
+                            <div th:if="${!#lists.isEmpty(view.project.preferredSkills)}">
+                                <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">우대 기술</p>
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                    <span th:each="skill : ${view.project.preferredSkills}"
+                                          class="rounded-xl border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700"
+                                          th:text="${skill}">Tailwind</span>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </aside>
+            </div>
+        </div>
+    </main>
+</div>
+</body>
+</html>

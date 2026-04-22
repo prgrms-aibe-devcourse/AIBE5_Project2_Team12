@@ -5,22 +5,35 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import com.generic4.itda.annotation.ControllerTest;
 import com.generic4.itda.domain.matching.Matching;
+import com.generic4.itda.domain.matching.constant.MatchingStatus;
 import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
 import com.generic4.itda.domain.proposal.ProposalWorkType;
+import com.generic4.itda.dto.matching.MatchingDetailContactViewModel;
+import com.generic4.itda.dto.matching.MatchingDetailHeaderViewModel;
+import com.generic4.itda.dto.matching.MatchingDetailProjectSummaryViewModel;
+import com.generic4.itda.dto.matching.MatchingDetailSummaryViewModel;
+import com.generic4.itda.dto.matching.MatchingDetailViewModel;
+import com.generic4.itda.dto.matching.MatchingParticipantContactViewModel;
+import com.generic4.itda.dto.matching.MatchingTimelineItemViewModel;
 import com.generic4.itda.dto.security.ItDaPrincipal;
 import com.generic4.itda.repository.MemberRepository;
+import com.generic4.itda.service.MatchingQueryService;
 import com.generic4.itda.service.MatchingService;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -42,7 +55,51 @@ class MatchingControllerTest {
     private MatchingService matchingService;
 
     @MockitoBean
+    private MatchingQueryService matchingQueryService;
+
+    @MockitoBean
     private MemberRepository memberRepository;
+
+    @Test
+    @DisplayName("매칭 상세 페이지를 렌더링한다")
+    void renderMatchingDetailPage() throws Exception {
+        given(matchingQueryService.getDetail(401L, "client@example.com"))
+                .willReturn(createMatchingDetailView());
+
+        mockMvc.perform(get("/matchings/401")
+                        .with(authentication(authToken("client@example.com", "클라이언트"))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("matching/detail"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("매칭 프로세스 현황")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("연락처 정보")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("프로젝트 요약")));
+    }
+
+    @Test
+    @DisplayName("없는 매칭 상세를 조회하면 홈으로 이동하며 오류 메시지를 남긴다")
+    void redirectHomeWhenMatchingDetailNotFound() throws Exception {
+        given(matchingQueryService.getDetail(999L, "client@example.com"))
+                .willThrow(new IllegalArgumentException("매칭 정보를 찾을 수 없습니다. id=999"));
+
+        mockMvc.perform(get("/matchings/999")
+                        .with(authentication(authToken("client@example.com", "클라이언트"))))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/"))
+                .andExpect(flash().attribute("errorMessage", "존재하지 않는 매칭입니다."));
+    }
+
+    @Test
+    @DisplayName("권한 없는 매칭 상세를 조회하면 홈으로 이동하며 오류 메시지를 남긴다")
+    void redirectHomeWhenMatchingDetailAccessDenied() throws Exception {
+        given(matchingQueryService.getDetail(401L, "client@example.com"))
+                .willThrow(new AccessDeniedException("해당 매칭 정보에 접근할 수 없습니다."));
+
+        mockMvc.perform(get("/matchings/401")
+                        .with(authentication(authToken("client@example.com", "클라이언트"))))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/"))
+                .andExpect(flash().attribute("errorMessage", "해당 매칭 정보에 접근할 수 없습니다."));
+    }
 
     @Test
     @DisplayName("클라이언트가 추천 결과로 매칭 요청을 보내면 지정한 화면으로 돌아간다")
@@ -66,6 +123,20 @@ class MatchingControllerTest {
     }
 
     @Test
+    @DisplayName("클라이언트가 추천 결과로 매칭 요청을 보내면 기본적으로 매칭 상세로 이동한다")
+    void requestMatchingAndRedirectToMatchingDetailByDefault() throws Exception {
+        Matching matching = createMatching();
+        given(matchingService.request(101L, "client@example.com")).willReturn(matching);
+
+        mockMvc.perform(post("/recommendation-results/101/matchings")
+                        .with(authentication(authToken("client@example.com", "클라이언트")))
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/matchings/401"))
+                .andExpect(flash().attribute("noticeMessage", "매칭 요청을 보냈습니다."));
+    }
+
+    @Test
     @DisplayName("매칭 요청 생성에 실패하면 안전한 경로로 리다이렉트하며 오류 메시지를 남긴다")
     void redirectWithErrorWhenRequestMatchingFails() throws Exception {
         given(matchingService.request(101L, "client@example.com"))
@@ -74,15 +145,15 @@ class MatchingControllerTest {
         mockMvc.perform(post("/recommendation-results/101/matchings")
                         .with(authentication(authToken("client@example.com", "클라이언트")))
                         .with(csrf())
-                        .param("redirectTo", "/proposals/200/recommendations/results?runId=501"))
+                        .param("errorRedirectTo", "/proposals/200/recommendations/results?runId=501"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/proposals/200/recommendations/results?runId=501"))
                 .andExpect(flash().attribute("errorMessage", "이미 요청했거나 진행 중인 후보입니다."));
     }
 
     @Test
-    @DisplayName("프리랜서가 수락하면 기본적으로 제안서 상세로 돌아간다")
-    void acceptMatchingAndRedirectToProposalDetail() throws Exception {
+    @DisplayName("프리랜서가 수락하면 기본적으로 매칭 상세로 이동한다")
+    void acceptMatchingAndRedirectToMatchingDetail() throws Exception {
         Matching matching = createMatching();
         given(matchingService.accept(401L, "freelancer@example.com")).willReturn(matching);
 
@@ -90,7 +161,7 @@ class MatchingControllerTest {
                         .with(authentication(authToken("freelancer@example.com", "프리랜서")))
                         .with(csrf()))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/proposals/200"))
+                .andExpect(redirectedUrl("/matchings/401"))
                 .andExpect(flash().attribute("noticeMessage", "매칭 요청을 수락했습니다."));
 
         then(matchingService).should().accept(401L, "freelancer@example.com");
@@ -122,7 +193,7 @@ class MatchingControllerTest {
         mockMvc.perform(post("/matchings/999/accept")
                         .with(authentication(authToken("freelancer@example.com", "프리랜서")))
                         .with(csrf())
-                        .param("redirectTo", "https://example.com/outside"))
+                        .param("errorRedirectTo", "https://example.com/outside"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/freelancers/dashboard"))
                 .andExpect(flash().attribute("errorMessage", "응답할 매칭 요청을 찾을 수 없습니다."));
@@ -164,6 +235,14 @@ class MatchingControllerTest {
                 .andExpect(redirectedUrlPattern("**/login"));
     }
 
+    @Test
+    @DisplayName("인증되지 않은 사용자는 매칭 상세 조회 시 로그인 페이지로 이동한다")
+    void redirectToLoginWhenUnauthenticatedOnDetail() throws Exception {
+        mockMvc.perform(get("/matchings/401"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrlPattern("**/login"));
+    }
+
     private UsernamePasswordAuthenticationToken authToken(String email, String name) {
         ItDaPrincipal principal = ItDaPrincipal.from(
                 createMember(email, "hashed-password", name, "010-1234-5678")
@@ -201,5 +280,47 @@ class MatchingControllerTest {
         Matching matching = Matching.create(null, proposalPosition, client, freelancer);
         ReflectionTestUtils.setField(matching, "id", 401L);
         return matching;
+    }
+
+    private MatchingDetailViewModel createMatchingDetailView() {
+        return new MatchingDetailViewModel(
+                401L,
+                "CLIENT",
+                MatchingStatus.PROPOSED,
+                false,
+                new MatchingDetailHeaderViewModel("AI 매칭 플랫폼", "플랫폼 백엔드 개발자", "김프리랜서", "매칭 요청"),
+                new MatchingDetailSummaryViewModel(
+                        "프리랜서 응답을 기다리는 중입니다.",
+                        "프리랜서가 요청을 확인하고 응답하면 다음 단계로 넘어갈 수 있습니다.",
+                        LocalDateTime.of(2026, 4, 22, 13, 0),
+                        null,
+                        "매칭이 수락되기 전까지는 연락처가 공개되지 않습니다."
+                ),
+                new MatchingDetailContactViewModel(
+                        false,
+                        new MatchingParticipantContactViewModel("클라이언트", "클라이언트", "client@example.com", "010-1111-2222"),
+                        new MatchingParticipantContactViewModel("프리랜서", "김프리랜서", "freelancer@example.com", "010-3333-4444")
+                ),
+                new MatchingDetailProjectSummaryViewModel(
+                        200L,
+                        "AI 매칭 플랫폼",
+                        "설명",
+                        "플랫폼 백엔드 개발자",
+                        "백엔드 개발자",
+                        "3,000,000원 ~ 5,000,000원",
+                        "4주",
+                        "원격",
+                        List.of("Java", "Spring"),
+                        List.of("Docker")
+                ),
+                List.of(
+                        new MatchingTimelineItemViewModel(
+                                LocalDateTime.of(2026, 4, 22, 13, 0),
+                                "클라이언트",
+                                "매칭 요청 전송",
+                                "프리랜서에게 매칭 요청을 보냈습니다."
+                        )
+                )
+        );
     }
 }

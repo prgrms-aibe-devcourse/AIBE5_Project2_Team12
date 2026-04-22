@@ -5,18 +5,28 @@ import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.proposal.ProposalPosition;
 import com.generic4.itda.domain.resume.Resume;
 import com.generic4.itda.domain.shared.BaseTimeEntity;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import java.time.LocalDateTime;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
 
 @Entity
 @Getter
 @NoArgsConstructor
 public class Matching extends BaseTimeEntity {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -39,26 +49,53 @@ public class Matching extends BaseTimeEntity {
     @Column(nullable = false)
     private MatchingStatus status;
 
+    private LocalDateTime requestedAt;
+    private LocalDateTime acceptedAt;
+    private LocalDateTime rejectedAt;
+    private LocalDateTime canceledAt;
     private LocalDateTime contractDate;
     private LocalDateTime completeDate;
 
     @Builder
-    private Matching(Resume resume, ProposalPosition proposalPosition, Member clientMember,
-                     Member freelancerMember, MatchingStatus status) {
+    private Matching(
+            Resume resume,
+            ProposalPosition proposalPosition,
+            Member clientMember,
+            Member freelancerMember,
+            MatchingStatus status,
+            LocalDateTime requestedAt,
+            LocalDateTime acceptedAt,
+            LocalDateTime rejectedAt,
+            LocalDateTime canceledAt,
+            LocalDateTime contractDate,
+            LocalDateTime completeDate
+    ) {
         this.resume = resume;
         this.proposalPosition = proposalPosition;
         this.clientMember = clientMember;
         this.freelancerMember = freelancerMember;
         this.status = status != null ? status : MatchingStatus.PROPOSED;
+        this.requestedAt = requestedAt;
+        this.acceptedAt = acceptedAt;
+        this.rejectedAt = rejectedAt;
+        this.canceledAt = canceledAt;
+        this.contractDate = contractDate;
+        this.completeDate = completeDate;
     }
 
-    public static Matching create(Resume resume, ProposalPosition proposalPosition, Member clientMember, Member freelancerMember) {
+    public static Matching create(
+            Resume resume,
+            ProposalPosition proposalPosition,
+            Member clientMember,
+            Member freelancerMember
+    ) {
         return Matching.builder()
                 .resume(resume)
                 .proposalPosition(proposalPosition)
                 .clientMember(clientMember)
                 .freelancerMember(freelancerMember)
                 .status(MatchingStatus.PROPOSED)
+                .requestedAt(LocalDateTime.now())
                 .build();
     }
 
@@ -67,6 +104,7 @@ public class Matching extends BaseTimeEntity {
             throw new IllegalStateException("제안 상태의 매칭만 수락할 수 있습니다.");
         }
         this.status = MatchingStatus.ACCEPTED;
+        this.acceptedAt = LocalDateTime.now();
     }
 
     public void reject() {
@@ -74,5 +112,6 @@ public class Matching extends BaseTimeEntity {
             throw new IllegalStateException("제안 상태의 매칭만 거절할 수 있습니다.");
         }
         this.status = MatchingStatus.REJECTED;
+        this.rejectedAt = LocalDateTime.now();
     }
 }
