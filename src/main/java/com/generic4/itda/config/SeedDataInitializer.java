@@ -32,6 +32,7 @@ import com.generic4.itda.repository.RecommendationResultRepository;
 import com.generic4.itda.repository.RecommendationRunRepository;
 import com.generic4.itda.repository.ResumeRepository;
 import com.generic4.itda.repository.SkillRepository;
+import com.generic4.itda.service.ResumeEmbeddingService;
 import com.generic4.itda.service.recommend.RecommendationFingerprintGenerator;
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
@@ -61,6 +62,15 @@ public class SeedDataInitializer implements ApplicationRunner {
     private static final String SEED_BACKEND_EMAIL = "seed.backend@itda.local";
     private static final String SEED_FULLSTACK_EMAIL = "seed.fullstack@itda.local";
     private static final String SEED_AI_EMAIL = "seed.ai@itda.local";
+    private static final String SEED_PLATFORM_BACKEND_EMAIL = "seed.platform@itda.local";
+    private static final String SEED_DATA_BACKEND_EMAIL = "seed.data@itda.local";
+    private static final String SEED_FRONTEND_EMAIL = "seed.frontend@itda.local";
+    private static final String SEED_DESIGN_SYSTEM_EMAIL = "seed.design@itda.local";
+    private static final String SEED_MLOPS_EMAIL = "seed.mlops@itda.local";
+    private static final String SEED_AI_PRODUCT_EMAIL = "seed.ai-product@itda.local";
+    private static final String SEED_JUNIOR_BACKEND_EMAIL = "seed.junior@itda.local";
+    private static final String SEED_SITE_ONLY_BACKEND_EMAIL = "seed.siteonly@itda.local";
+    private static final String SEED_OPTOUT_EMAIL = "seed.optout@itda.local";
     private static final String SEED_HIDDEN_EMAIL = "seed.hidden@itda.local";
 
     private static final String MATCHING_PROPOSAL_TITLE = "[SEED] AI 프리랜서 추천 플랫폼 고도화";
@@ -75,6 +85,7 @@ public class SeedDataInitializer implements ApplicationRunner {
     private final RecommendationRunRepository recommendationRunRepository;
     private final RecommendationResultRepository recommendationResultRepository;
     private final RecommendationFingerprintGenerator recommendationFingerprintGenerator;
+    private final ResumeEmbeddingService resumeEmbeddingService;
     private final PasswordEncoder passwordEncoder;
 
     @Value("${app.seed.default-password:demo1234}")
@@ -89,22 +100,54 @@ public class SeedDataInitializer implements ApplicationRunner {
         Member backend = ensureMember(SEED_BACKEND_EMAIL, "김백엔드", "백엔드 시드", "010-9000-1001");
         Member fullstack = ensureMember(SEED_FULLSTACK_EMAIL, "이풀스택", "풀스택 시드", "010-9000-1002");
         Member aiEngineer = ensureMember(SEED_AI_EMAIL, "박에이아이", "AI 시드", "010-9000-1003");
-        Member hidden = ensureMember(SEED_HIDDEN_EMAIL, "최히든", "비공개 시드", "010-9000-1004");
+        Member platformBackend = ensureMember(SEED_PLATFORM_BACKEND_EMAIL, "정플랫폼", "플랫폼 백엔드 시드", "010-9000-1004");
+        Member dataBackend = ensureMember(SEED_DATA_BACKEND_EMAIL, "오데이터", "데이터 백엔드 시드", "010-9000-1005");
+        Member frontend = ensureMember(SEED_FRONTEND_EMAIL, "한프론트", "프론트 시드", "010-9000-1006");
+        Member designSystem = ensureMember(SEED_DESIGN_SYSTEM_EMAIL, "윤디자인", "디자인 시스템 시드", "010-9000-1007");
+        Member mlops = ensureMember(SEED_MLOPS_EMAIL, "임엠엘옵스", "MLOps 시드", "010-9000-1008");
+        Member aiProduct = ensureMember(SEED_AI_PRODUCT_EMAIL, "서에이아이", "AI 제품화 시드", "010-9000-1009");
+        Member juniorBackend = ensureMember(SEED_JUNIOR_BACKEND_EMAIL, "신주니어", "주니어 백엔드 시드", "010-9000-1010");
+        Member siteOnlyBackend = ensureMember(SEED_SITE_ONLY_BACKEND_EMAIL, "조온사이트", "온사이트 백엔드 시드", "010-9000-1011");
+        Member optOut = ensureMember(SEED_OPTOUT_EMAIL, "권옵트아웃", "옵트아웃 시드", "010-9000-1012");
+        Member hidden = ensureMember(SEED_HIDDEN_EMAIL, "최히든", "비공개 시드", "010-9000-1013");
 
-        ensureResume(
+        Resume backendResume = ensureResume(
                 backend,
-                "Spring Boot와 PostgreSQL 기반 B2B 백엔드 서비스를 설계하고 운영해 온 백엔드 개발자입니다.",
+                """
+                추천/매칭과 B2B SaaS 도메인에서 Java/Spring 기반 API, 배치, 캐시 전략을 설계해 온 백엔드 개발자입니다.
+                운영 장애 분석, 데이터 모델링, 성능 튜닝을 함께 맡으며 트래픽이 큰 서비스의 안정성을 높여왔습니다.
+                """,
                 (byte) 6,
                 careerPayload(
                         careerItem(
                                 "ITDA Labs",
-                                "백엔드 개발자",
+                                "시니어 백엔드 개발자",
                                 CareerEmploymentType.FULL_TIME,
-                                "2021-03",
+                                "2023-01",
                                 null,
                                 true,
-                                "매칭/추천 API와 운영용 백오피스를 설계하고 성능 튜닝을 담당했습니다.",
-                                List.of("Java", "Spring", "PostgreSQL", "Redis")
+                                "추천/매칭 API와 운영용 백오피스를 설계하고, Redis 캐시 전략과 Querydsl 기반 검색 성능 개선을 주도했습니다.",
+                                List.of("Java", "Spring Boot", "PostgreSQL", "Redis", "Querydsl", "Docker")
+                        ),
+                        careerItem(
+                                "B2B Cloud",
+                                "백엔드 개발자",
+                                CareerEmploymentType.FULL_TIME,
+                                "2020-04",
+                                "2022-12",
+                                false,
+                                "정산/권한 관리 도메인 API와 배치를 개발하고 GitHub Actions 기반 배포 파이프라인을 운영했습니다.",
+                                List.of("Java", "Spring", "JPA", "MySQL", "GitHub Actions", "Linux")
+                        ),
+                        careerItem(
+                                "Data Commerce",
+                                "백엔드 엔지니어",
+                                CareerEmploymentType.FULL_TIME,
+                                "2018-03",
+                                "2020-03",
+                                false,
+                                "주문/회원 서비스를 마이그레이션하면서 PostgreSQL 스키마 개선과 REST API 표준화를 담당했습니다.",
+                                List.of("Java", "Spring Boot", "PostgreSQL", "REST API")
                         )
                 ),
                 WorkType.HYBRID,
@@ -115,26 +158,56 @@ public class SeedDataInitializer implements ApplicationRunner {
                 skillLevels(
                         skillLevel("Java", Proficiency.ADVANCED),
                         skillLevel("Spring", Proficiency.ADVANCED),
+                        skillLevel("Spring Boot", Proficiency.ADVANCED),
                         skillLevel("PostgreSQL", Proficiency.ADVANCED),
-                        skillLevel("Redis", Proficiency.INTERMEDIATE)
+                        skillLevel("Redis", Proficiency.ADVANCED),
+                        skillLevel("JPA", Proficiency.ADVANCED),
+                        skillLevel("Querydsl", Proficiency.INTERMEDIATE),
+                        skillLevel("REST API", Proficiency.ADVANCED),
+                        skillLevel("Docker", Proficiency.INTERMEDIATE),
+                        skillLevel("GitHub Actions", Proficiency.INTERMEDIATE),
+                        skillLevel("Linux", Proficiency.INTERMEDIATE)
                 ),
                 skills
         );
 
-        ensureResume(
+        Resume fullstackResume = ensureResume(
                 fullstack,
-                "백엔드와 프론트를 모두 다루며 관리자 화면과 고객용 서비스 UI를 함께 구축하는 풀스택 개발자입니다.",
+                """
+                관리자 백오피스, 고객용 웹, API 서버를 함께 개발해 온 풀스택 개발자입니다.
+                프론트엔드 생산성과 백엔드 운영을 같이 챙기며 초기 제품의 기능 실험과 운영 고도화에 익숙합니다.
+                """,
                 (byte) 5,
                 careerPayload(
                         careerItem(
                                 "Product Studio",
-                                "풀스택 개발자",
+                                "풀스택 리드",
                                 CareerEmploymentType.FULL_TIME,
-                                "2020-07",
+                                "2022-05",
                                 null,
                                 true,
-                                "관리자 대시보드와 API 서버를 한 팀에서 개발했습니다.",
-                                List.of("Java", "Spring", "React", "TypeScript", "Docker")
+                                "운영 대시보드와 고객용 웹을 함께 개발하면서 React/TypeScript 프론트와 Spring API 서버를 동시에 운영했습니다.",
+                                List.of("React", "TypeScript", "Next.js", "Java", "Spring", "Docker")
+                        ),
+                        careerItem(
+                                "Commerce Tools",
+                                "프론트엔드 개발자",
+                                CareerEmploymentType.FULL_TIME,
+                                "2020-01",
+                                "2022-04",
+                                false,
+                                "관리자 화면 IA를 개편하고 공통 컴포넌트 및 배포 파이프라인을 정리했습니다.",
+                                List.of("React", "TypeScript", "Figma", "Docker")
+                        ),
+                        careerItem(
+                                "Agency Works",
+                                "웹 개발자",
+                                CareerEmploymentType.FREELANCE,
+                                "2019-01",
+                                "2019-12",
+                                false,
+                                "다수의 기업 랜딩 페이지와 예약/문의 폼을 구축하며 프론트엔드와 간단한 백엔드 연동을 담당했습니다.",
+                                List.of("JavaScript", "HTML", "CSS", "REST API")
                         )
                 ),
                 WorkType.HYBRID,
@@ -147,44 +220,495 @@ public class SeedDataInitializer implements ApplicationRunner {
                         skillLevel("Spring", Proficiency.INTERMEDIATE),
                         skillLevel("React", Proficiency.ADVANCED),
                         skillLevel("TypeScript", Proficiency.ADVANCED),
-                        skillLevel("Docker", Proficiency.INTERMEDIATE)
+                        skillLevel("Next.js", Proficiency.INTERMEDIATE),
+                        skillLevel("JavaScript", Proficiency.ADVANCED),
+                        skillLevel("HTML", Proficiency.ADVANCED),
+                        skillLevel("CSS", Proficiency.INTERMEDIATE),
+                        skillLevel("Docker", Proficiency.INTERMEDIATE),
+                        skillLevel("REST API", Proficiency.INTERMEDIATE),
+                        skillLevel("Figma", Proficiency.BEGINNER)
                 ),
                 skills
         );
 
-        ensureResume(
+        Resume aiResume = ensureResume(
                 aiEngineer,
-                "LLM 기능 기획부터 Python 기반 추론 서비스 운영까지 경험한 AI 엔지니어입니다.",
+                """
+                LLM 기반 추천, RAG, 추론 API 운영을 맡아 온 AI 엔지니어입니다.
+                프롬프트 실험 설계부터 FastAPI 배포, 로그 수집, 평가 지표 설계까지 제품화 흐름을 경험했습니다.
+                """,
                 (byte) 4,
                 careerPayload(
                         careerItem(
                                 "AI Matching Team",
                                 "AI 엔지니어",
                                 CareerEmploymentType.CONTRACT,
-                                "2022-01",
+                                "2023-02",
                                 null,
                                 true,
-                                "추천 설명 생성과 검색 증강 워크플로를 구현했습니다.",
-                                List.of("Python", "PostgreSQL", "LLM", "AWS")
+                                "추천 설명 생성, 검색 증강, 실험 로그 적재 파이프라인을 구현하고 추론 서버를 운영했습니다.",
+                                List.of("Python", "FastAPI", "LLM", "LangChain", "AWS", "PostgreSQL")
+                        ),
+                        careerItem(
+                                "Data Insight Lab",
+                                "ML 엔지니어",
+                                CareerEmploymentType.FULL_TIME,
+                                "2021-01",
+                                "2023-01",
+                                false,
+                                "문서 분류 모델과 임베딩 검색 기능을 구축하고 PyTorch 실험 코드를 서비스 배치로 이관했습니다.",
+                                List.of("Python", "PyTorch", "PostgreSQL", "Docker")
                         )
                 ),
-                WorkType.REMOTE,
+                WorkType.HYBRID,
                 ResumeWritingStatus.DONE,
                 "https://ai.seed.itda.local",
                 true,
                 true,
                 skillLevels(
                         skillLevel("Python", Proficiency.ADVANCED),
+                        skillLevel("FastAPI", Proficiency.ADVANCED),
                         skillLevel("LLM", Proficiency.ADVANCED),
+                        skillLevel("LangChain", Proficiency.INTERMEDIATE),
                         skillLevel("PostgreSQL", Proficiency.INTERMEDIATE),
-                        skillLevel("AWS", Proficiency.INTERMEDIATE)
+                        skillLevel("AWS", Proficiency.INTERMEDIATE),
+                        skillLevel("Docker", Proficiency.INTERMEDIATE),
+                        skillLevel("PyTorch", Proficiency.INTERMEDIATE)
+                ),
+                skills
+        );
+
+        Resume platformBackendResume = ensureResume(
+                platformBackend,
+                """
+                플랫폼/인프라와 서비스 백엔드를 함께 맡아 온 하이브리드형 백엔드 개발자입니다.
+                추천 API처럼 읽기 부하가 높은 서비스에서 캐시, 메시징, 배포 자동화를 설계하는 일을 주로 해왔습니다.
+                """,
+                (byte) 8,
+                careerPayload(
+                        careerItem(
+                                "Platform Works",
+                                "플랫폼 백엔드 리드",
+                                CareerEmploymentType.FULL_TIME,
+                                "2022-06",
+                                null,
+                                true,
+                                "대용량 트래픽 API의 캐시 계층과 Kafka 기반 비동기 처리를 설계하고 배포 자동화를 운영했습니다.",
+                                List.of("Java", "Spring Boot", "Redis", "Kafka", "Docker", "Kubernetes")
+                        ),
+                        careerItem(
+                                "Cloud Ops Studio",
+                                "백엔드 엔지니어",
+                                CareerEmploymentType.FULL_TIME,
+                                "2019-05",
+                                "2022-05",
+                                false,
+                                "멀티 테넌트 SaaS의 인증/권한 API와 PostgreSQL 튜닝, CI/CD 파이프라인 개선을 담당했습니다.",
+                                List.of("Java", "Spring", "PostgreSQL", "GitHub Actions", "Linux")
+                        ),
+                        careerItem(
+                                "Retail Data Hub",
+                                "서버 개발자",
+                                CareerEmploymentType.FULL_TIME,
+                                "2017-01",
+                                "2019-04",
+                                false,
+                                "상품/재고 동기화 배치와 검색 연동 기능을 구축했습니다.",
+                                List.of("Java", "Spring Boot", "MySQL", "Elasticsearch")
+                        )
+                ),
+                WorkType.HYBRID,
+                ResumeWritingStatus.DONE,
+                "https://platform.seed.itda.local",
+                true,
+                true,
+                skillLevels(
+                        skillLevel("Java", Proficiency.ADVANCED),
+                        skillLevel("Spring", Proficiency.ADVANCED),
+                        skillLevel("Spring Boot", Proficiency.ADVANCED),
+                        skillLevel("PostgreSQL", Proficiency.ADVANCED),
+                        skillLevel("Redis", Proficiency.ADVANCED),
+                        skillLevel("Kafka", Proficiency.INTERMEDIATE),
+                        skillLevel("Docker", Proficiency.ADVANCED),
+                        skillLevel("Kubernetes", Proficiency.INTERMEDIATE),
+                        skillLevel("GitHub Actions", Proficiency.INTERMEDIATE),
+                        skillLevel("Linux", Proficiency.ADVANCED)
+                ),
+                skills
+        );
+
+        ensureResume(
+                dataBackend,
+                """
+                데이터 집약형 서비스에서 조회 성능, 검색 품질, 배치 처리까지 담당해 온 백엔드 개발자입니다.
+                SQL 최적화와 Elasticsearch 연동, Querydsl 기반 검색 기능 구현 경험이 강점입니다.
+                """,
+                (byte) 5,
+                careerPayload(
+                        careerItem(
+                                "Search Commerce",
+                                "백엔드 개발자",
+                                CareerEmploymentType.FULL_TIME,
+                                "2022-01",
+                                null,
+                                true,
+                                "추천/검색 API를 개발하며 Elasticsearch 색인 구조와 PostgreSQL 조회 성능을 함께 튜닝했습니다.",
+                                List.of("Java", "Spring Boot", "PostgreSQL", "Elasticsearch", "Querydsl")
+                        ),
+                        careerItem(
+                                "Growth Data Team",
+                                "데이터 백엔드 엔지니어",
+                                CareerEmploymentType.FULL_TIME,
+                                "2020-03",
+                                "2021-12",
+                                false,
+                                "로그 적재/정제 배치와 운영 대시보드용 API를 개발했습니다.",
+                                List.of("Java", "Spring", "Kafka", "JPA", "REST API")
+                        )
+                ),
+                WorkType.HYBRID,
+                ResumeWritingStatus.DONE,
+                "https://data.seed.itda.local",
+                true,
+                true,
+                skillLevels(
+                        skillLevel("Java", Proficiency.ADVANCED),
+                        skillLevel("Spring", Proficiency.ADVANCED),
+                        skillLevel("Spring Boot", Proficiency.INTERMEDIATE),
+                        skillLevel("PostgreSQL", Proficiency.ADVANCED),
+                        skillLevel("Elasticsearch", Proficiency.INTERMEDIATE),
+                        skillLevel("Querydsl", Proficiency.INTERMEDIATE),
+                        skillLevel("JPA", Proficiency.INTERMEDIATE),
+                        skillLevel("Kafka", Proficiency.INTERMEDIATE),
+                        skillLevel("REST API", Proficiency.ADVANCED)
+                ),
+                skills
+        );
+
+        ensureResume(
+                frontend,
+                """
+                React/TypeScript 기반 운영 화면과 고객용 웹을 주로 구축해 온 프론트엔드 개발자입니다.
+                복잡한 폼, 데이터 테이블, 디자인 시스템 정리와 같은 운영자 경험 개선 작업에 강점이 있습니다.
+                """,
+                (byte) 4,
+                careerPayload(
+                        careerItem(
+                                "Ops Dashboard Team",
+                                "프론트엔드 개발자",
+                                CareerEmploymentType.FULL_TIME,
+                                "2023-01",
+                                null,
+                                true,
+                                "운영자용 대시보드의 필터/리스트/상세 흐름을 재구성하고 반응형 UI를 개선했습니다.",
+                                List.of("React", "TypeScript", "Next.js", "Tailwind CSS", "Figma")
+                        ),
+                        careerItem(
+                                "Design Sprint Lab",
+                                "웹 퍼블리셔 겸 프론트엔드 개발자",
+                                CareerEmploymentType.FULL_TIME,
+                                "2021-01",
+                                "2022-12",
+                                false,
+                                "디자인 시안을 기준으로 공통 레이아웃과 폼 컴포넌트를 구현했습니다.",
+                                List.of("HTML", "CSS", "JavaScript", "React")
+                        )
+                ),
+                WorkType.REMOTE,
+                ResumeWritingStatus.DONE,
+                "https://frontend.seed.itda.local",
+                true,
+                true,
+                skillLevels(
+                        skillLevel("React", Proficiency.ADVANCED),
+                        skillLevel("TypeScript", Proficiency.ADVANCED),
+                        skillLevel("Next.js", Proficiency.ADVANCED),
+                        skillLevel("JavaScript", Proficiency.ADVANCED),
+                        skillLevel("HTML", Proficiency.ADVANCED),
+                        skillLevel("CSS", Proficiency.ADVANCED),
+                        skillLevel("Tailwind CSS", Proficiency.INTERMEDIATE),
+                        skillLevel("Figma", Proficiency.INTERMEDIATE),
+                        skillLevel("Docker", Proficiency.BEGINNER)
+                ),
+                skills
+        );
+
+        ensureResume(
+                designSystem,
+                """
+                프론트엔드와 디자인 시스템 구축을 함께 경험한 UI 플랫폼 개발자입니다.
+                운영 화면의 일관성을 높이기 위한 공통 컴포넌트와 토큰 관리, QA 협업 흐름에 익숙합니다.
+                """,
+                (byte) 6,
+                careerPayload(
+                        careerItem(
+                                "Design Platform",
+                                "프론트엔드 플랫폼 개발자",
+                                CareerEmploymentType.FULL_TIME,
+                                "2022-02",
+                                null,
+                                true,
+                                "관리자/고객용 화면에서 재사용하는 디자인 토큰과 공통 React 컴포넌트를 구축했습니다.",
+                                List.of("React", "TypeScript", "Figma", "Tailwind CSS", "Docker")
+                        ),
+                        careerItem(
+                                "Brand Commerce",
+                                "프론트엔드 개발자",
+                                CareerEmploymentType.FULL_TIME,
+                                "2019-11",
+                                "2022-01",
+                                false,
+                                "Next.js 기반 커머스 프론트와 백오피스를 함께 개발했습니다.",
+                                List.of("React", "Next.js", "TypeScript", "JavaScript")
+                        )
+                ),
+                WorkType.HYBRID,
+                ResumeWritingStatus.DONE,
+                "https://design.seed.itda.local",
+                true,
+                true,
+                skillLevels(
+                        skillLevel("React", Proficiency.ADVANCED),
+                        skillLevel("TypeScript", Proficiency.ADVANCED),
+                        skillLevel("Next.js", Proficiency.INTERMEDIATE),
+                        skillLevel("JavaScript", Proficiency.ADVANCED),
+                        skillLevel("Tailwind CSS", Proficiency.ADVANCED),
+                        skillLevel("Figma", Proficiency.ADVANCED),
+                        skillLevel("HTML", Proficiency.INTERMEDIATE),
+                        skillLevel("CSS", Proficiency.INTERMEDIATE),
+                        skillLevel("Docker", Proficiency.INTERMEDIATE)
+                ),
+                skills
+        );
+
+        ensureResume(
+                mlops,
+                """
+                LLM 추론 서비스와 운영 자동화를 함께 맡아 온 MLOps 성향의 AI 엔지니어입니다.
+                FastAPI 추론 서버, 실험 로그 파이프라인, 배포 자동화를 연결해 모델 기능을 서비스로 안착시키는 일을 해왔습니다.
+                """,
+                (byte) 6,
+                careerPayload(
+                        careerItem(
+                                "Inference Ops",
+                                "AI 플랫폼 엔지니어",
+                                CareerEmploymentType.FULL_TIME,
+                                "2022-04",
+                                null,
+                                true,
+                                "FastAPI 기반 추론 API와 실험 결과 수집, 배포 자동화를 운영했습니다.",
+                                List.of("Python", "FastAPI", "AWS", "Docker", "GitHub Actions", "Linux")
+                        ),
+                        careerItem(
+                                "LLM Service Lab",
+                                "ML 엔지니어",
+                                CareerEmploymentType.FULL_TIME,
+                                "2020-02",
+                                "2022-03",
+                                false,
+                                "문서 임베딩 검색과 요약 기능을 구현하며 LangChain 기반 워크플로를 서비스에 연결했습니다.",
+                                List.of("Python", "LLM", "LangChain", "PostgreSQL", "PyTorch")
+                        )
+                ),
+                WorkType.HYBRID,
+                ResumeWritingStatus.DONE,
+                "https://mlops.seed.itda.local",
+                true,
+                true,
+                skillLevels(
+                        skillLevel("Python", Proficiency.ADVANCED),
+                        skillLevel("FastAPI", Proficiency.ADVANCED),
+                        skillLevel("LLM", Proficiency.ADVANCED),
+                        skillLevel("LangChain", Proficiency.INTERMEDIATE),
+                        skillLevel("AWS", Proficiency.ADVANCED),
+                        skillLevel("Docker", Proficiency.ADVANCED),
+                        skillLevel("GitHub Actions", Proficiency.INTERMEDIATE),
+                        skillLevel("Linux", Proficiency.ADVANCED),
+                        skillLevel("PostgreSQL", Proficiency.INTERMEDIATE),
+                        skillLevel("PyTorch", Proficiency.INTERMEDIATE)
+                ),
+                skills
+        );
+
+        ensureResume(
+                aiProduct,
+                """
+                LLM 기능을 실제 제품 플로우에 녹여내는 데 강점이 있는 AI 애플리케이션 엔지니어입니다.
+                추천 설명 생성, 관리자 검수 화면, 실험 도구를 함께 만들며 AI 기능의 제품화를 주도했습니다.
+                """,
+                (byte) 3,
+                careerPayload(
+                        careerItem(
+                                "AI Product Squad",
+                                "AI 애플리케이션 엔지니어",
+                                CareerEmploymentType.FULL_TIME,
+                                "2023-05",
+                                null,
+                                true,
+                                "추천 설명 생성 기능과 운영 검수 화면, 실험용 FastAPI API를 함께 개발했습니다.",
+                                List.of("Python", "FastAPI", "LLM", "AWS", "React", "TypeScript")
+                        ),
+                        careerItem(
+                                "Prompt Studio",
+                                "프로덕트 엔지니어",
+                                CareerEmploymentType.CONTRACT,
+                                "2022-02",
+                                "2023-04",
+                                false,
+                                "프롬프트 실험 도구와 문서 요약 기능을 구축했습니다.",
+                                List.of("Python", "LangChain", "PostgreSQL", "Docker")
+                        )
+                ),
+                WorkType.HYBRID,
+                ResumeWritingStatus.DONE,
+                "https://ai-product.seed.itda.local",
+                true,
+                true,
+                skillLevels(
+                        skillLevel("Python", Proficiency.ADVANCED),
+                        skillLevel("FastAPI", Proficiency.INTERMEDIATE),
+                        skillLevel("LLM", Proficiency.ADVANCED),
+                        skillLevel("LangChain", Proficiency.INTERMEDIATE),
+                        skillLevel("AWS", Proficiency.INTERMEDIATE),
+                        skillLevel("React", Proficiency.INTERMEDIATE),
+                        skillLevel("TypeScript", Proficiency.INTERMEDIATE),
+                        skillLevel("Docker", Proficiency.INTERMEDIATE),
+                        skillLevel("PostgreSQL", Proficiency.INTERMEDIATE)
+                ),
+                skills
+        );
+
+        ensureResume(
+                juniorBackend,
+                """
+                Java/Spring 기반 API 개발을 막 시작한 주니어 백엔드 개발자입니다.
+                운영 경험은 짧지만 기본 CRUD, 테스트 코드, 배포 자동화 학습 프로젝트를 수행했습니다.
+                """,
+                (byte) 1,
+                careerPayload(
+                        careerItem(
+                                "Starter API Team",
+                                "백엔드 개발자",
+                                CareerEmploymentType.FULL_TIME,
+                                "2025-03",
+                                null,
+                                true,
+                                "사내 운영 도구용 CRUD API와 배치성 알림 기능을 구현했습니다.",
+                                List.of("Java", "Spring Boot", "PostgreSQL", "GitHub Actions")
+                        )
+                ),
+                WorkType.HYBRID,
+                ResumeWritingStatus.DONE,
+                "https://junior.seed.itda.local",
+                true,
+                true,
+                skillLevels(
+                        skillLevel("Java", Proficiency.INTERMEDIATE),
+                        skillLevel("Spring", Proficiency.INTERMEDIATE),
+                        skillLevel("Spring Boot", Proficiency.INTERMEDIATE),
+                        skillLevel("PostgreSQL", Proficiency.BEGINNER),
+                        skillLevel("GitHub Actions", Proficiency.BEGINNER)
+                ),
+                skills
+        );
+
+        ensureResume(
+                siteOnlyBackend,
+                """
+                오프라인 협업과 현장 대응이 많은 프로젝트를 주로 수행해 온 온사이트 중심 백엔드 개발자입니다.
+                시스템 운영과 고객사 커뮤니케이션에는 강하지만, 원격/하이브리드 선호도는 낮은 편입니다.
+                """,
+                (byte) 7,
+                careerPayload(
+                        careerItem(
+                                "Enterprise Delivery",
+                                "백엔드 개발자",
+                                CareerEmploymentType.FULL_TIME,
+                                "2021-07",
+                                null,
+                                true,
+                                "고객사 상주 환경에서 Java/Spring 기반 업무 시스템과 배치 기능을 운영했습니다.",
+                                List.of("Java", "Spring", "Oracle", "Redis", "Linux")
+                        ),
+                        careerItem(
+                                "SI Partners",
+                                "서버 개발자",
+                                CareerEmploymentType.FULL_TIME,
+                                "2018-01",
+                                "2021-06",
+                                false,
+                                "공공기관 시스템 API와 관리자 화면 연계 기능을 구축했습니다.",
+                                List.of("Java", "Spring Boot", "Oracle", "REST API")
+                        )
+                ),
+                WorkType.SITE,
+                ResumeWritingStatus.DONE,
+                "https://siteonly.seed.itda.local",
+                true,
+                true,
+                skillLevels(
+                        skillLevel("Java", Proficiency.ADVANCED),
+                        skillLevel("Spring", Proficiency.ADVANCED),
+                        skillLevel("Spring Boot", Proficiency.INTERMEDIATE),
+                        skillLevel("Oracle", Proficiency.ADVANCED),
+                        skillLevel("Redis", Proficiency.INTERMEDIATE),
+                        skillLevel("REST API", Proficiency.INTERMEDIATE),
+                        skillLevel("Linux", Proficiency.INTERMEDIATE)
+                ),
+                skills
+        );
+
+        ensureResume(
+                optOut,
+                """
+                추천/매칭 도메인 경험은 충분하지만, 현재는 수동 제안만 받고 있어 AI 추천 노출을 꺼둔 백엔드 개발자입니다.
+                후보 풀 필터 동작을 확인하기 위한 옵트아웃 케이스입니다.
+                """,
+                (byte) 5,
+                careerPayload(
+                        careerItem(
+                                "Private Matching Team",
+                                "백엔드 개발자",
+                                CareerEmploymentType.FULL_TIME,
+                                "2022-08",
+                                null,
+                                true,
+                                "매칭/추천 플랫폼의 운영 API를 개발했지만 현재는 직접 제안만 검토하고 있습니다.",
+                                List.of("Java", "Spring", "PostgreSQL", "Redis")
+                        ),
+                        careerItem(
+                                "Core API Studio",
+                                "백엔드 엔지니어",
+                                CareerEmploymentType.FULL_TIME,
+                                "2020-01",
+                                "2022-07",
+                                false,
+                                "공통 인증/회원 API를 운영했습니다.",
+                                List.of("Java", "Spring Boot", "MySQL", "JPA")
+                        )
+                ),
+                WorkType.HYBRID,
+                ResumeWritingStatus.DONE,
+                "https://optout.seed.itda.local",
+                true,
+                false,
+                skillLevels(
+                        skillLevel("Java", Proficiency.ADVANCED),
+                        skillLevel("Spring", Proficiency.ADVANCED),
+                        skillLevel("Spring Boot", Proficiency.INTERMEDIATE),
+                        skillLevel("PostgreSQL", Proficiency.INTERMEDIATE),
+                        skillLevel("Redis", Proficiency.INTERMEDIATE),
+                        skillLevel("JPA", Proficiency.INTERMEDIATE)
                 ),
                 skills
         );
 
         ensureResume(
                 hidden,
-                "화면 구현은 가능하지만 아직 외부 공개 전 검수 중인 프론트엔드 개발자입니다.",
+                """
+                화면 구현 경험은 충분하지만 아직 외부 공개 전 검수 중인 프론트엔드 개발자입니다.
+                공개 여부와 AI 추천 허용 여부 필터를 확인하기 위한 비공개 케이스입니다.
+                """,
                 (byte) 2,
                 careerPayload(
                         careerItem(
@@ -194,8 +718,8 @@ public class SeedDataInitializer implements ApplicationRunner {
                                 "2024-01",
                                 null,
                                 true,
-                                "초기 대시보드 프로토타입과 공통 컴포넌트를 개발했습니다.",
-                                List.of("React", "TypeScript")
+                                "초기 대시보드 프로토타입과 공통 컴포넌트를 개발하고 UX 검수 대응을 진행했습니다.",
+                                List.of("React", "TypeScript", "Figma")
                         )
                 ),
                 WorkType.REMOTE,
@@ -205,7 +729,8 @@ public class SeedDataInitializer implements ApplicationRunner {
                 false,
                 skillLevels(
                         skillLevel("React", Proficiency.INTERMEDIATE),
-                        skillLevel("TypeScript", Proficiency.INTERMEDIATE)
+                        skillLevel("TypeScript", Proficiency.INTERMEDIATE),
+                        skillLevel("Figma", Proficiency.INTERMEDIATE)
                 ),
                 skills
         );
@@ -299,11 +824,7 @@ public class SeedDataInitializer implements ApplicationRunner {
         // ── Matching 시드 ────────────────────────────────────
         // matchingProposal의 포지션에 프리랜서 매칭 이력 생성
         // → seed.backend / seed.ai 로그인 시 해당 제안서 상세 페이지 접근 가능
-        Resume backendResume = resumeRepository.findByMemberId(backend.getId()).orElseThrow();
-        Resume aiResume      = resumeRepository.findByMemberId(aiEngineer.getId()).orElseThrow();
-        Resume fullstackResume = resumeRepository.findByMemberId(fullstack.getId()).orElseThrow();
-
-        ensureMatching(backendResume, backendPos1, client, backend,    MatchingStatus.PROPOSED);
+        ensureMatching(backendResume, backendPos1, client, backend, MatchingStatus.PROPOSED);
         ensureMatching(aiResume,      aiPos,       client, aiEngineer, MatchingStatus.ACCEPTED);
 
         // ── Recommendation 시드 ────────────────────────────────
@@ -312,8 +833,8 @@ public class SeedDataInitializer implements ApplicationRunner {
                 backendPos1,
                 List.of(
                         backendResume,
-                        fullstackResume,
-                        aiResume
+                        platformBackendResume,
+                        fullstackResume
                 )
         );
 
@@ -321,7 +842,8 @@ public class SeedDataInitializer implements ApplicationRunner {
                 """
                 Seed data is ready.
                 Seed client email={} matchingProposalId={} writingProposalId={}
-                Seed freelancer emails=[{}, {}, {}, {}]
+                Seed public candidate emails=[{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}]
+                Filter scenario resumes=[hidden:{}, optOut:{}]
                 Matching seeds: backend→backendPos1(PROPOSED), ai→aiPos(ACCEPTED)
                 """,
                 client.getEmail().getValue(),
@@ -330,7 +852,16 @@ public class SeedDataInitializer implements ApplicationRunner {
                 backend.getEmail().getValue(),
                 fullstack.getEmail().getValue(),
                 aiEngineer.getEmail().getValue(),
-                hidden.getEmail().getValue()
+                platformBackend.getEmail().getValue(),
+                dataBackend.getEmail().getValue(),
+                frontend.getEmail().getValue(),
+                designSystem.getEmail().getValue(),
+                mlops.getEmail().getValue(),
+                aiProduct.getEmail().getValue(),
+                juniorBackend.getEmail().getValue(),
+                siteOnlyBackend.getEmail().getValue(),
+                hidden.getEmail().getValue(),
+                optOut.getEmail().getValue()
         );
     }
 
@@ -454,7 +985,7 @@ public class SeedDataInitializer implements ApplicationRunner {
         }
 
         for (SeedSkillLevel skillLevel : skillLevels) {
-            Skill skill = skills.get(skillLevel.skillName());
+            Skill skill = getRequiredSkill(skills, skillLevel.skillName());
             Optional<ResumeSkill> existingSkill = resume.getSkills().stream()
                     .filter(resumeSkill -> resumeSkill.getSkill().getName().equals(skillLevel.skillName()))
                     .findFirst();
@@ -467,7 +998,18 @@ public class SeedDataInitializer implements ApplicationRunner {
             resume.addSkill(skill, skillLevel.proficiency());
         }
 
-        return resumeRepository.save(resume);
+        List<String> desiredSkillNames = skillLevels.stream()
+                .map(SeedSkillLevel::skillName)
+                .toList();
+        List<Skill> removableSkills = resume.getSkills().stream()
+                .map(ResumeSkill::getSkill)
+                .filter(skill -> !desiredSkillNames.contains(skill.getName()))
+                .toList();
+        removableSkills.forEach(resume::removeSkill);
+
+        Resume savedResume = resumeRepository.save(resume);
+        refreshResumeEmbedding(savedResume);
+        return savedResume;
     }
 
     private Proposal ensureProposal(
@@ -521,7 +1063,7 @@ public class SeedDataInitializer implements ApplicationRunner {
             Map<String, Skill> skills
     ) {
         ProposalPosition proposalPosition = proposal.getPositions().stream()
-                .filter(existing -> hasSamePositionIdentity(existing, position, title))
+                .filter(existing -> hasSamePositionIdentity(existing, position))
                 .findFirst()
                 .orElseGet(() -> proposal.addPosition(
                         position,
@@ -550,7 +1092,7 @@ public class SeedDataInitializer implements ApplicationRunner {
         );
 
         for (SeedSkillRequirement requirement : skillRequirements) {
-            Skill skill = skills.get(requirement.skillName());
+            Skill skill = getRequiredSkill(skills, requirement.skillName());
             Optional<ProposalPositionSkill> existingSkill = proposalPosition.getSkills().stream()
                     .filter(proposalSkill -> proposalSkill.getSkill().getName().equals(requirement.skillName()))
                     .findFirst();
@@ -570,12 +1112,12 @@ public class SeedDataInitializer implements ApplicationRunner {
         Proposal hydrated = proposalRepository.findWithPositionsById(savedProposal.getId()).orElse(savedProposal);
 
         return hydrated.getPositions().stream()
-                .filter(existing -> hasSamePositionIdentity(existing, position, title))
+                .filter(existing -> hasSamePositionIdentity(existing, position))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("시드 포지션 저장에 실패했습니다. proposalId=" + savedProposal.getId()));
     }
 
-    private boolean hasSamePositionIdentity(ProposalPosition existing, Position position, String title) {
+    private boolean hasSamePositionIdentity(ProposalPosition existing, Position position) {
         boolean samePosition = existing.getPosition().getId() != null && position.getId() != null
                 ? existing.getPosition().getId().equals(position.getId())
                 : existing.getPosition().getName().equals(position.getName());
@@ -583,6 +1125,27 @@ public class SeedDataInitializer implements ApplicationRunner {
         // ProposalPositions with the same Position, so treat "same Position" as identity and update
         // the rest of fields (title, budgets, skills...) in-place.
         return samePosition;
+    }
+
+    private Skill getRequiredSkill(Map<String, Skill> skills, String skillName) {
+        Skill skill = skills.get(skillName);
+        if (skill == null) {
+            throw new IllegalStateException("시드 스킬을 찾을 수 없습니다. skillName=" + skillName);
+        }
+        return skill;
+    }
+
+    private void refreshResumeEmbedding(Resume resume) {
+        try {
+            resumeEmbeddingService.createOrRefresh(resume);
+        } catch (Exception e) {
+            log.error(
+                    "시드 이력서 임베딩 생성/갱신 실패. resumeId={} email={}",
+                    resume.getId(),
+                    resume.getMember().getEmail().getValue(),
+                    e
+            );
+        }
     }
 
     private Matching ensureMatching(
@@ -754,8 +1317,9 @@ public class SeedDataInitializer implements ApplicationRunner {
                 ? resume.getMember().getNickname()
                 : resume.getMember().getName();
         String years = resume.getCareerYears() != null ? resume.getCareerYears().toString() : "?";
+        String email = resume.getMember().getEmail().getValue();
 
-        if (rank == 1) {
+        if (SEED_BACKEND_EMAIL.equals(email)) {
             return new SeedRecommendationNarrative(
                     List.of("추천/매칭", "백엔드", "운영"),
                     List.of(
@@ -771,7 +1335,23 @@ public class SeedDataInitializer implements ApplicationRunner {
             );
         }
 
-        if (rank == 2) {
+        if (SEED_PLATFORM_BACKEND_EMAIL.equals(email)) {
+            return new SeedRecommendationNarrative(
+                    List.of("플랫폼", "백엔드", "운영 자동화"),
+                    List.of(
+                            "Redis/Kafka 기반 고트래픽 백엔드 운영 경험",
+                            "Docker/Kubernetes/GitHub Actions 기반 배포 자동화 경험",
+                            "PostgreSQL 튜닝과 플랫폼 운영 협업 경험"
+                    ),
+                    """
+                    %s 후보는 %s 포지션에서 필요한 백엔드 구현 역량에 더해 플랫폼 운영 관점까지 함께 가져갈 수 있는 인력입니다.
+                    Redis/Kafka를 활용한 비동기 처리와 캐시 설계 경험이 있어, 추천 API 고도화 과정에서 병목 구간을 구조적으로 개선할 가능성이 높습니다.
+                    배포 자동화와 운영 안정화 경험까지 갖추고 있어 초기 고도화 이후의 운영 단계까지 연결해 기여할 수 있습니다. (경력 %s년)
+                    """.formatted(name, positionTitle, years).trim()
+            );
+        }
+
+        if (SEED_FULLSTACK_EMAIL.equals(email)) {
             return new SeedRecommendationNarrative(
                     List.of("백엔드", "관리자/대시보드", "DevOps"),
                     List.of(
@@ -787,18 +1367,48 @@ public class SeedDataInitializer implements ApplicationRunner {
             );
         }
 
+        if (SEED_AI_EMAIL.equals(email) || SEED_MLOPS_EMAIL.equals(email) || SEED_AI_PRODUCT_EMAIL.equals(email)) {
+            return new SeedRecommendationNarrative(
+                    List.of("데이터", "AI", "플랫폼"),
+                    List.of(
+                            "LLM 기반 추천/설명 생성 파이프라인 구현 경험",
+                            "Python/AWS 기반 추론 서비스 운영 경험",
+                            "PostgreSQL 기반 데이터 모델링 및 분석 경험"
+                    ),
+                    """
+                    %s 후보는 LLM/추천 파이프라인 경험이 있어, 추천 품질 개선(설명 생성/실험/지표 설계) 측면에서 강점을 보입니다.
+                    이번 포지션이 순수 백엔드 중심이라면 매칭 강도는 다소 낮을 수 있으나, 추천 기능 고도화/실험을 병행한다면 기여도가 커질 수 있습니다.
+                    데이터 저장소(PostgreSQL) 경험이 있어 백엔드팀과의 협업 접점도 확보 가능합니다. (경력 %s년)
+                    """.formatted(name, years).trim()
+            );
+        }
+
+        if (rank == 1) {
+            return new SeedRecommendationNarrative(
+                    List.of("백엔드", "운영", "협업"),
+                    List.of(
+                            "핵심 요구 스킬과 직접 맞닿는 실무 경험",
+                            "운영 환경에서의 기능 개선 및 안정화 경험",
+                            "프로젝트 초반 적응이 빠른 범용 기술 스택"
+                    ),
+                    """
+                    %s 후보는 %s 포지션의 핵심 요구사항과 직접 맞닿는 경험을 갖고 있어 빠르게 전력화될 가능성이 높습니다.
+                    운영 환경에서 기능 개선과 안정화 작업을 함께 수행한 이력이 있어 실무 투입 이후의 리스크도 낮은 편입니다. (경력 %s년)
+                    """.formatted(name, positionTitle, years).trim()
+            );
+        }
+
         return new SeedRecommendationNarrative(
-                List.of("데이터", "AI", "플랫폼"),
+                List.of("범용 개발", "협업", "운영"),
                 List.of(
-                        "LLM 기반 추천/설명 생성 파이프라인 구현 경험",
-                        "Python/AWS 기반 추론 서비스 운영 경험",
-                        "PostgreSQL 기반 데이터 모델링 및 분석 경험"
+                        "실무형 기능 개발과 운영 경험 보유",
+                        "프로젝트 상황에 맞춘 역할 확장 가능",
+                        "협업 비용이 낮은 범용 기술 스택"
                 ),
                 """
-                %s 후보는 LLM/추천 파이프라인 경험이 있어, 추천 품질 개선(설명 생성/실험/지표 설계) 측면에서 강점을 보입니다.
-                이번 포지션이 순수 백엔드 중심이라면 매칭 강도는 다소 낮을 수 있으나, 추천 기능 고도화/실험을 병행한다면 기여도가 커질 수 있습니다.
-                데이터 저장소(PostgreSQL) 경험이 있어 백엔드팀과의 협업 접점도 확보 가능합니다. (경력 %s년)
-                """.formatted(name, years).trim()
+                %s 후보는 특정 단일 역할에만 한정되지 않고, 기능 개발과 운영을 함께 수행할 수 있는 범용 역량을 갖추고 있습니다.
+                현재 %s 포지션이 요구하는 핵심 기술과의 직접 접점이 있어 온보딩 부담이 낮고, 주변 업무까지 유연하게 확장할 수 있습니다. (경력 %s년)
+                """.formatted(name, positionTitle, years).trim()
         );
     }
 

@@ -89,7 +89,7 @@ class HeuristicV1RecommendationScorerTest {
         List<Double> queryEmbedding = dummyQueryEmbedding();
         List<Double> resumeEmbedding = List.of(0.2, 0.8);
 
-        given(properties.getModel()).willReturn(EMBEDDING_MODEL);
+        given(properties.resolveEmbeddingModel()).willReturn(EMBEDDING_MODEL);
         given(proposalPosition.getCareerMinYears()).willReturn(5);
         given(proposalPosition.getCareerMaxYears()).willReturn(8);
         given(recommendationQueryTextGenerator.generate(
@@ -161,7 +161,7 @@ class HeuristicV1RecommendationScorerTest {
 
         // then
         verify(resumeEmbeddingReader).readEmbeddingsByResumeIds(List.of(100L), customModel);
-        verify(properties, never()).getModel();
+        verify(properties, never()).resolveEmbeddingModel();
     }
 
     // -------------------------------------------------------------------------

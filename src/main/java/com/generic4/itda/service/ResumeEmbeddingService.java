@@ -31,7 +31,7 @@ public class ResumeEmbeddingService {
 
         String embeddingText = resumeEmbeddingTextGenerator.generate(resume);
         SourceHash sourceHash = resumeEmbeddingSourceHashGenerator.generate(embeddingText);
-        String embeddingModel = aiEmbeddingProperties.getModel();
+        String embeddingModel = aiEmbeddingProperties.resolveEmbeddingModel();
 
         ResumeEmbedding existing = resumeEmbeddingRepository
                 .findByResume_IdAndEmbeddingModel(resume.getId(), embeddingModel)

@@ -104,7 +104,7 @@ class ResumeEmbeddingServiceTest {
 
             given(resumeEmbeddingTextGenerator.generate(resume)).willReturn(text);
             given(resumeEmbeddingSourceHashGenerator.generate(text)).willReturn(hash);
-            given(aiEmbeddingProperties.getModel()).willReturn(MODEL);
+            given(aiEmbeddingProperties.resolveEmbeddingModel()).willReturn(MODEL);
             given(resumeEmbeddingRepository.findByResume_IdAndEmbeddingModel(RESUME_ID, MODEL))
                     .willReturn(Optional.empty());
             given(queryEmbeddingGenerator.generate(text)).willReturn(vectorValues);
@@ -141,7 +141,7 @@ class ResumeEmbeddingServiceTest {
 
             given(resumeEmbeddingTextGenerator.generate(resume)).willReturn(text);
             given(resumeEmbeddingSourceHashGenerator.generate(text)).willReturn(hash);
-            given(aiEmbeddingProperties.getModel()).willReturn(MODEL);
+            given(aiEmbeddingProperties.resolveEmbeddingModel()).willReturn(MODEL);
             given(resumeEmbeddingRepository.findByResume_IdAndEmbeddingModel(RESUME_ID, MODEL))
                     .willReturn(Optional.of(existing));
 
@@ -169,7 +169,7 @@ class ResumeEmbeddingServiceTest {
 
             given(resumeEmbeddingTextGenerator.generate(resume)).willReturn(text);
             given(resumeEmbeddingSourceHashGenerator.generate(text)).willReturn(newHash);
-            given(aiEmbeddingProperties.getModel()).willReturn(MODEL);
+            given(aiEmbeddingProperties.resolveEmbeddingModel()).willReturn(MODEL);
             given(resumeEmbeddingRepository.findByResume_IdAndEmbeddingModel(RESUME_ID, MODEL))
                     .willReturn(Optional.of(existing));
             given(queryEmbeddingGenerator.generate(text)).willReturn(newVectorValues);
