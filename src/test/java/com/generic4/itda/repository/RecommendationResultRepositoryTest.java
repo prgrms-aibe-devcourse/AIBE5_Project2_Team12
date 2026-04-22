@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -186,6 +187,43 @@ class RecommendationResultRepositoryTest {
 
         assertThat(found.get(0).getResume().getMember().getEmail().getValue()).isEqualTo("applicant@test.com");
         assertThat(found.get(1).getResume().getMember().getEmail().getValue()).isEqualTo("another2@test.com");
+    }
+
+    @Nested
+    @DisplayName("findDetailById")
+    class FindDetailById {
+
+        @Test
+        @DisplayName("추천 결과에서 매칭 생성에 필요한 상위 그래프를 함께 조회한다")
+        void fetchesRecommendationResultGraphForMatchingRequest() {
+            ReasonFacts reasonFacts = new ReasonFacts(List.of("Java"), List.of("백엔드"), 3, List.of("Spring 경험"));
+            RecommendationResult result = recommendationResultRepository.saveAndFlush(
+                    RecommendationResult.create(
+                            run,
+                            resume,
+                            1,
+                            new BigDecimal("0.9500"),
+                            new BigDecimal("0.8800"),
+                            reasonFacts
+                    )
+            );
+            em.clear();
+
+            RecommendationResult found = recommendationResultRepository.findDetailById(result.getId()).orElseThrow();
+
+            PersistenceUnitUtil util = em.getEntityManagerFactory().getPersistenceUnitUtil();
+            assertThat(util.isLoaded(found, "recommendationRun")).isTrue();
+            assertThat(util.isLoaded(found, "resume")).isTrue();
+            assertThat(util.isLoaded(found.getRecommendationRun(), "proposalPosition")).isTrue();
+            assertThat(util.isLoaded(found.getRecommendationRun().getProposalPosition(), "proposal")).isTrue();
+            assertThat(util.isLoaded(found.getRecommendationRun().getProposalPosition().getProposal(), "member")).isTrue();
+            assertThat(util.isLoaded(found.getResume(), "member")).isTrue();
+
+            assertThat(found.getRecommendationRun().getId()).isEqualTo(run.getId());
+            assertThat(found.getRecommendationRun().getProposalPosition().getProposal().getMember().getEmail().getValue())
+                    .isEqualTo("proposer@test.com");
+            assertThat(found.getResume().getMember().getEmail().getValue()).isEqualTo("applicant@test.com");
+        }
     }
 
     private Position persistPosition(String name) {
