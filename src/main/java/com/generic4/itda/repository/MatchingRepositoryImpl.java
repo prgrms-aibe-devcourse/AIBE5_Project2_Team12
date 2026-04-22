@@ -36,12 +36,26 @@ public class MatchingRepositoryImpl implements MatchingRepositoryCustom {
             MatchingStatus.ACCEPTED,
             MatchingStatus.IN_PROGRESS
     );
+    private static final EnumSet<MatchingStatus> NEW_ROW_STATUSES = EnumSet.of(
+            MatchingStatus.PROPOSED
+    );
+    private static final EnumSet<MatchingStatus> IN_PROGRESS_ROW_STATUSES = EnumSet.of(
+            MatchingStatus.ACCEPTED,
+            MatchingStatus.IN_PROGRESS
+    );
+    private static final EnumSet<MatchingStatus> COMPLETED_ROW_STATUSES = EnumSet.of(
+            MatchingStatus.COMPLETED,
+            MatchingStatus.REJECTED,
+            MatchingStatus.CANCELED
+    );
 
     @Override
     public List<FreelancerDashboardItem> getDashboardItems(String email, String status, String q) {
         return queryFactory
                 .select(Projections.constructor(FreelancerDashboardItem.class,
+                        matching.id,
                         proposal.id,
+                        proposalPosition.id,
                         proposal.title,
                         clientMember.nickname,
                         proposalPosition.title,
@@ -66,13 +80,25 @@ public class MatchingRepositoryImpl implements MatchingRepositoryCustom {
 
     // 1. 상태 필터링 (MatchingStatus 기준)
     private BooleanExpression statusEq(String status) {
-        if (!StringUtils.hasText(status)) return null;
+        if (!StringUtils.hasText(status)) {
+            return null;
+        }
+
+        String normalizedStatus = status.trim().toUpperCase();
+
+        return switch (normalizedStatus) {
+            case "NEW" -> matching.status.in(NEW_ROW_STATUSES);
+            case "IN_PROGRESS" -> matching.status.in(IN_PROGRESS_ROW_STATUSES);
+            case "COMPLETED" -> matching.status.in(COMPLETED_ROW_STATUSES);
+            default -> matchingStatusEq(normalizedStatus);
+        };
+    }
+
+    private BooleanExpression matchingStatusEq(String normalizedStatus) {
         try {
-            // 전달받은 문자열을 Enum으로 변환하여 비교
-            MatchingStatus matchingStatus = MatchingStatus.valueOf(status.toUpperCase());
+            MatchingStatus matchingStatus = MatchingStatus.valueOf(normalizedStatus);
             return matching.status.eq(matchingStatus);
         } catch (IllegalArgumentException e) {
-            // 잘못된 상태값이 들어오면 조건을 무시 (전체 조회와 동일 효과)
             return null;
         }
     }

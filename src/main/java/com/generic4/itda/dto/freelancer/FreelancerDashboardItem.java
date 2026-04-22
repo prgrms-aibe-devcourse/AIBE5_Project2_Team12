@@ -1,13 +1,12 @@
 package com.generic4.itda.dto.freelancer;
 
 import com.generic4.itda.domain.matching.constant.MatchingStatus;
-import lombok.Getter;
-
 import java.time.LocalDateTime;
-import java.util.List;
 
 public record FreelancerDashboardItem(
+        Long matchingId,
         Long proposalId,
+        Long proposalPositionId,
         String proposalTitle,
         String companyName,
         String positionName,

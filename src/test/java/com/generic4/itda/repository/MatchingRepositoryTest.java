@@ -14,6 +14,7 @@ import com.generic4.itda.domain.resume.CareerPayload;
 import com.generic4.itda.domain.resume.Resume;
 import com.generic4.itda.domain.resume.ResumeWritingStatus;
 import com.generic4.itda.domain.resume.WorkType;
+import com.generic4.itda.dto.freelancer.FreelancerDashboardItem;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceUnitUtil;
 import java.util.EnumSet;
@@ -278,6 +279,42 @@ class MatchingRepositoryTest {
 
         assertThat(items).hasSize(1);
         assertThat(matching.getId()).isNotNull();
+        assertThat(items)
+                .extracting("matchingId", "proposalId", "proposalPositionId")
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(
+                        matching.getId(),
+                        proposal.getId(),
+                        backendPosition.getId()
+                ));
+    }
+
+    @Test
+    @DisplayName("getDashboardItems는 대시보드 상태값 NEW/IN_PROGRESS/COMPLETED를 실제 매칭 상태에 맞게 필터링한다")
+    void getDashboardItems_filtersByDashboardStatusBuckets() {
+        Matching proposedMatching = saveMatching(backendPosition, freelancerResume, MatchingStatus.PROPOSED);
+
+        ProposalPosition acceptedPosition = saveAdditionalPosition("AI 추천 서비스", "AI 엔지니어");
+        Matching acceptedMatching = saveMatching(acceptedPosition, freelancerResume, MatchingStatus.ACCEPTED);
+
+        ProposalPosition completedPosition = saveAdditionalPosition("운영 자동화 툴", "운영 엔지니어");
+        Matching completedMatching = saveMatching(completedPosition, freelancerResume, MatchingStatus.COMPLETED);
+
+        em.flush();
+        em.clear();
+
+        List<FreelancerDashboardItem> newItems = matchingRepository.getDashboardItems(
+                freelancerMember.getEmail().getValue(), "NEW", null);
+        List<FreelancerDashboardItem> inProgressItems = matchingRepository.getDashboardItems(
+                freelancerMember.getEmail().getValue(), "IN_PROGRESS", null);
+        List<FreelancerDashboardItem> completedItems = matchingRepository.getDashboardItems(
+                freelancerMember.getEmail().getValue(), "COMPLETED", null);
+
+        assertThat(newItems).extracting(FreelancerDashboardItem::matchingId)
+                .containsExactly(proposedMatching.getId());
+        assertThat(inProgressItems).extracting(FreelancerDashboardItem::matchingId)
+                .containsExactly(acceptedMatching.getId());
+        assertThat(completedItems).extracting(FreelancerDashboardItem::matchingId)
+                .containsExactly(completedMatching.getId());
     }
 
     private Matching saveMatching(ProposalPosition proposalPosition, Resume resume, MatchingStatus status) {
@@ -295,5 +332,24 @@ class MatchingRepositoryTest {
         Position position = Position.create(name);
         em.persist(position);
         return position;
+    }
+
+    private ProposalPosition saveAdditionalPosition(String proposalTitle, String positionName) {
+        Position position = persistPosition(positionName);
+        Proposal extraProposal = Proposal.create(clientMember, proposalTitle, "원문", null, null, null, null);
+        ProposalPosition extraPosition = extraProposal.addPosition(
+                position,
+                positionName,
+                null,
+                1L,
+                2_000_000L,
+                4_000_000L,
+                null,
+                null,
+                null,
+                null
+        );
+        proposalRepository.saveAndFlush(extraProposal);
+        return extraPosition;
     }
 }
