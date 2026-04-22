@@ -76,6 +76,32 @@ class MatchingControllerTest {
     }
 
     @Test
+    @DisplayName("없는 매칭 상세를 조회하면 홈으로 이동하며 오류 메시지를 남긴다")
+    void redirectHomeWhenMatchingDetailNotFound() throws Exception {
+        given(matchingQueryService.getDetail(999L, "client@example.com"))
+                .willThrow(new IllegalArgumentException("매칭 정보를 찾을 수 없습니다. id=999"));
+
+        mockMvc.perform(get("/matchings/999")
+                        .with(authentication(authToken("client@example.com", "클라이언트"))))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/"))
+                .andExpect(flash().attribute("errorMessage", "존재하지 않는 매칭입니다."));
+    }
+
+    @Test
+    @DisplayName("권한 없는 매칭 상세를 조회하면 홈으로 이동하며 오류 메시지를 남긴다")
+    void redirectHomeWhenMatchingDetailAccessDenied() throws Exception {
+        given(matchingQueryService.getDetail(401L, "client@example.com"))
+                .willThrow(new AccessDeniedException("해당 매칭 정보에 접근할 수 없습니다."));
+
+        mockMvc.perform(get("/matchings/401")
+                        .with(authentication(authToken("client@example.com", "클라이언트"))))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/"))
+                .andExpect(flash().attribute("errorMessage", "해당 매칭 정보에 접근할 수 없습니다."));
+    }
+
+    @Test
     @DisplayName("클라이언트가 추천 결과로 매칭 요청을 보내면 지정한 화면으로 돌아간다")
     void requestMatchingAndRedirectToProvidedPath() throws Exception {
         Matching matching = createMatching();
@@ -205,6 +231,14 @@ class MatchingControllerTest {
     @DisplayName("인증되지 않은 사용자는 매칭 응답 시 로그인 페이지로 이동한다")
     void redirectToLoginWhenUnauthenticated() throws Exception {
         mockMvc.perform(post("/matchings/401/accept").with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrlPattern("**/login"));
+    }
+
+    @Test
+    @DisplayName("인증되지 않은 사용자는 매칭 상세 조회 시 로그인 페이지로 이동한다")
+    void redirectToLoginWhenUnauthenticatedOnDetail() throws Exception {
+        mockMvc.perform(get("/matchings/401"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrlPattern("**/login"));
     }
