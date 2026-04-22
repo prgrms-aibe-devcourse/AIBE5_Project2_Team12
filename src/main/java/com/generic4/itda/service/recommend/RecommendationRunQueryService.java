@@ -1,5 +1,7 @@
 package com.generic4.itda.service.recommend;
 
+import com.generic4.itda.domain.matching.Matching;
+import com.generic4.itda.domain.matching.constant.MatchingStatus;
 import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
@@ -8,13 +10,22 @@ import com.generic4.itda.domain.recommendation.RecommendationRun;
 import com.generic4.itda.domain.recommendation.constant.LlmStatus;
 import com.generic4.itda.domain.recommendation.vo.ReasonFacts;
 import com.generic4.itda.domain.resume.Resume;
+import com.generic4.itda.domain.resume.ResumeSkill;
 import com.generic4.itda.dto.recommend.RecommendationCandidateItem;
+import com.generic4.itda.dto.recommend.RecommendationResumeCareerItem;
+import com.generic4.itda.dto.recommend.RecommendationResumeDetailViewModel;
+import com.generic4.itda.dto.recommend.RecommendationResumeSkillItem;
 import com.generic4.itda.dto.recommend.RecommendationResultsViewModel;
 import com.generic4.itda.dto.recommend.RecommendationRunStatusViewModel;
+import com.generic4.itda.repository.MatchingRepository;
 import com.generic4.itda.repository.RecommendationResultRepository;
 import com.generic4.itda.repository.RecommendationRunRepository;
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.SortedSet;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +37,7 @@ public class RecommendationRunQueryService {
 
     private final RecommendationRunRepository recommendationRunRepository;
     private final RecommendationResultRepository recommendationResultRepository;
+    private final MatchingRepository matchingRepository;
 
     public RecommendationRunStatusViewModel getRecommendationRunStatus(Long proposalId, Long runId, String email) {
         RecommendationRun run = recommendationRunRepository.findDetailById(runId)
@@ -56,8 +68,15 @@ public class RecommendationRunQueryService {
 
         List<RecommendationResult> results = recommendationResultRepository.findByRunIdWithResume(runId);
 
+        // 후보별 매칭 상태를 한 번의 쿼리로 배치 조회 (N+1 방지)
+        List<Long> resumeIds = results.stream()
+                .map(r -> r.getResume().getId())
+                .toList();
+        Map<Long, MatchingStatus> matchingStatusMap = loadMatchingStatusMap(
+                proposalPosition.getId(), resumeIds);
+
         List<RecommendationCandidateItem> candidates = results.stream()
-                .map(this::toCandidateItem)
+                .map(r -> toCandidateItem(r, matchingStatusMap.get(r.getResume().getId())))
                 .toList();
 
         return new RecommendationResultsViewModel(
@@ -71,7 +90,59 @@ public class RecommendationRunQueryService {
         );
     }
 
-    private RecommendationCandidateItem toCandidateItem(RecommendationResult result) {
+    public RecommendationResumeDetailViewModel getRecommendationCandidateResume(Long proposalId, Long resultId, String email) {
+        RecommendationResult result = recommendationResultRepository.findDetailById(resultId)
+                .orElseThrow(() -> new IllegalArgumentException("추천 결과를 찾을 수 없습니다."));
+
+        RecommendationRun run = result.getRecommendationRun();
+        ProposalPosition proposalPosition = run.getProposalPosition();
+        Proposal proposal = proposalPosition.getProposal();
+
+        validateProposalMatches(proposal, proposalId);
+        validateOwnership(proposal, email);
+
+        if (!run.isComputed()) {
+            throw new IllegalStateException("추천 결과가 아직 준비되지 않았습니다.");
+        }
+
+        Resume resume = result.getResume();
+
+        // 해당 후보의 매칭 상태 조회
+        MatchingStatus matchingStatus = matchingRepository
+                .findByProposalPositionIdAndResumeIdIn(proposalPosition.getId(), List.of(resume.getId()))
+                .stream()
+                .findFirst()
+                .map(Matching::getStatus)
+                .orElse(null);
+
+        return new RecommendationResumeDetailViewModel(
+                proposal.getId(),
+                run.getId(),
+                result.getId(),
+                proposal.getTitle(),
+                resolvePositionTitle(proposalPosition),
+                "/proposals/%d/recommendations/results?runId=%d".formatted(proposal.getId(), run.getId()),
+                toCandidateItem(result, matchingStatus),
+                resume.getPortfolioUrl(),
+                toSkillItems(resume.getSkills()),
+                toCareerItems(resume)
+        );
+    }
+
+    private Map<Long, MatchingStatus> loadMatchingStatusMap(Long positionId, Collection<Long> resumeIds) {
+        if (resumeIds.isEmpty()) {
+            return Map.of();
+        }
+        return matchingRepository.findByProposalPositionIdAndResumeIdIn(positionId, resumeIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        m -> m.getResume().getId(),
+                        Matching::getStatus,
+                        (a, b) -> a  // 동일 resume에 매칭이 여러 개면 첫 번째 유지
+                ));
+    }
+
+    private RecommendationCandidateItem toCandidateItem(RecommendationResult result, MatchingStatus matchingStatus) {
         Resume resume = result.getResume();
         Member member = resume.getMember();
         ReasonFacts facts = result.getReasonFacts();
@@ -116,7 +187,8 @@ public class RecommendationRunQueryService {
                 highlights,
                 result.getLlmReason(),
                 result.getLlmStatus().getDescription(),
-                result.getLlmStatus() == LlmStatus.READY
+                result.getLlmStatus() == LlmStatus.READY,
+                matchingStatus != null ? matchingStatus.name() : null
         );
     }
 
@@ -137,6 +209,46 @@ public class RecommendationRunQueryService {
         if (!proposal.getId().equals(proposalId)) {
             throw new IllegalArgumentException("잘못된 추천 실행 접근입니다.");
         }
+    }
+
+    private static List<RecommendationResumeSkillItem> toSkillItems(SortedSet<ResumeSkill> skills) {
+        if (skills == null || skills.isEmpty()) {
+            return List.of();
+        }
+
+        return skills.stream()
+                .map(skill -> new RecommendationResumeSkillItem(
+                        skill.getSkill().getName(),
+                        skill.getProficiency().getDescription()
+                ))
+                .toList();
+    }
+
+    private static List<RecommendationResumeCareerItem> toCareerItems(Resume resume) {
+        if (resume.getCareer() == null || resume.getCareer().getItems() == null || resume.getCareer().getItems().isEmpty()) {
+            return List.of();
+        }
+
+        return resume.getCareer().getItems().stream()
+                .map(item -> new RecommendationResumeCareerItem(
+                        item.getCompanyName(),
+                        item.getPosition(),
+                        item.getEmploymentType() != null ? item.getEmploymentType().getDescription() : "-",
+                        formatPeriod(item.getStartYearMonth(), item.getEndYearMonth(), item.getCurrentlyWorking()),
+                        item.getSummary(),
+                        item.getTechStack() == null ? List.of() : item.getTechStack()
+                ))
+                .toList();
+    }
+
+    private static String formatPeriod(String startYearMonth, String endYearMonth, Boolean currentlyWorking) {
+        String start = (startYearMonth == null || startYearMonth.isBlank()) ? "-" : startYearMonth;
+        if (currentlyWorking != null && currentlyWorking) {
+            return start + " ~ " + "\uD604\uC7AC";
+        }
+
+        String end = (endYearMonth == null || endYearMonth.isBlank()) ? "-" : endYearMonth;
+        return start + " ~ " + end;
     }
 
     private void validateOwnership(Proposal proposal, String email) {
