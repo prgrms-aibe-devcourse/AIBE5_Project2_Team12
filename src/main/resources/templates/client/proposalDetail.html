@@ -69,10 +69,45 @@
                         </th:block>
 
                          
-                         <th:block th:if="${viewerRole == 'FREELANCER'}">
-                             
-                             <th:block th:if="${proposedPositions != null and !#lists.isEmpty(proposedPositions)}">
-                                 
+                         <th:block th:if="${viewerRole == 'FREELANCER'}"
+                                   th:with="selectedPos=${selectedProposalPosition}">
+
+                             <th:block th:if="${selectedPos != null}"
+                                       th:with="selectedMatching=${matchingByPositionId != null ? matchingByPositionId[selectedPos.id] : null}">
+                                 <th:block th:if="${selectedMatching != null and selectedMatching.status.name() == 'PROPOSED'}">
+                                     <div class="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
+                                         <p class="text-xs font-black uppercase tracking-widest text-slate-400">현재 응답할 포지션</p>
+                                         <div class="flex flex-wrap items-center justify-between gap-2">
+                                             <span class="text-sm font-bold text-slate-700" th:text="${selectedPos.title}">포지션</span>
+                                             <div class="flex items-center gap-2">
+                                                 <form th:action="@{/matchings/{id}/accept(id=${selectedMatching.id})}" method="post" class="inline">
+                                                     <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+                                                     <input type="hidden" name="redirectTo" th:value="@{/matchings/{id}(id=${selectedMatching.id})}">
+                                                     <input type="hidden" name="errorRedirectTo"
+                                                            th:value="@{/proposals/{id}(id=${proposal.id}, proposalPositionId=${selectedPos.id})}">
+                                                     <button type="submit"
+                                                             class="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-700">
+                                                         수락
+                                                     </button>
+                                                 </form>
+                                                 <form th:action="@{/matchings/{id}/reject(id=${selectedMatching.id})}" method="post" class="inline">
+                                                     <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+                                                     <input type="hidden" name="redirectTo" th:value="@{/matchings/{id}(id=${selectedMatching.id})}">
+                                                     <input type="hidden" name="errorRedirectTo"
+                                                            th:value="@{/proposals/{id}(id=${proposal.id}, proposalPositionId=${selectedPos.id})}">
+                                                     <button type="submit"
+                                                             class="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-500 transition hover:bg-red-50">
+                                                         거절
+                                                     </button>
+                                                 </form>
+                                             </div>
+                                         </div>
+                                     </div>
+                                 </th:block>
+                             </th:block>
+
+                             <th:block th:if="${selectedPos == null and proposedPositions != null and !#lists.isEmpty(proposedPositions)}">
+
                                  <th:block th:if="${#lists.size(proposedPositions) == 1}"
                                            th:with="pos=${proposedPositions[0]}, myMatching=${matchingByPositionId != null ? matchingByPositionId[proposedPositions[0].id] : null}">
                                      <th:block th:if="${myMatching != null and myMatching.status.name() == 'PROPOSED'}">
@@ -99,7 +134,6 @@
                                      </th:block>
                                  </th:block>
 
-                                 
                                  <th:block th:if="${#lists.size(proposedPositions) > 1}">
                                      <div class="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
                                          <p class="text-xs font-black uppercase tracking-widest text-slate-400">응답할 포지션</p>
@@ -462,6 +496,4 @@
 </div>
 </body>
 </html>
-
-
 

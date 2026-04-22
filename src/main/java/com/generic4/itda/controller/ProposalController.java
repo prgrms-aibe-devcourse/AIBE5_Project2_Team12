@@ -108,6 +108,7 @@ public class ProposalController {
     @GetMapping("/{proposalId}")
     public String detail(
             @PathVariable Long proposalId,
+            @RequestParam(name = "proposalPositionId", required = false) Long proposalPositionId,
             @AuthenticationPrincipal ItDaPrincipal principal,
             Model model,
             RedirectAttributes redirectAttributes
@@ -145,11 +146,18 @@ public class ProposalController {
             List<ProposalPosition> proposedPositions = proposal.getPositions().stream()
                     .filter(pos -> matchingByPositionId.containsKey(pos.getId()))
                     .toList();
+            ProposalPosition selectedProposalPosition = resolveSelectedProposalPosition(
+                    proposedPositions,
+                    proposalPositionId
+            );
 
             model.addAttribute("proposal", proposal);
             model.addAttribute("viewerRole", "FREELANCER");
             model.addAttribute("matchingByPositionId", matchingByPositionId);
             model.addAttribute("proposedPositions", proposedPositions);
+            model.addAttribute("selectedProposalPosition", selectedProposalPosition);
+            model.addAttribute("selectedProposalPositionId",
+                    selectedProposalPosition != null ? selectedProposalPosition.getId() : null);
             addMemberAttributes(model, principal);
             return "client/proposalDetail";
         } catch (ProposalNotFoundException e) {
@@ -159,6 +167,17 @@ public class ProposalController {
             redirectAttributes.addFlashAttribute("errorMessage", "접근 권한이 없는 제안서입니다.");
             return "redirect:/";
         }
+    }
+
+    private ProposalPosition resolveSelectedProposalPosition(List<ProposalPosition> proposedPositions, Long proposalPositionId) {
+        if (proposalPositionId == null || proposedPositions == null || proposedPositions.isEmpty()) {
+            return null;
+        }
+
+        return proposedPositions.stream()
+                .filter(position -> position.getId().equals(proposalPositionId))
+                .findFirst()
+                .orElse(null);
     }
 
     @GetMapping("/{proposalId}/edit")
