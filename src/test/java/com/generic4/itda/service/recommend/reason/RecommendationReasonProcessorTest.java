@@ -9,6 +9,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.generic4.itda.config.ai.RecommendationReasonProperties;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
 import com.generic4.itda.domain.recommendation.RecommendationResult;
@@ -18,6 +19,7 @@ import com.generic4.itda.domain.recommendation.vo.ReasonFacts;
 import com.generic4.itda.domain.resume.Resume;
 import java.math.BigDecimal;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,6 +33,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class RecommendationReasonProcessorTest {
 
     @Mock
+    private RecommendationReasonProperties properties;
+
+    @Mock
     private RecommendationReasonGenerator recommendationReasonGenerator;
 
     @InjectMocks
@@ -38,6 +43,11 @@ class RecommendationReasonProcessorTest {
 
     @Captor
     private ArgumentCaptor<RecommendationReasonContext> contextCaptor;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(properties.isEnabled()).thenReturn(true);
+    }
 
     @Test
     @DisplayName("results가 null이면 예외 없이 종료되고 generator는 호출되지 않는다")
@@ -56,6 +66,22 @@ class RecommendationReasonProcessorTest {
         assertThatCode(() -> recommendationReasonProcessor.process(List.of()))
                 .doesNotThrowAnyException();
 
+        verify(recommendationReasonGenerator, times(0)).generate(any());
+    }
+
+    @Test
+    @DisplayName("추천 이유 생성 옵션이 꺼져 있으면 PENDING result를 skip 하고 generator를 호출하지 않는다")
+    void process_whenRecommendationReasonDisabled_skipsPendingResults() {
+        // given
+        RecommendationResult result = createPendingResult();
+        when(properties.isEnabled()).thenReturn(false);
+
+        // when
+        recommendationReasonProcessor.process(List.of(result));
+
+        // then
+        assertThat(result.getLlmStatus()).isEqualTo(LlmStatus.PENDING);
+        assertThat(result.getLlmReason()).isNull();
         verify(recommendationReasonGenerator, times(0)).generate(any());
     }
 

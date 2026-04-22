@@ -141,6 +141,23 @@ class OpenAiRecommendationReasonGeneratorTest {
     }
 
     @Test
+    @DisplayName("reason 필드 앞뒤 공백은 trim 처리된다")
+    void generate_reason앞뒤공백_trim처리() throws JsonProcessingException {
+        // given
+        responseBody.set(objectMapper.writeValueAsString(
+                java.util.Map.of("output_text", objectMapper.writeValueAsString(
+                        java.util.Map.of("reason", "  핵심 기술과 하이라이트가 포지션 요구사항과 맞습니다.  ")
+                ))
+        ));
+
+        // when
+        String reason = generator.generate(createContext());
+
+        // then
+        assertThat(reason).isEqualTo("핵심 기술과 하이라이트가 포지션 요구사항과 맞습니다.");
+    }
+
+    @Test
     @DisplayName("응답 본문이 비어 있으면 예외가 발생한다")
     void generate_응답본문비어있음_예외발생() {
         // given
@@ -164,6 +181,18 @@ class OpenAiRecommendationReasonGeneratorTest {
         assertThatThrownBy(() -> generator.generate(createContext()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("reason");
+    }
+
+    @Test
+    @DisplayName("응답에 output_text와 output 배열이 모두 없으면 예외가 발생한다")
+    void generate_텍스트응답없음_예외발생() {
+        // given
+        responseBody.set("{}");
+
+        // when / then
+        assertThatThrownBy(() -> generator.generate(createContext()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("추천 이유 생성 응답에서 텍스트를 찾을 수 없습니다.");
     }
 
     private void handleExchange(HttpExchange exchange) throws IOException {
