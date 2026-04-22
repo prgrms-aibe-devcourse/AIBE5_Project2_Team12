@@ -32,6 +32,7 @@ import com.generic4.itda.repository.RecommendationResultRepository;
 import com.generic4.itda.repository.RecommendationRunRepository;
 import com.generic4.itda.repository.ResumeRepository;
 import com.generic4.itda.repository.SkillRepository;
+import com.generic4.itda.service.ResumeEmbeddingService;
 import com.generic4.itda.service.recommend.RecommendationFingerprintGenerator;
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
@@ -75,6 +76,7 @@ public class SeedDataInitializer implements ApplicationRunner {
     private final RecommendationRunRepository recommendationRunRepository;
     private final RecommendationResultRepository recommendationResultRepository;
     private final RecommendationFingerprintGenerator recommendationFingerprintGenerator;
+    private final ResumeEmbeddingService resumeEmbeddingService;
     private final PasswordEncoder passwordEncoder;
 
     @Value("${app.seed.default-password:demo1234}")
@@ -91,7 +93,7 @@ public class SeedDataInitializer implements ApplicationRunner {
         Member aiEngineer = ensureMember(SEED_AI_EMAIL, "박에이아이", "AI 시드", "010-9000-1003");
         Member hidden = ensureMember(SEED_HIDDEN_EMAIL, "최히든", "비공개 시드", "010-9000-1004");
 
-        ensureResume(
+        Resume backendResume = ensureResume(
                 backend,
                 "Spring Boot와 PostgreSQL 기반 B2B 백엔드 서비스를 설계하고 운영해 온 백엔드 개발자입니다.",
                 (byte) 6,
@@ -121,7 +123,7 @@ public class SeedDataInitializer implements ApplicationRunner {
                 skills
         );
 
-        ensureResume(
+        Resume fullstackResume = ensureResume(
                 fullstack,
                 "백엔드와 프론트를 모두 다루며 관리자 화면과 고객용 서비스 UI를 함께 구축하는 풀스택 개발자입니다.",
                 (byte) 5,
@@ -152,7 +154,7 @@ public class SeedDataInitializer implements ApplicationRunner {
                 skills
         );
 
-        ensureResume(
+        Resume aiResume = ensureResume(
                 aiEngineer,
                 "LLM 기능 기획부터 Python 기반 추론 서비스 운영까지 경험한 AI 엔지니어입니다.",
                 (byte) 4,
@@ -299,11 +301,7 @@ public class SeedDataInitializer implements ApplicationRunner {
         // ── Matching 시드 ────────────────────────────────────
         // matchingProposal의 포지션에 프리랜서 매칭 이력 생성
         // → seed.backend / seed.ai 로그인 시 해당 제안서 상세 페이지 접근 가능
-        Resume backendResume = resumeRepository.findByMemberId(backend.getId()).orElseThrow();
-        Resume aiResume      = resumeRepository.findByMemberId(aiEngineer.getId()).orElseThrow();
-        Resume fullstackResume = resumeRepository.findByMemberId(fullstack.getId()).orElseThrow();
-
-        ensureMatching(backendResume, backendPos1, client, backend,    MatchingStatus.PROPOSED);
+        ensureMatching(backendResume, backendPos1, client, backend, MatchingStatus.PROPOSED);
         ensureMatching(aiResume,      aiPos,       client, aiEngineer, MatchingStatus.ACCEPTED);
 
         // ── Recommendation 시드 ────────────────────────────────
@@ -454,7 +452,7 @@ public class SeedDataInitializer implements ApplicationRunner {
         }
 
         for (SeedSkillLevel skillLevel : skillLevels) {
-            Skill skill = skills.get(skillLevel.skillName());
+            Skill skill = getRequiredSkill(skills, skillLevel.skillName());
             Optional<ResumeSkill> existingSkill = resume.getSkills().stream()
                     .filter(resumeSkill -> resumeSkill.getSkill().getName().equals(skillLevel.skillName()))
                     .findFirst();
@@ -467,7 +465,9 @@ public class SeedDataInitializer implements ApplicationRunner {
             resume.addSkill(skill, skillLevel.proficiency());
         }
 
-        return resumeRepository.save(resume);
+        Resume savedResume = resumeRepository.save(resume);
+        refreshResumeEmbedding(savedResume);
+        return savedResume;
     }
 
     private Proposal ensureProposal(
@@ -521,7 +521,7 @@ public class SeedDataInitializer implements ApplicationRunner {
             Map<String, Skill> skills
     ) {
         ProposalPosition proposalPosition = proposal.getPositions().stream()
-                .filter(existing -> hasSamePositionIdentity(existing, position, title))
+                .filter(existing -> hasSamePositionIdentity(existing, position))
                 .findFirst()
                 .orElseGet(() -> proposal.addPosition(
                         position,
@@ -550,7 +550,7 @@ public class SeedDataInitializer implements ApplicationRunner {
         );
 
         for (SeedSkillRequirement requirement : skillRequirements) {
-            Skill skill = skills.get(requirement.skillName());
+            Skill skill = getRequiredSkill(skills, requirement.skillName());
             Optional<ProposalPositionSkill> existingSkill = proposalPosition.getSkills().stream()
                     .filter(proposalSkill -> proposalSkill.getSkill().getName().equals(requirement.skillName()))
                     .findFirst();
@@ -570,12 +570,12 @@ public class SeedDataInitializer implements ApplicationRunner {
         Proposal hydrated = proposalRepository.findWithPositionsById(savedProposal.getId()).orElse(savedProposal);
 
         return hydrated.getPositions().stream()
-                .filter(existing -> hasSamePositionIdentity(existing, position, title))
+                .filter(existing -> hasSamePositionIdentity(existing, position))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("시드 포지션 저장에 실패했습니다. proposalId=" + savedProposal.getId()));
     }
 
-    private boolean hasSamePositionIdentity(ProposalPosition existing, Position position, String title) {
+    private boolean hasSamePositionIdentity(ProposalPosition existing, Position position) {
         boolean samePosition = existing.getPosition().getId() != null && position.getId() != null
                 ? existing.getPosition().getId().equals(position.getId())
                 : existing.getPosition().getName().equals(position.getName());
@@ -583,6 +583,27 @@ public class SeedDataInitializer implements ApplicationRunner {
         // ProposalPositions with the same Position, so treat "same Position" as identity and update
         // the rest of fields (title, budgets, skills...) in-place.
         return samePosition;
+    }
+
+    private Skill getRequiredSkill(Map<String, Skill> skills, String skillName) {
+        Skill skill = skills.get(skillName);
+        if (skill == null) {
+            throw new IllegalStateException("시드 스킬을 찾을 수 없습니다. skillName=" + skillName);
+        }
+        return skill;
+    }
+
+    private void refreshResumeEmbedding(Resume resume) {
+        try {
+            resumeEmbeddingService.createOrRefresh(resume);
+        } catch (Exception e) {
+            log.error(
+                    "시드 이력서 임베딩 생성/갱신 실패. resumeId={} email={}",
+                    resume.getId(),
+                    resume.getMember().getEmail().getValue(),
+                    e
+            );
+        }
     }
 
     private Matching ensureMatching(
