@@ -6,7 +6,6 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
-import com.generic4.itda.domain.matching.Matching;
 import com.generic4.itda.domain.matching.constant.MatchingStatus;
 import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.position.Position;
@@ -36,6 +35,7 @@ import com.generic4.itda.repository.RecommendationRunRepository;
 import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -382,8 +382,10 @@ class RecommendationRunQueryServiceTest {
         result.markLlmReady("추천 사유입니다.");
 
         given(recommendationResultRepository.findByRunIdWithResume(RUN_ID)).willReturn(List.of(result));
-        given(matchingRepository.findByProposalPositionIdAndResumeIdIn(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyCollection()))
-                .willReturn(List.of());
+        given(matchingRepository.getLatestMatchingStatusMap(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyCollection()
+        )).willReturn(Map.of());
 
         // when
         RecommendationResultsViewModel view = service.getRecommendationResults(PROPOSAL_ID, RUN_ID, OWNER_EMAIL);
@@ -414,7 +416,10 @@ class RecommendationRunQueryServiceTest {
 
         verify(recommendationRunRepository).findDetailById(RUN_ID);
         verify(recommendationResultRepository).findByRunIdWithResume(RUN_ID);
-        verify(matchingRepository).findByProposalPositionIdAndResumeIdIn(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyCollection());
+        verify(matchingRepository).getLatestMatchingStatusMap(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyCollection()
+        );
         verifyNoMoreInteractions(recommendationRunRepository);
         verifyNoMoreInteractions(recommendationResultRepository);
     }
@@ -445,15 +450,10 @@ class RecommendationRunQueryServiceTest {
 
         given(recommendationResultRepository.findByRunIdWithResume(RUN_ID)).willReturn(List.of(result));
 
-        Resume matchingResume = org.mockito.Mockito.mock(Resume.class);
-        given(matchingResume.getId()).willReturn(resumeId);
-        Matching mockMatching = org.mockito.Mockito.mock(Matching.class);
-        given(mockMatching.getResume()).willReturn(matchingResume);
-        given(mockMatching.getStatus()).willReturn(MatchingStatus.PROPOSED);
-        given(matchingRepository.findByProposalPositionIdAndResumeIdIn(
+        given(matchingRepository.getLatestMatchingStatusMap(
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.anyCollection()
-        )).willReturn(List.of(mockMatching));
+        )).willReturn(Map.of(resumeId, MatchingStatus.PROPOSED));
 
         // when
         RecommendationResultsViewModel view = service.getRecommendationResults(PROPOSAL_ID, RUN_ID, OWNER_EMAIL);
@@ -489,15 +489,10 @@ class RecommendationRunQueryServiceTest {
 
         given(recommendationResultRepository.findByRunIdWithResume(RUN_ID)).willReturn(List.of(result));
 
-        Resume matchingResume = org.mockito.Mockito.mock(Resume.class);
-        given(matchingResume.getId()).willReturn(resumeId);
-        Matching mockMatching = org.mockito.Mockito.mock(Matching.class);
-        given(mockMatching.getResume()).willReturn(matchingResume);
-        given(mockMatching.getStatus()).willReturn(MatchingStatus.ACCEPTED);
-        given(matchingRepository.findByProposalPositionIdAndResumeIdIn(
+        given(matchingRepository.getLatestMatchingStatusMap(
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.anyCollection()
-        )).willReturn(List.of(mockMatching));
+        )).willReturn(Map.of(resumeId, MatchingStatus.ACCEPTED));
 
         // when
         RecommendationResultsViewModel view = service.getRecommendationResults(PROPOSAL_ID, RUN_ID, OWNER_EMAIL);
@@ -561,8 +556,10 @@ class RecommendationRunQueryServiceTest {
         result.markLlmReady("사유");
 
         given(recommendationResultRepository.findDetailById(RESULT_ID)).willReturn(Optional.of(result));
-        given(matchingRepository.findByProposalPositionIdAndResumeIdIn(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyCollection()))
-                .willReturn(List.of());
+        given(matchingRepository.getLatestMatchingStatus(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()
+        )).willReturn(Optional.empty());
 
         // when
         RecommendationResumeDetailViewModel view = service.getRecommendationCandidateResume(PROPOSAL_ID, RESULT_ID, OWNER_EMAIL);
@@ -579,7 +576,10 @@ class RecommendationRunQueryServiceTest {
         assertThat(view.careerItems().get(0).companyName()).isEqualTo("ACME");
 
         verify(recommendationResultRepository).findDetailById(RESULT_ID);
-        verify(matchingRepository).findByProposalPositionIdAndResumeIdIn(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyCollection());
+        verify(matchingRepository).getLatestMatchingStatus(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()
+        );
         verifyNoMoreInteractions(recommendationRunRepository);
         verifyNoMoreInteractions(recommendationResultRepository);
     }
