@@ -22,6 +22,7 @@ public class MatchingRepositoryImpl implements MatchingRepositoryCustom {
     private final QProposalPosition proposalPosition = QProposalPosition.proposalPosition;
     private final QProposal proposal = QProposal.proposal;
     private final QMember clientMember = new QMember("clientMember");
+    private final QMember freelancerMember = new QMember("freelancerMember");
 
     @Override
     public List<FreelancerDashboardItem> getDashboardItems(String email, String status, String q) {
@@ -40,8 +41,9 @@ public class MatchingRepositoryImpl implements MatchingRepositoryCustom {
                 .join(matching.proposalPosition, proposalPosition)
                 .join(proposalPosition.proposal, proposal)
                 .join(matching.clientMember, clientMember)
+                .join(matching.freelancerMember, freelancerMember)
                 .where(
-                        matching.freelancerMember.email.value.eq(email),
+                        freelancerMember.email.value.eq(email),
                         statusEq(status),
                         searchKw(q)
                 )
