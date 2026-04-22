@@ -46,6 +46,12 @@ ai:
     api-key: ${OPENAI_API_KEY}
     model: text-embedding-3-small
     timeout-millis: 5000
+  recommend-reason:
+    api-key: ${OPEN_API_KEY}
+    enabled: ${AI_RECOMMEND_REASON_ENABLED:false}
+    model: ${AI_RECOMMEND_REASON_MODEL:gpt-5-mini}
+    max-output-tokens: ${AI_RECOMMEND_REASON_MAX_OUTPUT_TOKENS:300}
+    temperature: ${AI_RECOMMEND_REASON_TEMPERATURE:0.2}
 
 app:
   seed:
