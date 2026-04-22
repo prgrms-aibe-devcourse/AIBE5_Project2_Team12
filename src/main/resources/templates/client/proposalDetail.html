@@ -10,6 +10,15 @@
     <main class="min-h-screen bg-slate-50 px-4 py-6 lg:px-8 lg:py-8">
         <div class="mx-auto max-w-5xl">
 
+            <section th:if="${errorMessage != null}"
+                     class="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-600">
+                <p th:text="${errorMessage}">오류 메시지</p>
+            </section>
+            <section th:if="${noticeMessage != null}"
+                     class="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                <p th:text="${noticeMessage}">안내 메시지</p>
+            </section>
+
             
             <div class="sticky top-0 z-10 mb-6 rounded-[28px] border border-slate-200 bg-white/95 px-6 py-5 shadow-sm shadow-slate-200/60 backdrop-blur">
                 <div class="flex flex-wrap items-center justify-between gap-4">
@@ -69,6 +78,7 @@
                                      <th:block th:if="${myMatching != null and myMatching.status.name() == 'PROPOSED'}">
                                          <form th:action="@{/matchings/{id}/accept(id=${myMatching.id})}" method="post" class="inline">
                                              <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+                                             <input type="hidden" name="redirectTo" th:value="@{/proposals/{id}(id=${proposal.id})}">
                                              <button type="submit"
                                                      class="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-100 transition hover:bg-blue-700">
                                                  <i data-lucide="check" class="h-4 w-4"></i>
@@ -77,6 +87,7 @@
                                          </form>
                                          <form th:action="@{/matchings/{id}/reject(id=${myMatching.id})}" method="post" class="inline">
                                              <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+                                             <input type="hidden" name="redirectTo" th:value="@{/proposals/{id}(id=${proposal.id})}">
                                              <button type="submit"
                                                      class="inline-flex items-center gap-2 rounded-2xl border border-red-200 bg-white px-5 py-3 text-sm font-bold text-red-500 transition hover:bg-red-50">
                                                  <i data-lucide="x" class="h-4 w-4"></i>
@@ -99,6 +110,7 @@
                                                      <div class="flex items-center gap-2">
                                                          <form th:action="@{/matchings/{id}/accept(id=${myMatching.id})}" method="post" class="inline">
                                                              <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+                                                             <input type="hidden" name="redirectTo" th:value="@{/proposals/{id}(id=${proposal.id})}">
                                                              <button type="submit"
                                                                      class="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-700">
                                                                  수락
@@ -106,6 +118,7 @@
                                                          </form>
                                                          <form th:action="@{/matchings/{id}/reject(id=${myMatching.id})}" method="post" class="inline">
                                                              <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+                                                             <input type="hidden" name="redirectTo" th:value="@{/proposals/{id}(id=${proposal.id})}">
                                                              <button type="submit"
                                                                      class="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-500 transition hover:bg-red-50">
                                                                  거절
@@ -441,7 +454,6 @@
 </div>
 </body>
 </html>
-
 
 
 

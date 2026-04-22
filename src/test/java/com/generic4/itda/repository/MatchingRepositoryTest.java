@@ -1,70 +1,217 @@
 package com.generic4.itda.repository;
 
-import com.generic4.itda.config.TestContainerConfig;
-import com.generic4.itda.config.TestQuerydslConfig;
-import com.generic4.itda.domain.matching.constant.MatchingStatus;
-import com.generic4.itda.dto.freelancer.FreelancerDashboardItem;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.context.annotation.Import;
-
-import java.util.List;
-
+import static com.generic4.itda.fixture.MemberFixture.createMember;
 import static org.assertj.core.api.Assertions.assertThat;
 
-@DataJpaTest
-@Import({TestContainerConfig.class, TestQuerydslConfig.class}) // 두 설정 모두 임포트
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE) // 실제 컨테이너 DB 사용
+import com.generic4.itda.annotation.RepositoryTest;
+import com.generic4.itda.domain.matching.Matching;
+import com.generic4.itda.domain.matching.constant.MatchingStatus;
+import com.generic4.itda.domain.member.Member;
+import com.generic4.itda.domain.position.Position;
+import com.generic4.itda.domain.proposal.Proposal;
+import com.generic4.itda.domain.proposal.ProposalPosition;
+import com.generic4.itda.domain.resume.CareerPayload;
+import com.generic4.itda.domain.resume.Resume;
+import com.generic4.itda.domain.resume.ResumeWritingStatus;
+import com.generic4.itda.domain.resume.WorkType;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceUnitUtil;
+import java.util.EnumSet;
+import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.util.ReflectionTestUtils;
+
+@RepositoryTest
 class MatchingRepositoryTest {
 
     @Autowired
     private MatchingRepository matchingRepository;
 
-    @Test
-    @DisplayName("전체 데이터 조회 및 통계 카운트 검증")
-    void getDashboardItems_Statistics() {
-        // Given
-        String email = "freelancer@test.com";
-        // 실제 테스트 시에는 EntityManager 등을 사용해 데이터를 INSERT 하는 로직이 선행되어야 함
+    @Autowired
+    private MemberRepository memberRepository;
 
-        // When
-        List<FreelancerDashboardItem> results = matchingRepository.getDashboardItems(email, null, null);
+    @Autowired
+    private ProposalRepository proposalRepository;
 
-        // Then
-        assertThat(results).isNotNull();
-        // 결과가 비어있더라도 쿼리 자체에 오류가 없는지 확인됨
-    }
+    @Autowired
+    private ResumeRepository resumeRepository;
 
-    @Test
-    @DisplayName("상태값이 'PROPOSED'인 데이터만 필터링 조회")
-    void getDashboardItems_StatusFilter() {
-        // Given
-        String email = "freelancer@test.com";
-        String status = "PROPOSED";
+    @Autowired
+    private EntityManager em;
 
-        // When
-        List<FreelancerDashboardItem> results = matchingRepository.getDashboardItems(email, status, null);
+    private Proposal proposal;
+    private ProposalPosition backendPosition;
+    private Resume freelancerResume;
+    private Member clientMember;
+    private Member freelancerMember;
 
-        // Then
-        assertThat(results).allMatch(item -> item.matchingStatus() == MatchingStatus.PROPOSED);
-    }
+    @BeforeEach
+    void setUp() {
+        clientMember = memberRepository.save(
+                createMember("client@test.com", "pw", "클라이언트", "010-0000-0001"));
+        freelancerMember = memberRepository.save(
+                createMember("freelancer@test.com", "pw", "프리랜서", "010-0000-0002"));
 
-    @Test
-    @DisplayName("검색어가 포함된 제목의 제안서 조회")
-    void getDashboardItems_SearchKeyword() {
-        // Given
-        String email = "freelancer@test.com";
-        String keyword = "Backend";
+        Position backend = persistPosition("백엔드 개발자");
 
-        // When
-        List<FreelancerDashboardItem> results = matchingRepository.getDashboardItems(email, null, keyword);
-
-        // Then
-        assertThat(results).allMatch(item ->
-                item.proposalTitle().contains(keyword) || item.companyName().contains(keyword)
+        proposal = Proposal.create(clientMember, "AI 매칭 플랫폼", "원문", null, null, null, null);
+        backendPosition = proposal.addPosition(
+                backend,
+                "플랫폼 백엔드 개발자",
+                null,
+                2L,
+                3_000_000L,
+                5_000_000L,
+                null,
+                null,
+                null,
+                null
         );
+        proposalRepository.saveAndFlush(proposal);
+
+        freelancerResume = resumeRepository.saveAndFlush(
+                Resume.create(
+                        freelancerMember,
+                        "자기소개입니다.",
+                        (byte) 3,
+                        new CareerPayload(),
+                        WorkType.REMOTE,
+                        ResumeWritingStatus.DONE,
+                        null
+                )
+        );
+    }
+
+    @Nested
+    @DisplayName("existsByProposalPosition_IdAndResume_IdAndStatusIn")
+    class ExistsActiveMatching {
+
+        @Test
+        @DisplayName("같은 포지션과 이력서 조합의 활성 매칭이 있으면 true를 반환한다")
+        void returnsTrueWhenActiveMatchingExists() {
+            Matching matching = saveMatching(backendPosition, freelancerResume, MatchingStatus.PROPOSED);
+
+            boolean result = matchingRepository.existsByProposalPosition_IdAndResume_IdAndStatusIn(
+                    backendPosition.getId(),
+                    freelancerResume.getId(),
+                    EnumSet.of(MatchingStatus.PROPOSED, MatchingStatus.ACCEPTED, MatchingStatus.IN_PROGRESS)
+            );
+
+            assertThat(result).isTrue();
+            assertThat(matching.getId()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("같은 조합이어도 종료 상태만 있으면 false를 반환한다")
+        void returnsFalseWhenOnlyTerminalMatchingExists() {
+            saveMatching(backendPosition, freelancerResume, MatchingStatus.REJECTED);
+
+            boolean result = matchingRepository.existsByProposalPosition_IdAndResume_IdAndStatusIn(
+                    backendPosition.getId(),
+                    freelancerResume.getId(),
+                    EnumSet.of(MatchingStatus.PROPOSED, MatchingStatus.ACCEPTED, MatchingStatus.IN_PROGRESS)
+            );
+
+            assertThat(result).isFalse();
+        }
+    }
+
+    @Test
+    @DisplayName("정원 점유 상태만 countByProposalPosition_IdAndStatusIn으로 집계할 수 있다")
+    void countByProposalPositionIdAndStatusIn_countsOnlyRequestedStatuses() {
+        saveMatching(backendPosition, freelancerResume, MatchingStatus.ACCEPTED);
+
+        Member secondFreelancer = memberRepository.save(
+                createMember("freelancer2@test.com", "pw", "프리랜서2", "010-0000-0003"));
+        Resume secondResume = resumeRepository.saveAndFlush(
+                Resume.create(
+                        secondFreelancer,
+                        "또 다른 자기소개입니다.",
+                        (byte) 5,
+                        new CareerPayload(),
+                        WorkType.REMOTE,
+                        ResumeWritingStatus.DONE,
+                        null
+                )
+        );
+        saveMatching(backendPosition, secondResume, MatchingStatus.IN_PROGRESS);
+
+        Member thirdFreelancer = memberRepository.save(
+                createMember("freelancer3@test.com", "pw", "프리랜서3", "010-0000-0004"));
+        Resume thirdResume = resumeRepository.saveAndFlush(
+                Resume.create(
+                        thirdFreelancer,
+                        "세 번째 자기소개입니다.",
+                        (byte) 1,
+                        new CareerPayload(),
+                        WorkType.SITE,
+                        ResumeWritingStatus.DONE,
+                        null
+                )
+        );
+        saveMatching(backendPosition, thirdResume, MatchingStatus.PROPOSED);
+
+        long occupiedCount = matchingRepository.countByProposalPosition_IdAndStatusIn(
+                backendPosition.getId(),
+                EnumSet.of(MatchingStatus.ACCEPTED, MatchingStatus.IN_PROGRESS)
+        );
+
+        assertThat(occupiedCount).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("findDetailById는 매칭 생성/응답에 필요한 연관 그래프를 함께 조회한다")
+    void findDetailById_fetchesMatchingGraph() {
+        Matching matching = saveMatching(backendPosition, freelancerResume, MatchingStatus.PROPOSED);
+        em.clear();
+
+        Matching found = matchingRepository.findDetailById(matching.getId()).orElseThrow();
+
+        PersistenceUnitUtil util = em.getEntityManagerFactory().getPersistenceUnitUtil();
+        assertThat(util.isLoaded(found, "proposalPosition")).isTrue();
+        assertThat(util.isLoaded(found, "resume")).isTrue();
+        assertThat(util.isLoaded(found, "clientMember")).isTrue();
+        assertThat(util.isLoaded(found, "freelancerMember")).isTrue();
+
+        ProposalPosition foundPosition = found.getProposalPosition();
+        assertThat(util.isLoaded(foundPosition, "proposal")).isTrue();
+        assertThat(foundPosition.getProposal().getId()).isEqualTo(proposal.getId());
+
+        assertThat(util.isLoaded(found.getResume(), "member")).isTrue();
+        assertThat(found.getResume().getMember().getId()).isEqualTo(freelancerMember.getId());
+    }
+
+    @Test
+    @DisplayName("getDashboardItems는 프리랜서가 받은 매칭 목록을 최신순으로 반환한다")
+    void getDashboardItems_returnsFreelancerDashboardItems() {
+        Matching matching = saveMatching(backendPosition, freelancerResume, MatchingStatus.PROPOSED);
+        em.flush();
+        em.clear();
+
+        List<?> items = matchingRepository.getDashboardItems(freelancerMember.getEmail().getValue(), null, null);
+
+        assertThat(items).hasSize(1);
+        assertThat(matching.getId()).isNotNull();
+    }
+
+    private Matching saveMatching(ProposalPosition proposalPosition, Resume resume, MatchingStatus status) {
+        Matching matching = Matching.create(
+                resume,
+                proposalPosition,
+                clientMember,
+                resume.getMember()
+        );
+        ReflectionTestUtils.setField(matching, "status", status);
+        return matchingRepository.saveAndFlush(matching);
+    }
+
+    private Position persistPosition(String name) {
+        Position position = Position.create(name);
+        em.persist(position);
+        return position;
     }
 }
