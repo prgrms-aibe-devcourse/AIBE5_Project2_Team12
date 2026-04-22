@@ -74,7 +74,7 @@ class ResumeEmbeddingServiceIntegrationTest {
 
         String expectedEmbeddingText = resumeEmbeddingTextGenerator.generate(resume);
         SourceHash expectedSourceHash = resumeEmbeddingSourceHashGenerator.generate(expectedEmbeddingText);
-        String expectedModel = aiEmbeddingProperties.getModel();
+        String expectedModel = aiEmbeddingProperties.resolveEmbeddingModel();
         List<Double> embeddingVector = List.of(0.12, 0.34, 0.56);
 
         given(queryEmbeddingGenerator.generate(expectedEmbeddingText)).willReturn(embeddingVector);

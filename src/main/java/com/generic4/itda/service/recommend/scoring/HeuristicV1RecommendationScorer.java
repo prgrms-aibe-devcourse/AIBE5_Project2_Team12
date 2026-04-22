@@ -40,7 +40,7 @@ public class HeuristicV1RecommendationScorer {
                 requiredSkillNames,
                 preferredSkillNames,
                 candidates,
-                properties.getModel()
+                properties.resolveEmbeddingModel()
         );
     }
 

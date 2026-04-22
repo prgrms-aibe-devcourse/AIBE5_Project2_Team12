@@ -232,10 +232,10 @@ class RecommendationRunProcessorTest {
                 Set.of("Java"),
                 Set.of("Spring")
         )).willReturn("query text");
-        given(aiEmbeddingProperties.getModel()).willReturn("text-embedding-3-small");
+        given(aiEmbeddingProperties.resolveEmbeddingModel()).willReturn("text-embedding-3-small:stub");
         given(queryEmbeddingGenerator.generate("query text"))
                 .willReturn(queryEmbedding);
-        given(resumeEmbeddingReader.readEmbeddingsByResumeIds(List.of(101L), "text-embedding-3-small"))
+        given(resumeEmbeddingReader.readEmbeddingsByResumeIds(List.of(101L), "text-embedding-3-small:stub"))
                 .willReturn(Map.of(101L, resumeEmbedding));
         given(cosineSimilarityCalculator.calculate(queryEmbedding, resumeEmbedding))
                 .willReturn(0.4);
@@ -289,7 +289,7 @@ class RecommendationRunProcessorTest {
                 Set.of("Java"),
                 Set.of("Spring")
         )).willReturn("query text");
-        given(aiEmbeddingProperties.getModel()).willReturn("text-embedding-3-small");
+        given(aiEmbeddingProperties.resolveEmbeddingModel()).willReturn("text-embedding-3-small:stub");
         given(queryEmbeddingGenerator.generate("query text"))
                 .willThrow(new QueryEmbeddingGenerationException("임베딩 실패"));
 
