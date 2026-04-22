@@ -15,5 +15,10 @@ public record RecommendationCandidateItem(
         List<String> highlights,
         String llmReason,
         String llmStatusLabel,
-        boolean llmReady
+        boolean llmReady,
+        /**
+         * 현재 매칭 상태. null이면 매칭 요청이 없는 상태 (버튼 활성).
+         * 값이 있으면 MatchingStatus.name() 문자열 (예: "PROPOSED", "ACCEPTED", ...).
+         */
+        String matchingStatus
 ) {}
