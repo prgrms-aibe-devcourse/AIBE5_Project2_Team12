@@ -29,6 +29,7 @@ import com.generic4.itda.exception.QueryEmbeddingGenerationException;
 import com.generic4.itda.config.ai.AiEmbeddingProperties;
 import com.generic4.itda.repository.RecommendationResultRepository;
 import com.generic4.itda.repository.RecommendationRunRepository;
+import com.generic4.itda.service.recommend.reason.RecommendationReasonProcessor;
 import com.generic4.itda.service.recommend.scoring.CareerAdjustmentCalculator;
 import com.generic4.itda.service.recommend.scoring.CosineSimilarityCalculator;
 import com.generic4.itda.service.recommend.scoring.HeuristicV1RecommendationScorer;
@@ -68,6 +69,9 @@ class RecommendationRunProcessorTest {
 
     @Mock
     private RecommendationResultCreator recommendationResultCreator;
+
+    @Mock
+    private RecommendationReasonProcessor recommendationReasonProcessor;
 
     @Mock
     private RecommendationQueryTextGenerator recommendationQueryTextGenerator;
@@ -178,6 +182,7 @@ class RecommendationRunProcessorTest {
                     Set.of("Java")
             );
             then(recommendationResultRepository).should().saveAll(results);
+            then(recommendationReasonProcessor).should().process(results);
         }
     }
 
@@ -429,6 +434,49 @@ class RecommendationRunProcessorTest {
         assertThat(run.getErrorMessage()).isEqualTo("저장 실패");
     }
 
+    @Test
+    @DisplayName("추천 이유 생성 중 예외가 발생해도 추천 실행은 COMPUTED 상태로 완료된다")
+    void 추천_이유_생성_중_예외가_발생해도_추천_실행은_COMPUTED_상태로_완료된다() {
+        RecommendationRun run = createRun(true);
+
+        List<RecommendationCandidate> candidates = List.of(
+                createCandidate(10L, 3,
+                        createCandidateSkill(1L, "Java", Proficiency.ADVANCED))
+        );
+        List<ScoredCandidate> scoredCandidates = List.of();
+        List<RecommendationResult> results = List.of(org.mockito.Mockito.mock(RecommendationResult.class));
+
+        given(recommendationRunRepository.findById(1L))
+                .willReturn(Optional.of(run));
+        given(recommendationCandidateFinder.findCandidates(run.getProposalPosition(), run.getTopK()))
+                .willReturn(candidates);
+        given(recommendationScorer.score(
+                any(),
+                any(),
+                anySet(),
+                anySet(),
+                anyList()
+        )).willReturn(scoredCandidates);
+        given(recommendationResultCreator.create(
+                run,
+                scoredCandidates,
+                run.getTopK(),
+                Set.of()
+        )).willReturn(results);
+        org.mockito.BDDMockito.willThrow(new RuntimeException("추천 이유 생성 실패"))
+                .given(recommendationReasonProcessor).process(results);
+
+        assertThatCode(() -> recommendationRunProcessor.process(1L))
+                .doesNotThrowAnyException();
+
+        assertThat(run.getStatus()).isEqualTo(RecommendationRunStatus.COMPUTED);
+        assertThat(run.getErrorMessage()).isNull();
+        assertThat(run.getHardFilterStats()).isEqualTo(new HardFilterStat(1, 1));
+        assertThat(run.getCandidateCount()).isEqualTo(1);
+        then(recommendationResultRepository).should().saveAll(results);
+        then(recommendationReasonProcessor).should().process(results);
+    }
+
     private RecommendationRun createRun(boolean running) {
         return createRun(createProposalPosition(), running);
     }
@@ -584,7 +632,8 @@ class RecommendationRunProcessorTest {
                 recommendationResultRepository,
                 recommendationCandidateFinder,
                 realScorer,
-                recommendationResultCreator
+                recommendationResultCreator,
+                recommendationReasonProcessor
         );
     }
 }
