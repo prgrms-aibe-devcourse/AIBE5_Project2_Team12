@@ -11,6 +11,15 @@
 <main class="min-h-screen bg-slate-50 py-10 px-6">
 <div class="max-w-6xl mx-auto space-y-8">
 
+    <section th:if="${errorMessage != null}"
+             class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-600">
+        <p th:text="${errorMessage}">오류 메시지</p>
+    </section>
+    <section th:if="${noticeMessage != null}"
+             class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+        <p th:text="${noticeMessage}">안내 메시지</p>
+    </section>
+
     <!-- 헤더 -->
     <div class="flex items-start justify-between">
         <div>
