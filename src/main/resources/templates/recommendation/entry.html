@@ -3,191 +3,169 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout/base}">
 <head>
-  <title>추천 진입</title>
+    <title th:text="${entry.proposalTitle} + ' | 추천 실행'">추천 실행 | IT-da</title>
 </head>
 <body>
 <div layout:fragment="content">
-  <main class="min-h-screen bg-slate-50 px-6 py-10 lg:px-10">
-    <div class="mx-auto flex w-full max-w-5xl flex-col gap-6">
+    <main class="min-h-screen bg-slate-50 px-4 py-6 lg:px-8 lg:py-8">
+        <div class="mx-auto max-w-4xl">
 
-      <!-- 헤더 -->
-      <section class="rounded-[32px] border border-slate-200 bg-white p-8 shadow-sm shadow-slate-200/70">
-        <div class="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p class="text-xs font-black uppercase tracking-widest text-slate-400">
-              Recommendation Entry
-            </p>
-            <h1 class="mt-2 text-3xl font-black tracking-tight text-slate-950"
-                th:text="${entry.proposalTitle}">
-              제안서 제목
-            </h1>
-            <p class="mt-3 text-sm text-slate-500">
-              현재 제안서 상태:
-              <span class="font-semibold text-slate-800"
-                    th:text="${entry.proposalStatus}">
-                                매칭 진행
-                            </span>
-            </p>
-          </div>
+            <!-- ── 상단 액션 바 ── -->
+            <div class="sticky top-0 z-10 mb-6 rounded-[28px] border border-slate-200 bg-white/95 px-6 py-5 shadow-sm shadow-slate-200/60 backdrop-blur">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center gap-4">
+                        <a th:href="@{/proposals/{id}(id=${entry.proposalId})}"
+                           class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600">
+                            <i data-lucide="arrow-left" class="h-4 w-4"></i>
+                            제안서로
+                        </a>
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">Recommendation</p>
+                            <h2 class="mt-1 text-xl font-bold tracking-tight text-slate-900"
+                                th:text="${entry.proposalTitle}">제안서 제목</h2>
+                        </div>
+                    </div>
 
-          <span th:classappend="${entry.runnable}
-                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                            : 'border-amber-200 bg-amber-50 text-amber-700'"
-                class="rounded-full border px-3 py-1 text-xs font-bold"
-                th:text="${entry.runnable} ? '추천 실행 가능' : '추천 실행 불가'">
-                        추천 실행 가능
+                    <span th:classappend="${entry.runnable}
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                : 'border-amber-200 bg-amber-50 text-amber-700'"
+                          class="inline-flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-xs font-bold">
+                        <i th:if="${entry.runnable}" data-lucide="circle-check" class="h-3.5 w-3.5"></i>
+                        <i th:unless="${entry.runnable}" data-lucide="circle-x" class="h-3.5 w-3.5"></i>
+                        <span th:text="${entry.runnable} ? '추천 실행 가능' : '추천 실행 불가'">추천 실행 가능</span>
                     </span>
-        </div>
-
-        <div th:if="${errorMessage}"
-             class="mt-5 rounded-2xl bor
-             der border-rose-200 bg-rose-50 px-4 py-4">
-          <p class="text-sm font-semibold text-rose-700"
-             th:text="${errorMessage}">
-            오류 메시지
-          </p>
-        </div>
-
-        <div class="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-          <p class="text-sm leading-6 text-slate-600"
-             th:text="${entry.helperMessage}">
-            안내 문구
-          </p>
-        </div>
-      </section>
-
-      <!-- 추천 요청 폼 -->
-      <section class="rounded-[32px] border border-slate-200 bg-white p-8 shadow-sm shadow-slate-200/70">
-        <form th:action="@{/proposals/{proposalId}/recommendations(proposalId=${entry.proposalId})}"
-              th:object="${requestForm}"
-              method="post"
-              class="space-y-6">
-
-          <!-- 포지션 선택 -->
-          <div>
-            <label for="proposalPositionId"
-                   class="text-xs font-black uppercase tracking-widest text-slate-400">
-              추천 대상 포지션
-            </label>
-
-            <div class="relative mt-3">
-              <select id="proposalPositionId"
-                      th:field="*{proposalPositionId}"
-                      class="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-4 pr-10 text-sm font-semibold text-slate-900 outline-none transition focus:border-slate-400">
-                <option value="">포지션을 선택해주세요</option>
-                <option th:each="position : ${entry.positions}"
-                        th:value="${position.proposalPositionId}"
-                        th:text="${position.positionTitle + (position.positionCategoryName != null and position.positionCategoryName != position.positionTitle ? ' · ' + position.positionCategoryName : '')}">
-                  백엔드 개발자
-                </option>
-              </select>
-              <div class="pointer-events-none absolute inset-y-0 right-4 flex items-center">
-                <svg class="h-4 w-4 text-slate-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                </svg>
-              </div>
+                </div>
             </div>
 
-            <p th:if="${#fields.hasErrors('proposalPositionId')}"
-               th:errors="*{proposalPositionId}"
-               class="mt-2 text-sm font-semibold text-rose-600">
-              포지션을 선택해주세요.
-            </p>
-          </div>
+            <!-- ── 안내 메시지 ── -->
+            <div th:if="${errorMessage}"
+                 class="mb-4 flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4">
+                <i data-lucide="triangle-alert" class="h-4 w-4 shrink-0 text-rose-500"></i>
+                <p class="text-sm font-semibold text-rose-700" th:text="${errorMessage}">오류 메시지</p>
+            </div>
 
-          <!-- 포지션 정보 카드 -->
-          <div class="space-y-4">
-            <div th:each="position : ${entry.positions}"
-                 th:classappend="${position.proposalPositionId == entry.selectedProposalPositionId}
-                                ? 'border-blue-200 bg-blue-50/40'
-                                : 'border-slate-200 bg-slate-50'"
-                 class="rounded-[24px] border p-5 transition">
+            <div class="mb-6 flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4">
+                <i data-lucide="info" class="mt-0.5 h-4 w-4 shrink-0 text-slate-400"></i>
+                <p class="text-sm leading-relaxed text-slate-600" th:text="${entry.helperMessage}">안내 문구</p>
+            </div>
 
-              <div class="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <h2 class="text-xl font-black tracking-tight text-slate-950"
-                      th:text="${position.positionTitle}">
-                    백엔드 개발자
-                  </h2>
+            <!-- ── 추천 요청 폼 ── -->
+            <section class="rounded-[32px] border border-slate-200 bg-white p-8 shadow-sm shadow-slate-200/70">
+                <form th:action="@{/proposals/{proposalId}/recommendations(proposalId=${entry.proposalId})}"
+                      th:object="${requestForm}"
+                      method="post"
+                      class="space-y-6">
+                    <input type="hidden" name="_csrf" th:value="${_csrf.token}">
 
-                  <p th:if="${position.positionCategoryName != null and position.positionCategoryName != position.positionTitle}"
-                     class="mt-2 inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-500"
-                     th:text="${position.positionCategoryName}">
-                    백엔드
-                  </p>
+                    <!-- 포지션 선택 -->
+                    <div>
+                        <div class="flex items-center gap-1.5 mb-3">
+                            <i data-lucide="layers" class="h-4 w-4 text-slate-400"></i>
+                            <label for="proposalPositionId"
+                                   class="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                                추천 대상 포지션
+                            </label>
+                        </div>
 
-                  <p class="mt-2 text-sm text-slate-500">
-                    모집 인원
-                    <span class="font-semibold text-slate-800"
-                          th:text="${position.headCount != null ? position.headCount + '명' : '미정'}">
-                                            2명
-                                        </span>
-                    <span class="mx-2 text-slate-300">•</span>
-                    예산
-                    <span class="font-semibold text-slate-800"
-                          th:text="${position.budgetText}">
-                                            5,000,000 ~ 9,000,000
-                                        </span>
-                    <span class="mx-2 text-slate-300">•</span>
-                    기간
-                    <span class="font-semibold text-slate-800"
-                          th:text="${position.expectedPeriod != null ? position.expectedPeriod + '주' : '미정'}">
-                                            8주
-                                        </span>
-                  </p>
-                </div>
+                        <div class="relative">
+                            <select id="proposalPositionId"
+                                    th:field="*{proposalPositionId}"
+                                    class="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-4 pr-10 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100">
+                                <option value="">포지션을 선택해주세요</option>
+                                <option th:each="position : ${entry.positions}"
+                                        th:value="${position.proposalPositionId}"
+                                        th:text="${position.positionTitle + (position.positionCategoryName != null and position.positionCategoryName != position.positionTitle ? ' · ' + position.positionCategoryName : '')}">
+                                    백엔드 개발자
+                                </option>
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-4 flex items-center">
+                                <i data-lucide="chevron-down" class="h-4 w-4 text-slate-400"></i>
+                            </div>
+                        </div>
 
-                <span th:if="${position.proposalPositionId == entry.selectedProposalPositionId}"
-                      class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
-                                    기본 선택 포지션
+                        <p th:if="${#fields.hasErrors('proposalPositionId')}"
+                           th:errors="*{proposalPositionId}"
+                           class="mt-2 text-sm font-semibold text-rose-600">
+                            포지션을 선택해주세요.
+                        </p>
+                    </div>
+
+                    <!-- 포지션 카드 목록 -->
+                    <div class="space-y-3">
+                        <article th:each="position : ${entry.positions}"
+                                 th:classappend="${position.proposalPositionId == entry.selectedProposalPositionId}
+                                    ? 'border-blue-200 bg-blue-50/40'
+                                    : 'border-slate-200 bg-slate-50'"
+                                 class="rounded-[24px] border p-5 transition">
+
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <h3 class="text-base font-bold tracking-tight text-slate-900"
+                                        th:text="${position.positionTitle}">백엔드 개발자</h3>
+                                    <p th:if="${position.positionCategoryName != null and position.positionCategoryName != position.positionTitle}"
+                                       class="mt-1 text-sm font-medium text-slate-500"
+                                       th:text="${position.positionCategoryName}">백엔드</p>
+                                </div>
+
+                                <span th:if="${position.proposalPositionId == entry.selectedProposalPositionId}"
+                                      class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                                    기본 선택
                                 </span>
-              </div>
+                            </div>
 
-              <div class="mt-5">
-                <p class="text-xs font-black uppercase tracking-widest text-slate-400">
-                  요구 스킬
-                </p>
+                            <!-- 수치 -->
+                            <div class="mt-3 flex flex-wrap gap-4">
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">인원</p>
+                                    <p class="mt-1 text-sm font-bold text-slate-900"
+                                       th:text="${position.headCount != null ? position.headCount + '명' : '미정'}">2명</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">예산</p>
+                                    <p class="mt-1 text-sm font-bold text-slate-900"
+                                       th:text="${position.budgetText != null ? position.budgetText : '미정'}">5,000,000 ~ 9,000,000</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">기간</p>
+                                    <p class="mt-1 text-sm font-bold text-slate-900"
+                                       th:text="${position.expectedPeriod != null ? position.expectedPeriod + '주' : '미정'}">8주</p>
+                                </div>
+                            </div>
 
-                <div class="mt-3 flex flex-wrap gap-2"
-                     th:if="${!#lists.isEmpty(position.skills)}">
+                            <!-- 스킬 -->
+                            <div class="mt-4" th:if="${!#lists.isEmpty(position.skills)}">
+                                <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">요구 스킬</p>
+                                <div class="mt-2 flex flex-wrap gap-2">
                                     <span th:each="skill : ${position.skills}"
-                                          class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                                          th:classappend="${skill.importanceLabel == '필수'} ? 'border-slate-200 bg-white text-slate-700' : 'border-blue-100 bg-blue-50 text-blue-700'"
+                                          class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold">
                                         <span th:text="${skill.skillName}">Java</span>
-                                        <span class="mx-1 text-slate-300">·</span>
-                                        <span class="text-slate-500"
-                                              th:text="${skill.importanceLabel}">
-                                            필수
-                                        </span>
+                                        <span class="text-slate-300">·</span>
+                                        <span th:text="${skill.importanceLabel}">필수</span>
                                     </span>
-                </div>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
 
-                <p th:if="${#lists.isEmpty(position.skills)}"
-                   class="mt-3 text-sm text-slate-500">
-                  등록된 스킬이 없습니다.
-                </p>
-              </div>
-            </div>
-          </div>
+                    <!-- 액션 -->
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-6">
+                        <p class="text-sm text-slate-500">추천 요청 후 실행 상태 페이지로 이동합니다.</p>
+                        <button type="submit"
+                                th:disabled="${!entry.runnable}"
+                                th:classappend="${entry.runnable}
+                                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 hover:bg-blue-700'
+                                    : 'cursor-not-allowed bg-slate-100 text-slate-400'"
+                                class="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold transition">
+                            <i data-lucide="sparkles" class="h-4 w-4"></i>
+                            추천 시작
+                        </button>
+                    </div>
+                </form>
+            </section>
 
-          <!-- 액션 -->
-          <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-6">
-            <p class="text-sm text-slate-500">
-              추천 요청 후 실행 상태 페이지로 이동합니다.
-            </p>
-
-            <button type="submit"
-                    th:disabled="${!entry.runnable}"
-                    th:classappend="${entry.runnable}
-                                    ? 'bg-slate-950 text-white hover:bg-slate-800'
-                                    : 'cursor-not-allowed bg-slate-200 text-slate-400'"
-                    class="rounded-2xl px-5 py-3 text-sm font-semibold transition">
-              추천 시작
-            </button>
-          </div>
-        </form>
-      </section>
-    </div>
-  </main>
+        </div>
+    </main>
 </div>
 </body>
 </html>
