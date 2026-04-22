@@ -11,23 +11,24 @@ public interface RecommendationResultRepository extends JpaRepository<Recommenda
 
     void deleteAllByRecommendationRun_ProposalPosition_Proposal_Id(Long proposalId);
 
+    void deleteAllByRecommendationRun_Id(Long runId);
+
+    @Query("SELECT DISTINCT r FROM RecommendationResult r " +
+            "JOIN FETCH r.recommendationRun run " +
+            "JOIN FETCH run.proposalPosition pp " +
+            "JOIN FETCH pp.proposal p " +
+            "JOIN FETCH p.member " +
+            "JOIN FETCH r.resume res " +
+            "JOIN FETCH res.member " +
+            "LEFT JOIN FETCH res.skills rs " +
+            "LEFT JOIN FETCH rs.skill " +
+            "WHERE r.id = :resultId")
+    Optional<RecommendationResult> findDetailById(@Param("resultId") Long resultId);
+
     @Query("SELECT r FROM RecommendationResult r " +
             "JOIN FETCH r.resume res " +
             "JOIN FETCH res.member " +
             "WHERE r.recommendationRun.id = :runId " +
             "ORDER BY r.rank ASC")
     List<RecommendationResult> findByRunIdWithResume(@Param("runId") Long runId);
-
-    @Query("""
-            select rr
-            from RecommendationResult rr
-            join fetch rr.recommendationRun run
-            join fetch run.proposalPosition pp
-            join fetch pp.proposal p
-            join fetch p.member proposalMember
-            join fetch rr.resume resume
-            join fetch resume.member resumeMember
-            where rr.id = :resultId
-            """)
-    Optional<RecommendationResult> findDetailById(Long resultId);
 }

@@ -185,6 +185,88 @@ class MatchingRepositoryTest {
         assertThat(found.getResume().getMember().getId()).isEqualTo(freelancerMember.getId());
     }
 
+    @Nested
+    @DisplayName("findByProposalPositionIdAndResumeIdIn")
+    class FindByProposalPositionIdAndResumeIdIn {
+
+        @Test
+        @DisplayName("포지션 ID와 resume ID 목록에 일치하는 매칭을 반환한다")
+        void returnsMatchingForGivenPositionAndResumeIds() {
+            Matching matching = saveMatching(backendPosition, freelancerResume, MatchingStatus.PROPOSED);
+            em.clear();
+
+            List<Matching> result = matchingRepository.findByProposalPositionIdAndResumeIdIn(
+                    backendPosition.getId(),
+                    List.of(freelancerResume.getId())
+            );
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getId()).isEqualTo(matching.getId());
+            assertThat(result.get(0).getStatus()).isEqualTo(MatchingStatus.PROPOSED);
+        }
+
+        @Test
+        @DisplayName("resume ID 목록에 없는 resume의 매칭은 반환하지 않는다")
+        void excludesMatchingsForUnlistedResumeIds() {
+            saveMatching(backendPosition, freelancerResume, MatchingStatus.PROPOSED);
+            em.clear();
+
+            List<Matching> result = matchingRepository.findByProposalPositionIdAndResumeIdIn(
+                    backendPosition.getId(),
+                    List.of(-999L)
+            );
+
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("다른 포지션의 매칭은 반환하지 않는다")
+        void excludesMatchingsForDifferentPosition() {
+            // 다른 제안서와 포지션 생성
+            Member otherClient = memberRepository.save(
+                    createMember("other-client@test.com", "pw", "다른클라이언트", "010-0000-0099"));
+            Position frontend = persistPosition("프론트엔드 개발자");
+            Proposal otherProposal = Proposal.create(otherClient, "다른 제안서", "원문", null, null, null, null);
+            ProposalPosition frontendPosition = otherProposal.addPosition(
+                    frontend, "프론트엔드 개발자", null, 1L, 1_000_000L, 2_000_000L, null, null, null, null);
+            proposalRepository.saveAndFlush(otherProposal);
+
+            saveMatching(frontendPosition, freelancerResume, MatchingStatus.PROPOSED);
+            em.clear();
+
+            // backendPosition으로 조회하면 frontendPosition 매칭은 안 나와야 함
+            List<Matching> result = matchingRepository.findByProposalPositionIdAndResumeIdIn(
+                    backendPosition.getId(),
+                    List.of(freelancerResume.getId())
+            );
+
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("여러 resume ID에 대한 매칭을 한 번에 반환한다")
+        void returnsMultipleMatchingsForBatchResumeIds() {
+            Member secondFreelancer = memberRepository.save(
+                    createMember("freelancer2@test.com", "pw", "프리랜서2", "010-0000-0010"));
+            Resume secondResume = resumeRepository.saveAndFlush(
+                    Resume.create(secondFreelancer, "두 번째 소개", (byte) 3,
+                            new CareerPayload(), WorkType.REMOTE, ResumeWritingStatus.DONE, null));
+
+            saveMatching(backendPosition, freelancerResume, MatchingStatus.PROPOSED);
+            saveMatching(backendPosition, secondResume, MatchingStatus.ACCEPTED);
+            em.clear();
+
+            List<Matching> result = matchingRepository.findByProposalPositionIdAndResumeIdIn(
+                    backendPosition.getId(),
+                    List.of(freelancerResume.getId(), secondResume.getId())
+            );
+
+            assertThat(result).hasSize(2);
+            assertThat(result).extracting(Matching::getStatus)
+                    .containsExactlyInAnyOrder(MatchingStatus.PROPOSED, MatchingStatus.ACCEPTED);
+        }
+    }
+
     @Test
     @DisplayName("getDashboardItems는 프리랜서가 받은 매칭 목록을 최신순으로 반환한다")
     void getDashboardItems_returnsFreelancerDashboardItems() {

@@ -9,6 +9,11 @@ import com.generic4.itda.domain.proposal.ProposalPosition;
 import com.generic4.itda.domain.proposal.ProposalPositionSkill;
 import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
 import com.generic4.itda.domain.proposal.ProposalWorkType;
+import com.generic4.itda.domain.recommendation.RecommendationResult;
+import com.generic4.itda.domain.recommendation.RecommendationRun;
+import com.generic4.itda.domain.recommendation.constant.RecommendationAlgorithm;
+import com.generic4.itda.domain.recommendation.vo.HardFilterStat;
+import com.generic4.itda.domain.recommendation.vo.ReasonFacts;
 import com.generic4.itda.domain.resume.CareerEmploymentType;
 import com.generic4.itda.domain.resume.CareerItemPayload;
 import com.generic4.itda.domain.resume.CareerPayload;
@@ -23,8 +28,12 @@ import com.generic4.itda.repository.MatchingRepository;
 import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.PositionRepository;
 import com.generic4.itda.repository.ProposalRepository;
+import com.generic4.itda.repository.RecommendationResultRepository;
+import com.generic4.itda.repository.RecommendationRunRepository;
 import com.generic4.itda.repository.ResumeRepository;
 import com.generic4.itda.repository.SkillRepository;
+import com.generic4.itda.service.recommend.RecommendationFingerprintGenerator;
+import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -63,6 +72,9 @@ public class SeedDataInitializer implements ApplicationRunner {
     private final ResumeRepository resumeRepository;
     private final ProposalRepository proposalRepository;
     private final MatchingRepository matchingRepository;
+    private final RecommendationRunRepository recommendationRunRepository;
+    private final RecommendationResultRepository recommendationResultRepository;
+    private final RecommendationFingerprintGenerator recommendationFingerprintGenerator;
     private final PasswordEncoder passwordEncoder;
 
     @Value("${app.seed.default-password:demo1234}")
@@ -289,9 +301,21 @@ public class SeedDataInitializer implements ApplicationRunner {
         // → seed.backend / seed.ai 로그인 시 해당 제안서 상세 페이지 접근 가능
         Resume backendResume = resumeRepository.findByMemberId(backend.getId()).orElseThrow();
         Resume aiResume      = resumeRepository.findByMemberId(aiEngineer.getId()).orElseThrow();
+        Resume fullstackResume = resumeRepository.findByMemberId(fullstack.getId()).orElseThrow();
 
         ensureMatching(backendResume, backendPos1, client, backend,    MatchingStatus.PROPOSED);
         ensureMatching(aiResume,      aiPos,       client, aiEngineer, MatchingStatus.ACCEPTED);
+
+        // ── Recommendation 시드 ────────────────────────────────
+        // backendPos1 기준 추천 결과 Top 3가 항상 노출되도록 실행(run) + 결과(result)를 준비한다.
+        ensureComputedRecommendationResults(
+                backendPos1,
+                List.of(
+                        backendResume,
+                        fullstackResume,
+                        aiResume
+                )
+        );
 
         log.info(
                 """
@@ -584,6 +608,205 @@ public class SeedDataInitializer implements ApplicationRunner {
             matching.accept();
         }
         return matching;
+    }
+
+    private void ensureComputedRecommendationResults(
+            ProposalPosition proposalPosition,
+            List<Resume> candidateResumes
+    ) {
+        List<Resume> uniqueCandidates = deduplicateResumesById(candidateResumes);
+
+        RecommendationAlgorithm algorithm = RecommendationAlgorithm.HEURISTIC_V1;
+        int topK = 3;
+        String fingerprint = recommendationFingerprintGenerator.generate(proposalPosition, algorithm, topK);
+
+        RecommendationRun run = recommendationRunRepository
+                .findByProposalPosition_IdAndRequestFingerprintAndAlgorithm(
+                        proposalPosition.getId(),
+                        fingerprint,
+                        algorithm
+                )
+                .orElse(null);
+
+        if (run != null && run.isFailed()) {
+            recommendationResultRepository.deleteAll(recommendationResultRepository.findByRunIdWithResume(run.getId()));
+            recommendationRunRepository.delete(run);
+            run = null;
+        }
+
+        if (run == null) {
+            run = recommendationRunRepository.save(
+                    RecommendationRun.create(proposalPosition, fingerprint, algorithm, topK)
+            );
+        }
+
+        if (!run.isComputed()) {
+            if (run.isPending()) {
+                run.markRunning();
+            }
+            if (run.isRunning()) {
+                run.markCompleted(new HardFilterStat(20, uniqueCandidates.size()));
+            }
+            run = recommendationRunRepository.save(run);
+        }
+
+        // 결과는 매번 같은 형태로 유지(시드 idempotency 목적)
+        // 주의: insert/delete flush 순서에 따라 unique constraint가 터질 수 있어 bulk delete로 먼저 정리한다.
+        recommendationResultRepository.deleteAllByRecommendationRun_Id(run.getId());
+        recommendationResultRepository.flush();
+
+        for (int i = 0; i < Math.min(topK, uniqueCandidates.size()); i++) {
+            Resume resume = uniqueCandidates.get(i);
+            int rank = i + 1;
+
+            BigDecimal finalScore = switch (rank) {
+                case 1 -> new BigDecimal("0.9500");
+                case 2 -> new BigDecimal("0.8700");
+                default -> new BigDecimal("0.7900");
+            };
+            BigDecimal embeddingScore = switch (rank) {
+                case 1 -> new BigDecimal("0.9100");
+                case 2 -> new BigDecimal("0.8400");
+                default -> new BigDecimal("0.7700");
+            };
+
+            List<String> requiredSkillNames = proposalPosition.getSkills().stream()
+                    .map(ProposalPositionSkill::getSkill)
+                    .map(Skill::getName)
+                    .distinct()
+                    .toList();
+
+            List<String> matchedSkills = resume.getSkills().stream()
+                    .map(ResumeSkill::getSkill)
+                    .map(Skill::getName)
+                    .filter(requiredSkillNames::contains)
+                    .distinct()
+                    .sorted()
+                    .toList();
+
+            SeedRecommendationNarrative narrative = seedNarrativeFor(rank, resume, proposalPosition.getTitle());
+            List<String> highlights = createSeedHighlights(matchedSkills, resume, embeddingScore);
+
+            ReasonFacts facts = new ReasonFacts(
+                    matchedSkills,
+                    narrative.matchedDomains(),
+                    resume.getCareerYears() != null ? resume.getCareerYears().intValue() : 0,
+                    highlights
+            );
+
+            RecommendationResult result = RecommendationResult.create(
+                    run,
+                    resume,
+                    rank,
+                    finalScore,
+                    embeddingScore,
+                    facts
+            );
+
+            result.markLlmReady(narrative.llmReason());
+            recommendationResultRepository.save(result);
+        }
+    }
+
+    private List<Resume> deduplicateResumesById(List<Resume> candidateResumes) {
+        if (candidateResumes == null || candidateResumes.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, Resume> deduplicated = new LinkedHashMap<>();
+        for (Resume resume : candidateResumes) {
+            if (resume == null) {
+                continue;
+            }
+            if (resume.getId() == null) {
+                continue;
+            }
+            deduplicated.putIfAbsent(resume.getId(), resume);
+        }
+        return List.copyOf(deduplicated.values());
+    }
+
+    private List<String> createSeedHighlights(
+            List<String> matchedSkills,
+            Resume resume,
+            BigDecimal embeddingScore
+    ) {
+        List<String> highlights = new java.util.ArrayList<>();
+
+        if (matchedSkills != null && !matchedSkills.isEmpty()) {
+            highlights.add("공통 스킬 " + matchedSkills.size() + "개 보유");
+        }
+
+        int careerYears = resume != null && resume.getCareerYears() != null ? resume.getCareerYears().intValue() : 0;
+        if (careerYears > 0) {
+            highlights.add("관련 경력 " + careerYears + "년");
+        }
+
+        if (embeddingScore != null && embeddingScore.compareTo(new BigDecimal("0.8000")) >= 0) {
+            highlights.add("요구 조건과 높은 유사도");
+        }
+
+        return highlights;
+    }
+
+    private SeedRecommendationNarrative seedNarrativeFor(int rank, Resume resume, String positionTitle) {
+        String name = resume.getMember().getNickname() != null && !resume.getMember().getNickname().isBlank()
+                ? resume.getMember().getNickname()
+                : resume.getMember().getName();
+        String years = resume.getCareerYears() != null ? resume.getCareerYears().toString() : "?";
+
+        if (rank == 1) {
+            return new SeedRecommendationNarrative(
+                    List.of("추천/매칭", "백엔드", "운영"),
+                    List.of(
+                            "Spring 기반 추천/매칭 API 설계 및 운영 경험",
+                            "PostgreSQL/Redis로 조회 성능·캐시 최적화 경험",
+                            "장애 대응 및 지표 기반 성능 튜닝 경험"
+                    ),
+                    """
+                    %s 후보는 %s 포지션에 필요한 Java/Spring 기반의 백엔드 설계·운영 경험이 풍부합니다.
+                    특히 추천/매칭 API를 운영 환경에서 튜닝한 경험이 있어 트래픽 증가 구간에서도 안정적으로 대응할 가능성이 높습니다.
+                    PostgreSQL/Redis를 함께 사용한 이력이 있어 데이터 접근 패턴 설계와 캐시 전략 수립에도 강점이 있습니다. (경력 %s년)
+                    """.formatted(name, positionTitle, years).trim()
+            );
+        }
+
+        if (rank == 2) {
+            return new SeedRecommendationNarrative(
+                    List.of("백엔드", "관리자/대시보드", "DevOps"),
+                    List.of(
+                            "API 서버와 관리자 화면을 함께 구축한 풀스택 경험",
+                            "Docker 기반 배포/운영 경험으로 개발-배포 흐름 대응",
+                            "백엔드(Spring)와 프론트(React/TS) 협업 관점 강점"
+                    ),
+                    """
+                    %s 후보는 백엔드(Spring)와 프론트(React/TypeScript)를 모두 경험해 팀 협업/커뮤니케이션 비용을 낮출 수 있습니다.
+                    추천 API 자체 개발뿐 아니라 운영/배포 파이프라인(Docker) 관점에서도 도움을 줄 수 있어, 초기 고도화 단계에서 유연하게 역할을 확장할 수 있습니다.
+                    핵심 백엔드 스킬셋(Java/Spring)을 보유하고 있어 포지션 요구사항과의 기본 적합도도 충분합니다. (경력 %s년)
+                    """.formatted(name, years).trim()
+            );
+        }
+
+        return new SeedRecommendationNarrative(
+                List.of("데이터", "AI", "플랫폼"),
+                List.of(
+                        "LLM 기반 추천/설명 생성 파이프라인 구현 경험",
+                        "Python/AWS 기반 추론 서비스 운영 경험",
+                        "PostgreSQL 기반 데이터 모델링 및 분석 경험"
+                ),
+                """
+                %s 후보는 LLM/추천 파이프라인 경험이 있어, 추천 품질 개선(설명 생성/실험/지표 설계) 측면에서 강점을 보입니다.
+                이번 포지션이 순수 백엔드 중심이라면 매칭 강도는 다소 낮을 수 있으나, 추천 기능 고도화/실험을 병행한다면 기여도가 커질 수 있습니다.
+                데이터 저장소(PostgreSQL) 경험이 있어 백엔드팀과의 협업 접점도 확보 가능합니다. (경력 %s년)
+                """.formatted(name, years).trim()
+        );
+    }
+
+    private record SeedRecommendationNarrative(
+            List<String> matchedDomains,
+            List<String> highlights,
+            String llmReason
+    ) {
     }
 
     private Position ensurePosition(String name) {

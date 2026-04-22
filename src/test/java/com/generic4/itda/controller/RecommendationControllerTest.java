@@ -12,6 +12,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.generic4.itda.annotation.ControllerTest;
 import com.generic4.itda.dto.recommend.RecommendationCandidateItem;
+import com.generic4.itda.dto.recommend.RecommendationResumeCareerItem;
+import com.generic4.itda.dto.recommend.RecommendationResumeDetailViewModel;
+import com.generic4.itda.dto.recommend.RecommendationResumeSkillItem;
 import com.generic4.itda.dto.recommend.RecommendationResultsViewModel;
 import com.generic4.itda.dto.security.ItDaPrincipal;
 import com.generic4.itda.repository.MemberRepository;
@@ -32,6 +35,7 @@ class RecommendationControllerTest {
 
     private static final Long PROPOSAL_ID = 10L;
     private static final Long RUN_ID = 301L;
+    private static final Long RESULT_ID = 100L;
 
     @Autowired
     private MockMvc mockMvc;
@@ -76,7 +80,8 @@ class RecommendationControllerTest {
                         List.of("대규모 트래픽 처리 경험"),
                         null,
                         "대기 중",
-                        false
+                        false,
+                        null  // 매칭 없음
                 ))
         );
 
@@ -126,6 +131,67 @@ class RecommendationControllerTest {
 
         then(recommendationRunQueryService).should()
                 .getRecommendationResults(eq(PROPOSAL_ID), eq(RUN_ID), eq("client@example.com"));
+    }
+
+    @Test
+    @DisplayName("추천 후보 이력서 조회가 성공하면 resume 화면을 렌더링한다")
+    void renderCandidateResume() throws Exception {
+        // given
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        RecommendationResumeDetailViewModel viewModel = new RecommendationResumeDetailViewModel(
+                PROPOSAL_ID,
+                RUN_ID,
+                RESULT_ID,
+                "제안서",
+                "백엔드 개발자",
+                "/proposals/10/recommendations/results?runId=301",
+                new RecommendationCandidateItem(
+                        RESULT_ID,
+                        1,
+                        "김*수",
+                        "소개",
+                        5,
+                        "원격",
+                        95,
+                        88,
+                        List.of("Java"),
+                        List.of("강점"),
+                        "사유",
+                        "READY",
+                        true,
+                        "PROPOSED"  // 매칭 요청 후 대기 중 시나리오
+                ),
+                "https://example.com",
+                List.of(new RecommendationResumeSkillItem("Java", "고급")),
+                List.of(new RecommendationResumeCareerItem(
+                        "ACME",
+                        "Backend",
+                        "정규직",
+                        "2024-01 ~ 2025-12",
+                        "요약",
+                        List.of("Java")
+                ))
+        );
+
+        given(recommendationRunQueryService.getRecommendationCandidateResume(eq(PROPOSAL_ID), eq(RESULT_ID), eq("client@example.com")))
+                .willReturn(viewModel);
+
+        // when / then
+        mockMvc.perform(get("/proposals/{proposalId}/recommendations/results/{resultId}", PROPOSAL_ID, RESULT_ID)
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("recommendation/resume"))
+                .andExpect(model().attributeExists("view"));
+
+        then(recommendationRunQueryService).should()
+                .getRecommendationCandidateResume(eq(PROPOSAL_ID), eq(RESULT_ID), eq("client@example.com"));
     }
 }
 
