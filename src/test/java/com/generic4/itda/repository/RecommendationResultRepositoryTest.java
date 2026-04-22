@@ -19,6 +19,7 @@ import com.generic4.itda.domain.resume.Resume;
 import com.generic4.itda.domain.resume.ResumeWritingStatus;
 import com.generic4.itda.domain.resume.WorkType;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceUnitUtil;
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -149,6 +150,42 @@ class RecommendationResultRepositoryTest {
         // then
         assertThatThrownBy(() -> recommendationResultRepository.saveAndFlush(second))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("runId로 결과를 조회하면 rank 오름차순으로 정렬되고 resume/member를 fetch join 한다")
+    void runId로_결과를_조회하면_rank_오름차순으로_정렬되고_resume_member를_fetch_join_한다() {
+        // given
+        Member anotherMember = memberRepository.save(
+                createMember("another2@test.com", "pw", "지원자2", "010-0000-0004"));
+        Resume anotherResume = resumeRepository.saveAndFlush(
+                Resume.create(anotherMember, "두번째 자기소개", (byte) 2, new CareerPayload(),
+                        WorkType.SITE, ResumeWritingStatus.WRITING, null));
+
+        ReasonFacts reasonFacts = new ReasonFacts(List.of(), List.of(), 0, List.of());
+        RecommendationResult rank2 = RecommendationResult.create(
+                run, anotherResume, 2, new BigDecimal("0.8000"), new BigDecimal("0.8000"), reasonFacts);
+        RecommendationResult rank1 = RecommendationResult.create(
+                run, resume, 1, new BigDecimal("0.9000"), new BigDecimal("0.9000"), reasonFacts);
+
+        recommendationResultRepository.saveAndFlush(rank2);
+        recommendationResultRepository.saveAndFlush(rank1);
+        em.clear();
+
+        // when
+        List<RecommendationResult> found = recommendationResultRepository.findByRunIdWithResume(run.getId());
+
+        // then
+        assertThat(found).hasSize(2);
+        assertThat(found.get(0).getRank()).isEqualTo(1);
+        assertThat(found.get(1).getRank()).isEqualTo(2);
+
+        PersistenceUnitUtil util = em.getEntityManagerFactory().getPersistenceUnitUtil();
+        assertThat(util.isLoaded(found.get(0), "resume")).isTrue();
+        assertThat(util.isLoaded(found.get(0).getResume(), "member")).isTrue();
+
+        assertThat(found.get(0).getResume().getMember().getEmail().getValue()).isEqualTo("applicant@test.com");
+        assertThat(found.get(1).getResume().getMember().getEmail().getValue()).isEqualTo("another2@test.com");
     }
 
     private Position persistPosition(String name) {

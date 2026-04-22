@@ -2,6 +2,7 @@ package com.generic4.itda.controller;
 
 import com.generic4.itda.dto.recommend.RecommendationEntryViewModel;
 import com.generic4.itda.dto.recommend.RecommendationRequestForm;
+import com.generic4.itda.dto.recommend.RecommendationResultsViewModel;
 import com.generic4.itda.dto.recommend.RecommendationRunStatusViewModel;
 import com.generic4.itda.dto.security.ItDaPrincipal;
 import com.generic4.itda.service.recommend.RecommendationEntryService;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
@@ -102,6 +104,30 @@ public class RecommendationController {
         }
     }
 
+    @GetMapping("/proposals/{proposalId}/recommendations/results")
+    public String results(
+            @PathVariable Long proposalId,
+            @RequestParam Long runId,
+            @AuthenticationPrincipal ItDaPrincipal principal,
+            Model model
+    ) {
+        try {
+            RecommendationResultsViewModel view = recommendationRunQueryService
+                    .getRecommendationResults(proposalId, runId, principal.getEmail());
+
+            model.addAttribute("view", view);
+            return "recommendation/results";
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            log.warn("추천 결과 조회 실패. proposalId={}, runId={}, email={}",
+                    proposalId, runId, principal.getEmail(), e);
+
+            model.addAttribute("title", "추천 결과를 확인할 수 없습니다.");
+            model.addAttribute("message", toResultsUserMessage(e));
+            model.addAttribute("backUrl", "/proposals/" + proposalId + "/runs/" + runId);
+            return "recommendation/error";
+        }
+    }
+
     private static String toUserMessage(RuntimeException e) {
         if (e instanceof IllegalArgumentException) {
             return "추천 요청을 처리할 수 없습니다. 선택한 포지션을 다시 확인해주세요.";
@@ -110,6 +136,13 @@ public class RecommendationController {
             return "현재 상태에는 추천을 실행할 수 없습니다.";
         }
         return "추천 요청 처리 중 문제가 발생했습니다. 다시 시도해주세요.";
+    }
+
+    private static String toResultsUserMessage(RuntimeException e) {
+        if (e instanceof IllegalStateException) {
+            return "추천이 아직 완료되지 않았습니다. 잠시 후 다시 시도해주세요.";
+        }
+        return "추천 결과를 불러오는 중 문제가 발생했습니다.";
     }
 
     private static String toRunStatusUserMessage(IllegalArgumentException e) {

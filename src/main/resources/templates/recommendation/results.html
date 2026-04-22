@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/base}">
+<head>
+    <title th:text="${view.proposalTitle} + ' | 추천 결과'">추천 결과 | IT-da</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <main class="min-h-screen bg-slate-50">
+
+        <!-- ══════════════════════════════════════════
+             상단 바
+        ══════════════════════════════════════════ -->
+        <div class="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur">
+            <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
+
+                <div class="flex items-center gap-4">
+                    <a th:href="@{/proposals/{id}(id=${view.proposalId})}"
+                       class="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700">
+                        <i data-lucide="arrow-left" class="h-4 w-4"></i>
+                    </a>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h1 class="text-lg font-bold text-slate-900"
+                                th:text="${view.proposalTitle}">제안서 제목</h1>
+                            <span class="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-blue-700">
+                                MATCHING
+                            </span>
+                        </div>
+                        <p class="mt-0.5 text-xs text-slate-400"
+                           th:text="${view.positionTitle} + ' · AI 추천 결과'">포지션 · AI 추천 결과</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <a th:href="@{/proposals/{id}/recommendations(id=${view.proposalId})}"
+                       class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50">
+                        <i data-lucide="refresh-cw" class="h-3.5 w-3.5"></i>
+                        추천 다시 실행
+                    </a>
+                    <a th:href="@{/proposals/{id}(id=${view.proposalId})}"
+                       class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                        <i data-lucide="file-text" class="h-3.5 w-3.5"></i>
+                        제안서 보기
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- ══════════════════════════════════════════
+             본문 2-column 레이아웃
+        ══════════════════════════════════════════ -->
+        <div class="mx-auto max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
+            <div class="grid gap-6 lg:grid-cols-5">
+
+                <!-- ────────────────────────────────────────
+                     좌측: AI 추천 카드 목록 (3/5)
+                ──────────────────────────────────────── -->
+                <section class="lg:col-span-3">
+
+                    <!-- 섹션 헤더 -->
+                    <div class="mb-4 flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <div class="flex h-7 w-7 items-center justify-center rounded-xl bg-blue-600">
+                                <i data-lucide="check" class="h-3.5 w-3.5 text-white"></i>
+                            </div>
+                            <h2 class="text-base font-bold text-slate-900">
+                                AI 추천 Top <span th:text="${#lists.size(view.candidates)}">3</span>
+                            </h2>
+                        </div>
+                        <p class="text-xs text-slate-400">프로젝트 요구사항 기반 자동 분석</p>
+                    </div>
+
+                    <!-- 후보 없음 -->
+                    <div th:if="${#lists.isEmpty(view.candidates)}"
+                         class="rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center">
+                        <i data-lucide="users" class="mx-auto mb-3 h-10 w-10 text-slate-200"></i>
+                        <p class="text-sm font-semibold text-slate-500">조건에 맞는 추천 결과가 없습니다</p>
+                        <p class="mt-1 text-xs text-slate-400">포지션 조건을 조정하거나 다시 시도해보세요.</p>
+                    </div>
+
+                    <!-- 후보 카드 목록 -->
+                    <div class="space-y-4" th:unless="${#lists.isEmpty(view.candidates)}">
+
+                        <article th:each="candidate : ${view.candidates}"
+                                 class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-200/50">
+
+                            <!-- ── 카드 상단: 이름 + 스킬 + 점수 ── -->
+                            <div class="flex items-start justify-between gap-4 px-5 pt-5 pb-4">
+
+                                <div class="flex items-start gap-3">
+                                    <!-- 아바타 -->
+                                    <div th:classappend="${candidate.rank == 1} ? 'bg-amber-50 text-amber-500 border-amber-100' :
+                                                          (${candidate.rank == 2} ? 'bg-slate-100 text-slate-400 border-slate-200' :
+                                                                                    'bg-orange-50 text-orange-400 border-orange-100')"
+                                         class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border">
+                                        <i data-lucide="user-plus" class="h-5 w-5"></i>
+                                    </div>
+
+                                    <div>
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-base font-bold text-slate-900"
+                                                  th:text="${candidate.maskedName}">김*수</span>
+                                            <span class="text-sm font-medium text-slate-400"
+                                                  th:text="${view.positionTitle}">프론트엔드 개발자</span>
+                                        </div>
+                                        <!-- 스킬 칩 -->
+                                        <div class="mt-2 flex flex-wrap gap-1.5"
+                                             th:if="${!#lists.isEmpty(candidate.matchedSkills)}">
+                                            <span th:each="skill : ${candidate.matchedSkills}"
+                                                  class="rounded-md border border-slate-100 bg-slate-50 px-2.5 py-0.5 text-xs font-medium text-slate-600"
+                                                  th:text="${skill}">Java</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 점수 -->
+                                <div class="shrink-0 text-right">
+                                    <p th:classappend="${candidate.finalScorePercent >= 80} ? 'text-blue-600' :
+                                                        (${candidate.finalScorePercent >= 60} ? 'text-indigo-500' : 'text-slate-500')"
+                                       class="text-2xl font-black tracking-tight"
+                                       th:text="${candidate.finalScorePercent + '%'}">98%</p>
+                                    <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">MATCH SCORE</p>
+                                </div>
+                            </div>
+
+                            <!-- ── AI 추천 사유 ── -->
+                            <div class="mx-5 mb-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                                <div class="mb-1.5 flex items-center gap-1.5">
+                                    <i data-lucide="sparkles" class="h-3.5 w-3.5 text-blue-400"></i>
+                                    <p class="text-[11px] font-bold uppercase tracking-widest text-slate-400">AI 추천 사유</p>
+                                </div>
+                                <p th:if="${candidate.llmReady and candidate.llmReason != null}"
+                                   class="text-sm leading-relaxed text-slate-700"
+                                   th:text="${candidate.llmReason}">AI 추천 사유 내용</p>
+                                <p th:unless="${candidate.llmReady and candidate.llmReason != null}"
+                                   class="text-xs text-slate-400 italic">AI 분석을 준비 중입니다.</p>
+                            </div>
+
+                            <!-- ── 주요 강점 (highlights) ── -->
+                            <div class="mx-5 mb-3 rounded-xl border border-emerald-50 bg-emerald-50/60 px-4 py-3"
+                                 th:if="${!#lists.isEmpty(candidate.highlights)}">
+                                <div class="mb-1.5 flex items-center gap-1.5">
+                                    <i data-lucide="star" class="h-3.5 w-3.5 text-emerald-500"></i>
+                                    <p class="text-[11px] font-bold uppercase tracking-widest text-slate-400">주요 강점</p>
+                                </div>
+                                <p class="text-sm leading-relaxed text-slate-700"
+                                   th:text="${candidate.highlights[0]}">강점 내용</p>
+                            </div>
+
+                            <!-- ── 매칭 요청 버튼 ── -->
+                            <div class="border-t border-slate-100 px-5 py-4">
+                                <button type="button"
+                                        class="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700">
+                                    <i data-lucide="send" class="h-4 w-4"></i>
+                                    매칭 요청하기
+                                </button>
+                            </div>
+
+                        </article>
+                    </div>
+                </section>
+
+                <!-- ────────────────────────────────────────
+                     우측: 실행 요약 사이드바 (2/5)
+                ──────────────────────────────────────── -->
+                <aside class="lg:col-span-2 space-y-4">
+
+                    <!-- 실행 요약 카드 -->
+                    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/50">
+                        <div class="mb-4 flex items-center justify-between">
+                            <h3 class="text-sm font-bold text-slate-900">추천 실행 요약</h3>
+                        </div>
+
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+                                <div class="flex items-center gap-2 text-sm text-slate-500">
+                                    <i data-lucide="layers" class="h-4 w-4 text-slate-400"></i>
+                                    포지션
+                                </div>
+                                <span class="text-sm font-semibold text-slate-800"
+                                      th:text="${view.positionTitle}">백엔드 개발자</span>
+                            </div>
+
+                            <div class="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+                                <div class="flex items-center gap-2 text-sm text-slate-500">
+                                    <i data-lucide="users" class="h-4 w-4 text-slate-400"></i>
+                                    후보 풀
+                                </div>
+                                <span class="text-sm font-semibold text-slate-800">
+                                    <span th:text="${view.candidateCount != null ? view.candidateCount : '-'}">17</span>명
+                                </span>
+                            </div>
+
+                            <div class="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+                                <div class="flex items-center gap-2 text-sm text-slate-500">
+                                    <i data-lucide="sparkles" class="h-4 w-4 text-slate-400"></i>
+                                    추천 결과
+                                </div>
+                                <span class="text-sm font-semibold text-slate-800">
+                                    Top <span th:text="${view.topK}">3</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 점수 범례 카드 -->
+                    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/50">
+                        <h3 class="mb-3 text-sm font-bold text-slate-900">점수 기준</h3>
+                        <div class="space-y-2.5">
+                            <div class="flex items-center justify-between text-xs">
+                                <div class="flex items-center gap-2">
+                                    <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                                    <span class="font-semibold text-slate-600">80% 이상</span>
+                                </div>
+                                <span class="text-slate-400">매우 높은 적합도</span>
+                            </div>
+                            <div class="flex items-center justify-between text-xs">
+                                <div class="flex items-center gap-2">
+                                    <span class="h-2 w-2 rounded-full bg-blue-400"></span>
+                                    <span class="font-semibold text-slate-600">60 ~ 79%</span>
+                                </div>
+                                <span class="text-slate-400">높은 적합도</span>
+                            </div>
+                            <div class="flex items-center justify-between text-xs">
+                                <div class="flex items-center gap-2">
+                                    <span class="h-2 w-2 rounded-full bg-slate-300"></span>
+                                    <span class="font-semibold text-slate-600">60% 미만</span>
+                                </div>
+                                <span class="text-slate-400">보통 적합도</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 안내 카드 -->
+                    <div class="rounded-2xl border border-blue-100 bg-blue-50 p-5">
+                        <div class="flex items-start gap-3">
+                            <i data-lucide="info" class="mt-0.5 h-4 w-4 shrink-0 text-blue-400"></i>
+                            <div>
+                                <p class="text-xs font-bold text-blue-700">매칭 요청 안내</p>
+                                <p class="mt-1 text-xs leading-relaxed text-blue-600">
+                                    매칭 요청 후 프리랜서가 수락하면 상세 프로필과 연락처를 확인할 수 있습니다.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                </aside>
+            </div>
+        </div>
+    </main>
+</div>
+</body>
+</html>
