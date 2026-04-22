@@ -40,6 +40,17 @@ public record FreelancerDashboardItem(
         };
     }
 
+    public String detailPath() {
+        return switch (getStatus()) {
+            case NEW -> proposalPositionId != null
+                    ? "/proposals/%d?proposalPositionId=%d".formatted(proposalId, proposalPositionId)
+                    : "/proposals/%d".formatted(proposalId);
+            case IN_PROGRESS, COMPLETED -> matchingId != null
+                    ? "/matchings/%d".formatted(matchingId)
+                    : "/proposals/%d".formatted(proposalId);
+        };
+    }
+
     public enum DashboardProposalStatus {
         NEW("신규 제안", "bg-blue-100 text-blue-700"),
         IN_PROGRESS("진행 중", "bg-emerald-100 text-emerald-700"),

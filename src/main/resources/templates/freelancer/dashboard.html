@@ -103,7 +103,7 @@
 
             <div th:if="${not items.isEmpty()}" class="divide-y divide-slate-100">
                 <div th:each="item : ${items}"
-                     th:attr="data-href=@{/proposals/{id}(id=${item.proposalId()})}"
+                     th:attr="data-href=${item.detailPath()}"
                      class="grid grid-cols-1 md:grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_80px] gap-4 items-center px-6 py-5 hover:bg-slate-50 transition-colors cursor-pointer">
                     <div class="space-y-1">
                         <p class="text-sm font-bold text-slate-900" th:text="${item.proposalTitle()}">프로젝트명</p>
@@ -127,7 +127,7 @@
                         <span th:text="${#temporals.format(item.receivedAt(), 'yyyy.MM.dd')}">날짜</span>
                     </div>
                     <div class="flex justify-end">
-                        <a th:href="@{/proposals/{id}(id=${item.proposalId()})}"
+                        <a th:href="${item.detailPath()}"
                            class="flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-700 whitespace-nowrap">
                             상세 보기<i data-lucide="chevron-right" class="w-4 h-4"></i>
                         </a>
