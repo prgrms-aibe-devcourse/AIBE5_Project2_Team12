@@ -4,7 +4,6 @@ import com.generic4.itda.domain.matching.Matching;
 import com.generic4.itda.domain.matching.constant.MatchingStatus;
 import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.proposal.ProposalPosition;
-import com.generic4.itda.domain.proposal.ProposalPositionSkill;
 import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
 import com.generic4.itda.dto.matching.MatchingDetailContactViewModel;
 import com.generic4.itda.dto.matching.MatchingDetailHeaderViewModel;
@@ -16,6 +15,7 @@ import com.generic4.itda.dto.matching.MatchingTimelineItemViewModel;
 import com.generic4.itda.repository.MatchingRepository;
 import java.text.NumberFormat;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
@@ -107,25 +107,20 @@ public class MatchingQueryService {
             case REJECTED -> VIEWER_ROLE_CLIENT.equals(viewerRole)
                     ? "다른 추천 후보를 검토하거나 제안서 상태를 다시 확인해보세요."
                     : "이 매칭은 종료 상태이며 추가 응답은 필요하지 않습니다.";
-            case IN_PROGRESS -> "계약 및 진행 현황을 이 화면에서 이어서 관리할 예정입니다.";
-            case COMPLETED -> "완료된 매칭입니다.";
-            case CANCELED -> "취소된 매칭입니다.";
+            case IN_PROGRESS -> "프로젝트가 진행 중입니다. 연락처와 제안서 정보를 확인하며 협업을 이어가세요.";
+            case COMPLETED -> "완료된 매칭입니다. 프로젝트 진행 이력을 확인할 수 있습니다.";
+            case CANCELED -> "취소된 매칭입니다. 필요한 경우 다른 추천 후보를 검토해보세요.";
         };
 
         String contactGuideMessage = isContactVisible(status)
                 ? "매칭이 성사되어 연락처 정보가 공개된 상태입니다."
                 : "매칭이 수락되기 전까지는 연락처가 공개되지 않습니다.";
 
-        LocalDateTime respondedAt = switch (status) {
-            case ACCEPTED, REJECTED, IN_PROGRESS, COMPLETED, CANCELED -> matching.getModifiedAt();
-            case PROPOSED -> null;
-        };
-
         return new MatchingDetailSummaryViewModel(
                 headline,
                 helperMessage,
-                matching.getCreatedAt(),
-                respondedAt,
+                resolveRequestedAt(matching),
+                resolveRespondedAt(matching),
                 contactGuideMessage
         );
     }
@@ -169,33 +164,72 @@ public class MatchingQueryService {
     }
 
     private List<MatchingTimelineItemViewModel> toTimeline(Matching matching) {
-        List<MatchingTimelineItemViewModel> timeline = new java.util.ArrayList<>();
+        List<MatchingTimelineItemViewModel> timeline = new ArrayList<>();
         timeline.add(new MatchingTimelineItemViewModel(
-                matching.getCreatedAt(),
+                resolveRequestedAt(matching),
                 "클라이언트",
                 "매칭 요청 전송",
                 "프리랜서에게 매칭 요청을 보냈습니다."
         ));
 
-        if (matching.getStatus() == MatchingStatus.ACCEPTED) {
+        if (matching.getAcceptedAt() != null) {
             timeline.add(new MatchingTimelineItemViewModel(
-                    matching.getModifiedAt(),
+                    matching.getAcceptedAt(),
                     "프리랜서",
                     "매칭 요청 수락",
                     "매칭 요청이 수락되어 연락처가 공개되었습니다."
             ));
         }
 
-        if (matching.getStatus() == MatchingStatus.REJECTED) {
+        if (matching.getRejectedAt() != null) {
             timeline.add(new MatchingTimelineItemViewModel(
-                    matching.getModifiedAt(),
+                    matching.getRejectedAt(),
                     "프리랜서",
                     "매칭 요청 거절",
                     "매칭 요청이 거절되어 이 매칭은 종료되었습니다."
             ));
         }
 
+        if (matching.getContractDate() != null) {
+            timeline.add(new MatchingTimelineItemViewModel(
+                    matching.getContractDate(),
+                    "클라이언트·프리랜서",
+                    "프로젝트 진행 시작",
+                    "계약이 확정되어 프로젝트가 진행 중 상태로 전환되었습니다."
+            ));
+        }
+
+        if (matching.getCompleteDate() != null) {
+            timeline.add(new MatchingTimelineItemViewModel(
+                    matching.getCompleteDate(),
+                    "클라이언트·프리랜서",
+                    "프로젝트 완료",
+                    "프로젝트가 완료되었습니다."
+            ));
+        }
+
+        if (matching.getCanceledAt() != null) {
+            timeline.add(new MatchingTimelineItemViewModel(
+                    matching.getCanceledAt(),
+                    "클라이언트·프리랜서",
+                    "매칭 취소",
+                    "매칭이 취소되었습니다."
+            ));
+        }
+
         return List.copyOf(timeline);
+    }
+
+    private LocalDateTime resolveRequestedAt(Matching matching) {
+        return matching.getRequestedAt() != null ? matching.getRequestedAt() : matching.getCreatedAt();
+    }
+
+    private LocalDateTime resolveRespondedAt(Matching matching) {
+        return switch (matching.getStatus()) {
+            case ACCEPTED, IN_PROGRESS, COMPLETED, CANCELED -> matching.getAcceptedAt();
+            case REJECTED -> matching.getRejectedAt();
+            case PROPOSED -> null;
+        };
     }
 
     private String resolveDisplayName(Member member) {
