@@ -2,6 +2,7 @@ package com.generic4.itda.controller;
 
 import com.generic4.itda.dto.recommend.RecommendationEntryViewModel;
 import com.generic4.itda.dto.recommend.RecommendationRequestForm;
+import com.generic4.itda.dto.recommend.RecommendationResumeDetailViewModel;
 import com.generic4.itda.dto.recommend.RecommendationResultsViewModel;
 import com.generic4.itda.dto.recommend.RecommendationRunStatusViewModel;
 import com.generic4.itda.dto.security.ItDaPrincipal;
@@ -124,6 +125,30 @@ public class RecommendationController {
             model.addAttribute("title", "추천 결과를 확인할 수 없습니다.");
             model.addAttribute("message", toResultsUserMessage(e));
             model.addAttribute("backUrl", "/proposals/" + proposalId + "/runs/" + runId);
+            return "recommendation/error";
+        }
+    }
+
+    @GetMapping("/proposals/{proposalId}/recommendations/results/{resultId}")
+    public String candidateResume(
+            @PathVariable Long proposalId,
+            @PathVariable Long resultId,
+            @AuthenticationPrincipal ItDaPrincipal principal,
+            Model model
+    ) {
+        try {
+            RecommendationResumeDetailViewModel view = recommendationRunQueryService
+                    .getRecommendationCandidateResume(proposalId, resultId, principal.getEmail());
+
+            model.addAttribute("view", view);
+            return "recommendation/resume";
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            log.warn("추천 후보 이력서 조회 실패. proposalId={}, resultId={}, email={}",
+                    proposalId, resultId, principal.getEmail(), e);
+
+            model.addAttribute("title", "추천 후보 이력서를 확인할 수 없습니다.");
+            model.addAttribute("message", toResultsUserMessage(e));
+            model.addAttribute("backUrl", "/proposals/" + proposalId + "/recommendations");
             return "recommendation/error";
         }
     }
