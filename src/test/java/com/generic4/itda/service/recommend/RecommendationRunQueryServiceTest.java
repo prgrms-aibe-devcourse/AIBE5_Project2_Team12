@@ -224,6 +224,116 @@ class RecommendationRunQueryServiceTest {
     }
 
     @Test
+    @DisplayName("RUNNING 상태면 추천 결과 조회 시 IllegalStateException이 발생한다")
+    void getRecommendationResults_throwsWhenRunIsRunning() {
+        // given
+        RecommendationRun run = createOwnedRunWithStatus(RecommendationRunStatus.RUNNING);
+        given(recommendationRunRepository.findDetailById(RUN_ID)).willReturn(Optional.of(run));
+
+        // when / then
+        assertThatThrownBy(() -> service.getRecommendationResults(PROPOSAL_ID, RUN_ID, OWNER_EMAIL))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("추천 결과가 아직 준비되지 않았습니다.");
+
+        verify(recommendationRunRepository).findDetailById(RUN_ID);
+        verifyNoMoreInteractions(recommendationRunRepository);
+        verifyNoMoreInteractions(recommendationResultRepository);
+    }
+
+    @Test
+    @DisplayName("FAILED 상태면 추천 결과 조회 시 IllegalStateException이 발생한다")
+    void getRecommendationResults_throwsWhenRunIsFailed() {
+        // given
+        RecommendationRun run = createOwnedRunWithStatus(RecommendationRunStatus.FAILED);
+        given(recommendationRunRepository.findDetailById(RUN_ID)).willReturn(Optional.of(run));
+
+        // when / then
+        assertThatThrownBy(() -> service.getRecommendationResults(PROPOSAL_ID, RUN_ID, OWNER_EMAIL))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("추천 결과가 아직 준비되지 않았습니다.");
+
+        verify(recommendationRunRepository).findDetailById(RUN_ID);
+        verifyNoMoreInteractions(recommendationRunRepository);
+        verifyNoMoreInteractions(recommendationResultRepository);
+    }
+
+    @Test
+    @DisplayName("추천 실행(run)이 존재하지 않으면 추천 결과 조회 시 IllegalArgumentException이 발생한다")
+    void getRecommendationResults_throwsWhenRunNotFound() {
+        // given
+        given(recommendationRunRepository.findDetailById(RUN_ID)).willReturn(Optional.empty());
+
+        // when / then
+        assertThatThrownBy(() -> service.getRecommendationResults(PROPOSAL_ID, RUN_ID, OWNER_EMAIL))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("추천 실행 정보를 찾을 수 없습니다.");
+
+        verify(recommendationRunRepository).findDetailById(RUN_ID);
+        verifyNoMoreInteractions(recommendationRunRepository);
+        verifyNoMoreInteractions(recommendationResultRepository);
+    }
+
+    @Test
+    @DisplayName("run이 다른 proposal에 속하면 추천 결과 조회 시 IllegalArgumentException이 발생한다")
+    void getRecommendationResults_throwsWhenProposalDoesNotMatch() {
+        // given
+        RecommendationRun run = createOwnedRunWithStatus(RecommendationRunStatus.COMPUTED);
+        given(recommendationRunRepository.findDetailById(RUN_ID)).willReturn(Optional.of(run));
+
+        // when / then
+        assertThatThrownBy(() -> service.getRecommendationResults(999L, RUN_ID, OWNER_EMAIL))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("잘못된 추천 실행 접근입니다.");
+
+        verify(recommendationRunRepository).findDetailById(RUN_ID);
+        verifyNoMoreInteractions(recommendationRunRepository);
+        verifyNoMoreInteractions(recommendationResultRepository);
+    }
+
+    @Test
+    @DisplayName("제안서 소유자 이메일과 다르면 추천 결과 조회 시 IllegalArgumentException이 발생한다")
+    void getRecommendationResults_throwsWhenEmailDoesNotMatchOwner() {
+        // given
+        RecommendationRun run = createOwnedRunWithStatus(RecommendationRunStatus.COMPUTED);
+        given(recommendationRunRepository.findDetailById(RUN_ID)).willReturn(Optional.of(run));
+
+        // when / then
+        assertThatThrownBy(() -> service.getRecommendationResults(PROPOSAL_ID, RUN_ID, "other@example.com"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("접근 권한이 없습니다.");
+
+        verify(recommendationRunRepository).findDetailById(RUN_ID);
+        verifyNoMoreInteractions(recommendationRunRepository);
+        verifyNoMoreInteractions(recommendationResultRepository);
+    }
+
+    @Test
+    @DisplayName("COMPUTED 상태에서도 결과가 없으면 빈 후보 리스트를 반환한다")
+    void getRecommendationResults_returnsEmptyCandidatesWhenNoResults() {
+        // given
+        RecommendationRun run = createOwnedRunWithStatus(RecommendationRunStatus.COMPUTED);
+        given(recommendationRunRepository.findDetailById(RUN_ID)).willReturn(Optional.of(run));
+        given(recommendationResultRepository.findByRunIdWithResume(RUN_ID)).willReturn(List.of());
+
+        // when
+        RecommendationResultsViewModel view = service.getRecommendationResults(PROPOSAL_ID, RUN_ID, OWNER_EMAIL);
+
+        // then
+        assertThat(view.proposalId()).isEqualTo(PROPOSAL_ID);
+        assertThat(view.runId()).isEqualTo(RUN_ID);
+        assertThat(view.proposalTitle()).isEqualTo("추천 테스트 제안서");
+        assertThat(view.positionTitle()).isEqualTo("백엔드 개발자");
+        assertThat(view.topK()).isEqualTo(3);
+        assertThat(view.candidateCount()).isEqualTo(3);
+        assertThat(view.candidates()).isEmpty();
+
+        verify(recommendationRunRepository).findDetailById(RUN_ID);
+        verify(recommendationResultRepository).findByRunIdWithResume(RUN_ID);
+        verifyNoMoreInteractions(recommendationRunRepository);
+        verifyNoMoreInteractions(recommendationResultRepository);
+    }
+
+    @Test
     @DisplayName("COMPUTED 상태면 추천 결과 ViewModel을 조립하고 후보 정보를 마스킹하여 반환한다")
     void getRecommendationResults_returnsViewModelWithCandidates() {
         // given
