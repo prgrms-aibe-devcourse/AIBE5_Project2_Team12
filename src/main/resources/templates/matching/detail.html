@@ -130,7 +130,7 @@
                                     <p class="text-sm font-bold"
                                        th:classappend="${inProgress or completed} ? 'text-slate-800' : 'text-slate-400'">계약 진행</p>
                                     <p class="mt-1 text-xs text-slate-400"
-                                       th:text="${inProgress ? '진행 중' : (completed ? '진행 완료' : '다음 이슈 예정')}">다음 이슈 예정</p>
+                                       th:text="${inProgress ? '진행 중' : (completed ? '진행 완료' : (accepted ? '양측 확인 대기' : '대기 중'))}">양측 확인 대기</p>
                                 </div>
                             </div>
 
@@ -143,7 +143,7 @@
                                     <p class="text-sm font-bold"
                                        th:classappend="${completed} ? 'text-slate-800' : 'text-slate-400'">프로젝트 완료</p>
                                     <p class="mt-1 text-xs text-slate-400"
-                                       th:text="${completed ? '완료됨' : '다음 이슈 예정'}">다음 이슈 예정</p>
+                                       th:text="${completed ? '완료됨' : (inProgress ? '후기/완료 확인' : '대기 중')}">후기/완료 확인</p>
                                 </div>
                             </div>
                         </div>
@@ -303,28 +303,261 @@
                         </div>
 
                         <div th:if="${accepted}"
-                             class="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50 px-5 py-4">
-                            <p class="text-sm font-bold text-emerald-700">매칭이 수락되었습니다</p>
-                            <p class="mt-2 text-sm leading-relaxed text-emerald-600">
-                                연락처가 공개된 상태입니다. 제안서 내용을 다시 확인하고 협의를 이어가세요.
-                            </p>
+                             class="mt-6 space-y-4">
+                            <div class="rounded-2xl border border-emerald-100 bg-emerald-50 px-5 py-4">
+                                <p class="text-sm font-bold text-emerald-700">매칭이 수락되었습니다</p>
+                                <p class="mt-2 text-sm leading-relaxed text-emerald-600">
+                                    연락처가 공개된 상태입니다. 양측이 계약 시작을 확인하면 프로젝트가 진행 중으로 전환됩니다.
+                                </p>
+                            </div>
+
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <div th:classappend="${view.lifecycle.clientContractAccepted} ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500'"
+                                     class="rounded-2xl border px-4 py-3">
+                                    <p class="text-xs font-black uppercase tracking-widest">CLIENT</p>
+                                    <p class="mt-1 text-sm font-bold"
+                                       th:text="${view.lifecycle.clientContractAccepted ? '계약 시작 확인 완료' : '계약 시작 확인 대기'}">
+                                        계약 시작 확인 대기
+                                    </p>
+                                </div>
+                                <div th:classappend="${view.lifecycle.freelancerContractAccepted} ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500'"
+                                     class="rounded-2xl border px-4 py-3">
+                                    <p class="text-xs font-black uppercase tracking-widest">FREELANCER</p>
+                                    <p class="mt-1 text-sm font-bold"
+                                       th:text="${view.lifecycle.freelancerContractAccepted ? '계약 시작 확인 완료' : '계약 시작 확인 대기'}">
+                                        계약 시작 확인 대기
+                                    </p>
+                                </div>
+                            </div>
+
+                            <form th:if="${view.lifecycle.canAcceptContractStart}"
+                                  th:action="@{/matchings/{id}/contract-start/accept(id=${view.matchingId})}"
+                                  method="post"
+                                  data-confirm-message="계약 시작을 확인하면 상대방 확인 후 프로젝트가 진행 중으로 전환됩니다. 계속할까요?">
+                                <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+                                <input type="hidden" name="redirectTo" th:value="@{/matchings/{id}(id=${view.matchingId})}">
+                                <input type="hidden" name="errorRedirectTo" th:value="@{/matchings/{id}(id=${view.matchingId})}">
+                                <button type="submit"
+                                        class="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-700">
+                                    <i data-lucide="handshake" class="h-4 w-4"></i>
+                                    계약 시작 확인
+                                </button>
+                            </form>
+
+                            <div th:if="${view.lifecycle.currentUserContractAccepted and !view.lifecycle.counterpartContractAccepted}"
+                                 class="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
+                                <p class="text-sm font-bold text-slate-700">상대방 확인 대기 중</p>
+                                <p class="mt-2 text-sm leading-relaxed text-slate-500"
+                                   th:text="${view.lifecycle.counterpartRoleLabel + '의 계약 시작 확인을 기다리고 있습니다.'}">
+                                    상대방의 계약 시작 확인을 기다리고 있습니다.
+                                </p>
+                            </div>
                         </div>
 
                         <div th:if="${inProgress}"
-                             class="mt-6 rounded-2xl border border-indigo-100 bg-indigo-50 px-5 py-4">
-                            <p class="text-sm font-bold text-indigo-700">프로젝트가 진행 중입니다</p>
-                            <p class="mt-2 text-sm leading-relaxed text-indigo-600">
-                                연락처와 제안서 정보를 확인하며 협업을 이어가세요. 진행 상태 변경 액션은 후속 이슈에서 제공됩니다.
-                            </p>
+                             class="mt-6 space-y-4">
+                            <div class="rounded-2xl border border-indigo-100 bg-indigo-50 px-5 py-4">
+                                <p class="text-sm font-bold text-indigo-700">프로젝트가 진행 중입니다</p>
+                                <p class="mt-2 text-sm leading-relaxed text-indigo-600">
+                                    프로젝트 완료 전에는 양측 모두 후기를 작성하고 완료를 확인해야 합니다.
+                                </p>
+                            </div>
+
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <div th:classappend="${view.lifecycle.clientReviewed} ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-slate-50 text-slate-500'"
+                                     class="rounded-2xl border px-4 py-3">
+                                    <p class="text-xs font-black uppercase tracking-widest">CLIENT REVIEW</p>
+                                    <p class="mt-1 text-sm font-bold"
+                                       th:text="${view.lifecycle.clientReviewed ? '후기 작성 완료' : '후기 작성 전'}">후기 작성 전</p>
+                                </div>
+                                <div th:classappend="${view.lifecycle.freelancerReviewed} ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-slate-50 text-slate-500'"
+                                     class="rounded-2xl border px-4 py-3">
+                                    <p class="text-xs font-black uppercase tracking-widest">FREELANCER REVIEW</p>
+                                    <p class="mt-1 text-sm font-bold"
+                                       th:text="${view.lifecycle.freelancerReviewed ? '후기 작성 완료' : '후기 작성 전'}">후기 작성 전</p>
+                                </div>
+                            </div>
+
+                            <form th:if="${view.lifecycle.canSubmitReview}"
+                                  th:action="@{/matchings/{id}/reviews(id=${view.matchingId})}"
+                                  method="post"
+                                  class="space-y-3">
+                                <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+                                <input type="hidden" name="redirectTo" th:value="@{/matchings/{id}(id=${view.matchingId})}">
+                                <input type="hidden" name="errorRedirectTo" th:value="@{/matchings/{id}(id=${view.matchingId})}">
+                                <label for="matchingReview" class="text-sm font-bold text-slate-700">프로젝트 후기</label>
+                                <textarea id="matchingReview"
+                                          name="review"
+                                          rows="4"
+                                          required
+                                          placeholder="협업 경험과 프로젝트 진행에 대한 후기를 작성해주세요."
+                                          class="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-indigo-300 focus:ring-4 focus:ring-indigo-50"></textarea>
+                                <button type="submit"
+                                        class="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-indigo-700">
+                                    <i data-lucide="message-square-text" class="h-4 w-4"></i>
+                                    후기 저장
+                                </button>
+                            </form>
+
+                            <div th:if="${view.lifecycle.currentUserReviewed}"
+                                 class="rounded-2xl border border-indigo-100 bg-white px-5 py-4">
+                                <p class="text-sm font-bold text-indigo-700">내 후기 작성 완료</p>
+                                <p class="mt-2 text-sm leading-relaxed text-slate-600"
+                                   th:text="${view.lifecycle.currentUserReview}">작성한 후기</p>
+                            </div>
+
+                            <form th:if="${view.lifecycle.canConfirmCompletion}"
+                                  th:action="@{/matchings/{id}/completion/confirm(id=${view.matchingId})}"
+                                  method="post"
+                                  data-confirm-message="프로젝트 완료를 확인할까요? 양측이 모두 확인하면 완료 상태로 전환됩니다.">
+                                <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+                                <input type="hidden" name="redirectTo" th:value="@{/matchings/{id}(id=${view.matchingId})}">
+                                <input type="hidden" name="errorRedirectTo" th:value="@{/matchings/{id}(id=${view.matchingId})}">
+                                <button type="submit"
+                                        class="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800">
+                                    <i data-lucide="flag" class="h-4 w-4"></i>
+                                    프로젝트 완료 확인
+                                </button>
+                            </form>
+
+                            <div th:if="${view.lifecycle.currentUserCompletionConfirmed and !view.lifecycle.counterpartCompletionConfirmed}"
+                                 class="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
+                                <p class="text-sm font-bold text-slate-700">상대방 완료 확인 대기 중</p>
+                                <p class="mt-2 text-sm leading-relaxed text-slate-500"
+                                   th:text="${view.lifecycle.counterpartRoleLabel + '의 완료 확인을 기다리고 있습니다.'}">
+                                    상대방의 완료 확인을 기다리고 있습니다.
+                                </p>
+                            </div>
                         </div>
 
                         <div th:if="${completed}"
-                             class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
-                            <p class="text-sm font-bold text-slate-700">프로젝트가 완료되었습니다</p>
-                            <p class="mt-2 text-sm leading-relaxed text-slate-600">
-                                완료된 매칭입니다. 프로젝트 정보와 진행 이력을 확인할 수 있습니다.
-                            </p>
+                             class="mt-6 space-y-4">
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
+                                <p class="text-sm font-bold text-slate-700">프로젝트가 완료되었습니다</p>
+                                <p class="mt-2 text-sm leading-relaxed text-slate-600">
+                                    완료된 매칭입니다. 양측 후기를 확인할 수 있습니다.
+                                </p>
+                            </div>
+                            <div class="rounded-2xl border border-slate-200 bg-white px-5 py-4">
+                                <p class="text-xs font-black uppercase tracking-widest text-slate-400">내 후기</p>
+                                <p class="mt-2 text-sm leading-relaxed text-slate-700"
+                                   th:text="${#strings.isEmpty(view.lifecycle.currentUserReview) ? '작성한 후기가 없습니다.' : view.lifecycle.currentUserReview}">
+                                    내 후기
+                                </p>
+                            </div>
+                            <div th:if="${view.lifecycle.counterpartReviewVisible}"
+                                 class="rounded-2xl border border-slate-200 bg-white px-5 py-4">
+                                <p class="text-xs font-black uppercase tracking-widest text-slate-400"
+                                   th:text="${view.lifecycle.counterpartRoleLabel + ' 후기'}">상대방 후기</p>
+                                <p class="mt-2 text-sm leading-relaxed text-slate-700"
+                                   th:text="${#strings.isEmpty(view.lifecycle.counterpartReview) ? '상대방 후기가 없습니다.' : view.lifecycle.counterpartReview}">
+                                    상대방 후기
+                                </p>
+                            </div>
                         </div>
+
+                        <div th:if="${(accepted or inProgress) and view.lifecycle.cancellation.requested}"
+                             class="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
+                            <p class="text-sm font-bold text-amber-800"
+                               th:text="${view.lifecycle.cancellation.requestedByCurrentUser ? '취소 요청을 보냈습니다' : '취소 요청이 도착했습니다'}">
+                                취소 요청이 도착했습니다
+                            </p>
+                            <dl class="mt-4 space-y-2 text-sm text-amber-800">
+                                <div class="flex justify-between gap-4">
+                                    <dt class="font-semibold text-amber-600">요청자</dt>
+                                    <dd th:text="${view.lifecycle.cancellation.requesterRoleLabel}">클라이언트</dd>
+                                </div>
+                                <div class="flex justify-between gap-4">
+                                    <dt class="font-semibold text-amber-600">사유</dt>
+                                    <dd class="text-right" th:text="${view.lifecycle.cancellation.reasonLabel}">사유</dd>
+                                </div>
+                                <div th:if="${!#strings.isEmpty(view.lifecycle.cancellation.reasonDetail)}" class="space-y-1">
+                                    <dt class="font-semibold text-amber-600">상세 사유</dt>
+                                    <dd class="leading-relaxed" th:text="${view.lifecycle.cancellation.reasonDetail}">상세 사유</dd>
+                                </div>
+                                <div class="flex justify-between gap-4">
+                                    <dt class="font-semibold text-amber-600">요청 시각</dt>
+                                    <dd th:text="${view.lifecycle.cancellation.requestedAt != null ? #temporals.format(view.lifecycle.cancellation.requestedAt, 'yyyy.MM.dd HH:mm') : '일시 미기록'}">
+                                        2026.04.22 14:30
+                                    </dd>
+                                </div>
+                                <div th:if="${view.lifecycle.cancellation.autoCancelAt != null}" class="flex justify-between gap-4">
+                                    <dt class="font-semibold text-amber-600">자동 취소 예정</dt>
+                                    <dd th:text="${#temporals.format(view.lifecycle.cancellation.autoCancelAt, 'yyyy.MM.dd HH:mm')}">
+                                        2026.04.23 14:30
+                                    </dd>
+                                </div>
+                            </dl>
+
+                            <form th:if="${view.lifecycle.cancellation.canWithdraw}"
+                                  th:action="@{/matchings/{id}/cancellations/withdraw(id=${view.matchingId})}"
+                                  method="post"
+                                  class="mt-4"
+                                  data-confirm-message="취소 요청을 철회할까요?">
+                                <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+                                <input type="hidden" name="redirectTo" th:value="@{/matchings/{id}(id=${view.matchingId})}">
+                                <input type="hidden" name="errorRedirectTo" th:value="@{/matchings/{id}(id=${view.matchingId})}">
+                                <button type="submit"
+                                        class="flex w-full items-center justify-center gap-2 rounded-2xl border border-amber-300 bg-white px-4 py-3 text-sm font-bold text-amber-700 transition hover:bg-amber-100">
+                                    <i data-lucide="rotate-ccw" class="h-4 w-4"></i>
+                                    취소 요청 철회
+                                </button>
+                            </form>
+
+                            <form th:if="${view.lifecycle.cancellation.canConfirm}"
+                                  th:action="@{/matchings/{id}/cancellations/confirm(id=${view.matchingId})}"
+                                  method="post"
+                                  class="mt-4"
+                                  data-confirm-message="취소 요청을 확인하면 매칭이 취소됩니다. 계속할까요?">
+                                <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+                                <input type="hidden" name="redirectTo" th:value="@{/matchings/{id}(id=${view.matchingId})}">
+                                <input type="hidden" name="errorRedirectTo" th:value="@{/matchings/{id}(id=${view.matchingId})}">
+                                <button type="submit"
+                                        class="flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-amber-700">
+                                    <i data-lucide="check" class="h-4 w-4"></i>
+                                    취소 확인
+                                </button>
+                            </form>
+                        </div>
+
+                        <form th:if="${(accepted or inProgress) and view.lifecycle.cancellation.canRequest}"
+                              th:action="@{/matchings/{id}/cancellations(id=${view.matchingId})}"
+                              method="post"
+                              data-cancellation-form
+                              class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
+                            <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+                            <input type="hidden" name="redirectTo" th:value="@{/matchings/{id}(id=${view.matchingId})}">
+                            <input type="hidden" name="errorRedirectTo" th:value="@{/matchings/{id}(id=${view.matchingId})}">
+                            <p class="text-sm font-bold text-slate-800">매칭 취소 요청</p>
+                            <p class="mt-2 text-sm leading-relaxed text-slate-500">
+                                취소 사유를 선택하면 상대방에게 확인 요청이 전달됩니다.
+                            </p>
+
+                            <div class="mt-4 space-y-2">
+                                <label th:each="option : ${view.lifecycle.cancellation.reasonOptions}"
+                                       class="flex cursor-pointer items-center gap-3 rounded-2xl border border-white bg-white px-4 py-3 text-sm font-semibold text-slate-600 transition hover:border-slate-200">
+                                    <input type="radio"
+                                           name="reason"
+                                           required
+                                           th:value="${option.value}"
+                                           th:attr="data-other=${option.other}"
+                                           class="h-4 w-4 border-slate-300 text-amber-600 focus:ring-amber-500">
+                                    <span th:text="${option.label}">사유</span>
+                                </label>
+                            </div>
+
+                            <textarea id="cancellationReasonDetail"
+                                      name="reasonDetail"
+                                      rows="3"
+                                      placeholder="기타 사유를 선택한 경우 상세 사유를 입력해주세요."
+                                      class="mt-3 w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-amber-300 focus:ring-4 focus:ring-amber-50"></textarea>
+
+                            <button type="submit"
+                                    class="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-amber-200 bg-white px-4 py-3 text-sm font-bold text-amber-700 transition hover:bg-amber-50">
+                                <i data-lucide="ban" class="h-4 w-4"></i>
+                                취소 요청 보내기
+                            </button>
+                        </form>
 
                         <div th:if="${canceled}"
                              class="mt-6 rounded-2xl border border-amber-100 bg-amber-50 px-5 py-4">
@@ -474,5 +707,38 @@
         </div>
     </main>
 </div>
+
+<th:block layout:fragment="scripts">
+<script>
+(function () {
+    document.querySelectorAll('[data-confirm-message]').forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+            if (!window.confirm(form.dataset.confirmMessage)) {
+                event.preventDefault();
+            }
+        });
+    });
+
+    document.querySelectorAll('[data-cancellation-form]').forEach(function (form) {
+        var detail = form.querySelector('textarea[name="reasonDetail"]');
+        var radios = form.querySelectorAll('input[name="reason"]');
+
+        function syncDetailRequired() {
+            var selected = form.querySelector('input[name="reason"]:checked');
+            var isOther = selected && selected.dataset.other === 'true';
+            if (detail) {
+                detail.required = !!isOther;
+                detail.classList.toggle('border-amber-300', !!isOther);
+            }
+        }
+
+        radios.forEach(function (radio) {
+            radio.addEventListener('change', syncDetailRequired);
+        });
+        syncDetailRequired();
+    });
+})();
+</script>
+</th:block>
 </body>
 </html>
