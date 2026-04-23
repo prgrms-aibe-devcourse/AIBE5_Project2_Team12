@@ -1,12 +1,18 @@
 package com.generic4.itda.service;
 
 import com.generic4.itda.domain.matching.Matching;
+import com.generic4.itda.domain.matching.constant.MatchingCancellationPhase;
+import com.generic4.itda.domain.matching.constant.MatchingCancellationReason;
+import com.generic4.itda.domain.matching.constant.MatchingParticipantRole;
 import com.generic4.itda.domain.matching.constant.MatchingStatus;
 import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.proposal.ProposalPosition;
 import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
+import com.generic4.itda.dto.matching.MatchingCancellationReasonOptionViewModel;
 import com.generic4.itda.dto.matching.MatchingDetailContactViewModel;
+import com.generic4.itda.dto.matching.MatchingDetailCancellationViewModel;
 import com.generic4.itda.dto.matching.MatchingDetailHeaderViewModel;
+import com.generic4.itda.dto.matching.MatchingDetailLifecycleViewModel;
 import com.generic4.itda.dto.matching.MatchingDetailProjectSummaryViewModel;
 import com.generic4.itda.dto.matching.MatchingDetailSummaryViewModel;
 import com.generic4.itda.dto.matching.MatchingDetailViewModel;
@@ -16,6 +22,7 @@ import com.generic4.itda.repository.MatchingRepository;
 import java.text.NumberFormat;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
@@ -49,7 +56,8 @@ public class MatchingQueryService {
                 toSummary(matching, viewerRole),
                 toContacts(matching),
                 toProjectSummary(matching.getProposalPosition()),
-                toTimeline(matching)
+                toTimeline(matching),
+                toLifecycle(matching, viewerRole)
         );
     }
 
@@ -218,6 +226,115 @@ public class MatchingQueryService {
         }
 
         return List.copyOf(timeline);
+    }
+
+    private MatchingDetailLifecycleViewModel toLifecycle(Matching matching, String viewerRole) {
+        MatchingParticipantRole currentRole = toParticipantRole(viewerRole);
+        MatchingParticipantRole counterpartRole = oppositeRole(currentRole);
+        boolean hasCancellationRequest = matching.hasCancellationRequest();
+        boolean currentUserReviewed = matching.hasReviewBy(currentRole);
+
+        return new MatchingDetailLifecycleViewModel(
+                roleLabel(currentRole),
+                roleLabel(counterpartRole),
+                matching.isContractStartAcceptedBy(MatchingParticipantRole.CLIENT),
+                matching.isContractStartAcceptedBy(MatchingParticipantRole.FREELANCER),
+                matching.isContractStartAcceptedBy(currentRole),
+                matching.isContractStartAcceptedBy(counterpartRole),
+                matching.getStatus() == MatchingStatus.ACCEPTED
+                        && !hasCancellationRequest
+                        && !matching.isContractStartAcceptedBy(currentRole),
+                toCancellation(matching, currentRole),
+                matching.hasReviewBy(MatchingParticipantRole.CLIENT),
+                matching.hasReviewBy(MatchingParticipantRole.FREELANCER),
+                currentUserReviewed,
+                matching.hasReviewBy(counterpartRole),
+                matching.getStatus() == MatchingStatus.IN_PROGRESS
+                        && !hasCancellationRequest
+                        && !currentUserReviewed,
+                reviewBy(matching, currentRole),
+                matching.getStatus() == MatchingStatus.COMPLETED ? reviewBy(matching, counterpartRole) : null,
+                matching.getStatus() == MatchingStatus.COMPLETED,
+                matching.isCompletionConfirmedBy(currentRole),
+                matching.isCompletionConfirmedBy(counterpartRole),
+                matching.getStatus() == MatchingStatus.IN_PROGRESS
+                        && !hasCancellationRequest
+                        && currentUserReviewed
+                        && !matching.isCompletionConfirmedBy(currentRole)
+        );
+    }
+
+    private MatchingDetailCancellationViewModel toCancellation(
+            Matching matching,
+            MatchingParticipantRole currentRole
+    ) {
+        boolean hasCancellationRequest = matching.hasCancellationRequest();
+        boolean requestedByCurrentUser = hasCancellationRequest
+                && matching.getCancellationRequestedBy() == currentRole;
+
+        return new MatchingDetailCancellationViewModel(
+                hasCancellationRequest,
+                requestedByCurrentUser,
+                canRequestCancellation(matching),
+                hasCancellationRequest && requestedByCurrentUser,
+                hasCancellationRequest && !requestedByCurrentUser,
+                hasCancellationRequest ? roleLabel(matching.getCancellationRequestedBy()) : null,
+                hasCancellationRequest ? roleLabel(oppositeRole(matching.getCancellationRequestedBy())) : null,
+                matching.getCancellationReason() != null ? matching.getCancellationReason().getLabel() : null,
+                matching.getCancellationReasonDetail(),
+                matching.getCancellationRequestedAt(),
+                matching.getCancellationAutoCancelAt(),
+                cancellationReasonOptions(matching, currentRole)
+        );
+    }
+
+    private boolean canRequestCancellation(Matching matching) {
+        return (matching.getStatus() == MatchingStatus.ACCEPTED || matching.getStatus() == MatchingStatus.IN_PROGRESS)
+                && !matching.hasCancellationRequest();
+    }
+
+    private List<MatchingCancellationReasonOptionViewModel> cancellationReasonOptions(
+            Matching matching,
+            MatchingParticipantRole currentRole
+    ) {
+        if (!canRequestCancellation(matching)) {
+            return List.of();
+        }
+
+        MatchingCancellationPhase phase = matching.getStatus() == MatchingStatus.ACCEPTED
+                ? MatchingCancellationPhase.BEFORE_CONTRACT
+                : MatchingCancellationPhase.AFTER_CONTRACT;
+
+        return Arrays.stream(MatchingCancellationReason.values())
+                .filter(reason -> reason.matches(phase, currentRole))
+                .map(reason -> new MatchingCancellationReasonOptionViewModel(
+                        reason.name(),
+                        reason.getLabel(),
+                        reason.isOther()
+                ))
+                .toList();
+    }
+
+    private MatchingParticipantRole toParticipantRole(String viewerRole) {
+        return VIEWER_ROLE_CLIENT.equals(viewerRole)
+                ? MatchingParticipantRole.CLIENT
+                : MatchingParticipantRole.FREELANCER;
+    }
+
+    private MatchingParticipantRole oppositeRole(MatchingParticipantRole role) {
+        return role == MatchingParticipantRole.CLIENT
+                ? MatchingParticipantRole.FREELANCER
+                : MatchingParticipantRole.CLIENT;
+    }
+
+    private String roleLabel(MatchingParticipantRole role) {
+        return role == MatchingParticipantRole.CLIENT ? "클라이언트" : "프리랜서";
+    }
+
+    private String reviewBy(Matching matching, MatchingParticipantRole role) {
+        return role == MatchingParticipantRole.CLIENT
+                ? matching.getClientReview()
+                : matching.getFreelancerReview();
     }
 
     private LocalDateTime resolveRequestedAt(Matching matching) {

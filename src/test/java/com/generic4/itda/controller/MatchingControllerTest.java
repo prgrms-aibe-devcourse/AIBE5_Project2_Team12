@@ -16,14 +16,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.generic4.itda.annotation.ControllerTest;
 import com.generic4.itda.domain.matching.Matching;
+import com.generic4.itda.domain.matching.constant.MatchingCancellationReason;
 import com.generic4.itda.domain.matching.constant.MatchingStatus;
 import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
 import com.generic4.itda.domain.proposal.ProposalWorkType;
+import com.generic4.itda.dto.matching.MatchingDetailCancellationViewModel;
 import com.generic4.itda.dto.matching.MatchingDetailContactViewModel;
 import com.generic4.itda.dto.matching.MatchingDetailHeaderViewModel;
+import com.generic4.itda.dto.matching.MatchingDetailLifecycleViewModel;
 import com.generic4.itda.dto.matching.MatchingDetailProjectSummaryViewModel;
 import com.generic4.itda.dto.matching.MatchingDetailSummaryViewModel;
 import com.generic4.itda.dto.matching.MatchingDetailViewModel;
@@ -236,6 +239,135 @@ class MatchingControllerTest {
     }
 
     @Test
+    @DisplayName("계약 시작 확인을 저장하면 매칭 상세로 이동한다")
+    void acceptContractStartAndRedirectToMatchingDetail() throws Exception {
+        Matching matching = createMatching();
+        given(matchingService.acceptContractStart(401L, "client@example.com")).willReturn(matching);
+
+        mockMvc.perform(post("/matchings/401/contract-start/accept")
+                        .with(authentication(authToken("client@example.com", "클라이언트")))
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/matchings/401"))
+                .andExpect(flash().attribute("noticeMessage", "계약 시작 확인을 저장했습니다."));
+
+        then(matchingService).should().acceptContractStart(401L, "client@example.com");
+    }
+
+    @Test
+    @DisplayName("취소 요청 폼을 서비스로 전달한다")
+    void requestCancellationAndRedirectToMatchingDetail() throws Exception {
+        Matching matching = createMatching();
+        given(matchingService.requestCancellation(
+                401L,
+                "client@example.com",
+                MatchingCancellationReason.CLIENT_BEFORE_OTHER,
+                "내부 일정 변경"
+        )).willReturn(matching);
+
+        mockMvc.perform(post("/matchings/401/cancellations")
+                        .with(authentication(authToken("client@example.com", "클라이언트")))
+                        .with(csrf())
+                        .param("reason", "CLIENT_BEFORE_OTHER")
+                        .param("reasonDetail", "내부 일정 변경"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/matchings/401"))
+                .andExpect(flash().attribute("noticeMessage", "취소 요청을 보냈습니다."));
+
+        then(matchingService).should().requestCancellation(
+                401L,
+                "client@example.com",
+                MatchingCancellationReason.CLIENT_BEFORE_OTHER,
+                "내부 일정 변경"
+        );
+    }
+
+    @Test
+    @DisplayName("취소 요청 철회를 처리한다")
+    void withdrawCancellationAndRedirectToMatchingDetail() throws Exception {
+        Matching matching = createMatching();
+        given(matchingService.withdrawCancellation(401L, "client@example.com")).willReturn(matching);
+
+        mockMvc.perform(post("/matchings/401/cancellations/withdraw")
+                        .with(authentication(authToken("client@example.com", "클라이언트")))
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/matchings/401"))
+                .andExpect(flash().attribute("noticeMessage", "취소 요청을 철회했습니다."));
+
+        then(matchingService).should().withdrawCancellation(401L, "client@example.com");
+    }
+
+    @Test
+    @DisplayName("취소 요청 확인을 처리한다")
+    void confirmCancellationAndRedirectToMatchingDetail() throws Exception {
+        Matching matching = createMatching();
+        given(matchingService.confirmCancellation(401L, "freelancer@example.com")).willReturn(matching);
+
+        mockMvc.perform(post("/matchings/401/cancellations/confirm")
+                        .with(authentication(authToken("freelancer@example.com", "프리랜서")))
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/matchings/401"))
+                .andExpect(flash().attribute("noticeMessage", "취소 요청을 확인하여 매칭이 취소되었습니다."));
+
+        then(matchingService).should().confirmCancellation(401L, "freelancer@example.com");
+    }
+
+    @Test
+    @DisplayName("후기 작성 내용을 서비스로 전달한다")
+    void submitReviewAndRedirectToMatchingDetail() throws Exception {
+        Matching matching = createMatching();
+        given(matchingService.submitReview(401L, "client@example.com", "좋은 협업이었습니다."))
+                .willReturn(matching);
+
+        mockMvc.perform(post("/matchings/401/reviews")
+                        .with(authentication(authToken("client@example.com", "클라이언트")))
+                        .with(csrf())
+                        .param("review", "좋은 협업이었습니다."))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/matchings/401"))
+                .andExpect(flash().attribute("noticeMessage", "후기를 저장했습니다."));
+
+        then(matchingService).should().submitReview(401L, "client@example.com", "좋은 협업이었습니다.");
+    }
+
+    @Test
+    @DisplayName("완료 확인을 저장하면 매칭 상세로 이동한다")
+    void confirmCompletionAndRedirectToMatchingDetail() throws Exception {
+        Matching matching = createMatching();
+        given(matchingService.confirmCompletion(401L, "client@example.com")).willReturn(matching);
+
+        mockMvc.perform(post("/matchings/401/completion/confirm")
+                        .with(authentication(authToken("client@example.com", "클라이언트")))
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/matchings/401"))
+                .andExpect(flash().attribute("noticeMessage", "프로젝트 완료 확인을 저장했습니다."));
+
+        then(matchingService).should().confirmCompletion(401L, "client@example.com");
+    }
+
+    @Test
+    @DisplayName("상태 전이 요청 실패는 사용자용 메시지로 변환한다")
+    void redirectWithMappedMessageWhenLifecycleActionFails() throws Exception {
+        given(matchingService.requestCancellation(
+                401L,
+                "client@example.com",
+                MatchingCancellationReason.CLIENT_BEFORE_OTHER,
+                null
+        )).willThrow(new IllegalArgumentException("기타 취소 사유를 입력해주세요."));
+
+        mockMvc.perform(post("/matchings/401/cancellations")
+                        .with(authentication(authToken("client@example.com", "클라이언트")))
+                        .with(csrf())
+                        .param("reason", "CLIENT_BEFORE_OTHER"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/matchings/401"))
+                .andExpect(flash().attribute("errorMessage", "기타 사유를 선택한 경우 상세 사유를 입력해주세요."));
+    }
+
+    @Test
     @DisplayName("인증되지 않은 사용자는 매칭 상세 조회 시 로그인 페이지로 이동한다")
     void redirectToLoginWhenUnauthenticatedOnDetail() throws Exception {
         mockMvc.perform(get("/matchings/401"))
@@ -320,6 +452,40 @@ class MatchingControllerTest {
                                 "매칭 요청 전송",
                                 "프리랜서에게 매칭 요청을 보냈습니다."
                         )
+                ),
+                new MatchingDetailLifecycleViewModel(
+                        "클라이언트",
+                        "프리랜서",
+                        false,
+                        false,
+                        false,
+                        false,
+                        false,
+                        new MatchingDetailCancellationViewModel(
+                                false,
+                                false,
+                                false,
+                                false,
+                                false,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                List.of()
+                        ),
+                        false,
+                        false,
+                        false,
+                        false,
+                        false,
+                        null,
+                        null,
+                        false,
+                        false,
+                        false,
+                        false
                 )
         );
     }
