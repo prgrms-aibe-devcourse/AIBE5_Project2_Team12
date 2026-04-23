@@ -41,10 +41,9 @@
                         class="position-filter inline-flex items-center gap-1.5 rounded-2xl px-4 py-2 text-sm font-bold transition"
                         th:attr="data-position-id=${pf.proposalPositionId}">
                     <span th:text="${pf.title}">포지션</span>
-                    <span th:if="${pf.count > 0}"
-                          th:text="${pf.count}"
-                          th:classappend="${view.selectedPositionId != null and view.selectedPositionId == pf.proposalPositionId} ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'"
-                          class="rounded-full px-2 py-0.5 text-xs font-bold">0</span>
+                    <span th:text="${pf.count > 0 ? pf.count : ''}"
+                          th:classappend="${pf.count == 0} ? 'hidden' : (${view.selectedPositionId != null and view.selectedPositionId == pf.proposalPositionId} ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500')"
+                          class="badge-count rounded-full px-2 py-0.5 text-xs font-bold">0</span>
                 </button>
             </div>
 
@@ -127,14 +126,21 @@
 
                 fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
                         .then(res => {
+                            if (res.redirected || res.status === 401 || res.status === 403) {
+                                window.location.href = '/login';
+                                return Promise.reject('auth');
+                            }
                             if (!res.ok) throw new Error('서버 오류');
+                            const contentType = res.headers.get('Content-Type') || '';
+                            if (!contentType.includes('text/html')) throw new Error('잘못된 응답 형식');
                             return res.text();
                         })
                         .then(html => {
                             wrapper.innerHTML = html;
                             if (window.lucide) lucide.createIcons();
                         })
-                        .catch(() => {
+                        .catch(err => {
+                            if (err === 'auth') return;
                             wrapper.innerHTML = '<p class="py-10 text-center text-sm text-rose-500 font-semibold">목록을 불러오는 중 오류가 발생했습니다.</p>';
                         });
             }
@@ -146,12 +152,12 @@
                     document.querySelectorAll('.position-filter').forEach(b => {
                         b.classList.remove('bg-slate-900', 'text-white');
                         b.classList.add('border', 'border-slate-300', 'bg-white', 'text-slate-700');
-                        const badge = b.querySelector('span:last-child');
+                        const badge = b.querySelector('.badge-count');
                         if (badge) { badge.classList.remove('bg-white/20'); badge.classList.add('bg-slate-100', 'text-slate-500'); }
                     });
                     btn.classList.add('bg-slate-900', 'text-white');
                     btn.classList.remove('border', 'border-slate-300', 'bg-white', 'text-slate-700');
-                    const activeBadge = btn.querySelector('span:last-child');
+                    const activeBadge = btn.querySelector('.badge-count');
                     if (activeBadge) { activeBadge.classList.add('bg-white/20'); activeBadge.classList.remove('bg-slate-100', 'text-slate-500'); }
 
                     fetchItems(currentPositionId, currentStatus);
