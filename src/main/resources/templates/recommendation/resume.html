@@ -3,251 +3,32 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout/base}">
 <head>
-    <title th:text="${view.proposalTitle} + ' | 추천 후보 이력서'">추천 후보 이력서 | IT-da</title>
+  <title th:text="${view.profile().title} + ' | IT-da'">추천 후보 프로필 | IT-da</title>
 </head>
 <body>
 <div layout:fragment="content">
-    <main class="min-h-screen bg-slate-50">
+  <main class="min-h-screen bg-slate-50" th:with="profile=${view.profile()}">
 
-        <!-- 상단 바 -->
-        <div class="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur">
-            <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
-                <div class="flex items-center gap-4">
-                    <a th:href="${view.backUrl}"
-                       class="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700">
-                        <i data-lucide="arrow-left" class="h-4 w-4"></i>
-                    </a>
-                    <div>
-                        <h1 class="text-lg font-bold text-slate-900">추천 후보 이력서</h1>
-                        <p class="mt-0.5 text-xs text-slate-400"
-                           th:text="${view.proposalTitle + ' · ' + view.positionTitle}">제안서 · 포지션</p>
-                        <p class="mt-0.5 text-[11px] font-semibold text-slate-400">상세보기 &gt;</p>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <th:block th:replace="~{fragments/profileFragments :: profileHeader(profile=${profile})}"></th:block>
+    <th:block th:replace="~{fragments/profileFragments :: profileAlerts}"></th:block>
 
-        <div class="mx-auto max-w-7xl px-4 pt-5 lg:px-6">
-            <section th:if="${errorMessage != null}"
-                     class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-600">
-                <p th:text="${errorMessage}">오류 메시지</p>
-            </section>
-            <section th:if="${noticeMessage != null}"
-                     class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
-                <p th:text="${noticeMessage}">안내 메시지</p>
-            </section>
-        </div>
+    <div class="mx-auto max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
+      <div class="grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.85fr)]">
 
-        <div class="mx-auto max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
-            <div class="grid gap-6 lg:grid-cols-5">
+        <th:block th:if="${profile.freelancerSubject()}"
+                  th:replace="~{fragments/profileFragments :: freelancerBody(profile=${profile})}">
+        </th:block>
 
-                <!-- 좌측: 후보 요약/사유/강점 -->
-                <section class="lg:col-span-2 space-y-6">
-                    <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/50">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-2">
-                                <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600"
-                                      th:text="${'TOP ' + view.candidate.rank}">TOP 1</span>
-                            </div>
-                            <p th:classappend="${view.candidate.finalScorePercent >= 80} ? 'text-blue-600' :
-                                                (${view.candidate.finalScorePercent >= 60} ? 'text-indigo-500' : 'text-slate-600')"
-                               class="text-2xl font-black tracking-tight"
-                               th:text="${view.candidate.finalScorePercent + '%'}">92%</p>
-                        </div>
+        <th:block th:if="${profile.clientSubject()}"
+                  th:replace="~{fragments/profileFragments :: clientBody(profile=${profile})}">
+        </th:block>
 
-                        <div class="mt-4">
-                            <p class="text-base font-bold text-slate-900" th:text="${view.candidate.maskedName}">김*수</p>
-                            <p class="mt-1 text-sm text-slate-500" th:text="${view.candidate.introduction}">자기소개</p>
-                        </div>
-
-                        <div class="mt-4 grid grid-cols-[1fr_1.6fr_1fr] gap-2">
-                            <div class="rounded-xl bg-slate-50 px-3 py-2 text-center">
-                                <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">경력</p>
-                                <p class="mt-1 text-sm font-bold text-slate-800" th:text="${view.candidate.careerYears} + '년'">5년</p>
-                            </div>
-                            <div class="rounded-xl bg-slate-50 px-3 py-2 text-center">
-                                <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">선호 근무 형태</p>
-                                <p class="mt-1 text-xs font-bold leading-tight text-slate-800"
-                                   th:text="${view.candidate.preferredWorkTypeLabel}">원격</p>
-                            </div>
-                            <div class="rounded-xl bg-slate-50 px-3 py-2 text-center">
-                                <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">매칭 점수</p>
-                                <p class="mt-1 text-sm font-bold text-slate-800" th:text="${view.candidate.embeddingScorePercent + '%'}">88%</p>
-                            </div>
-                        </div>
-
-                        <div class="mt-4 flex flex-wrap gap-1.5" th:if="${!#lists.isEmpty(view.candidate.matchedSkills)}">
-                            <span th:each="skill : ${view.candidate.matchedSkills}"
-                                  class="rounded-md border border-slate-100 bg-slate-50 px-2.5 py-0.5 text-xs font-medium text-slate-600"
-                                  th:text="${skill}">Java</span>
-                        </div>
-
-                        <!-- 매칭 없음: 요청 버튼 -->
-                        <th:block th:if="${view.candidate.matchingStatus == null}">
-                            <form class="mt-4"
-                                  th:action="@{/recommendation-results/{id}/matchings(id=${view.resultId})}"
-                                  method="post">
-                                <input type="hidden" name="_csrf" th:value="${_csrf.token}">
-                                <input type="hidden" name="redirectTo"
-                                       th:value="@{/proposals/{proposalId}/recommendations/results/{resultId}(proposalId=${view.proposalId}, resultId=${view.resultId})}">
-                                <input type="hidden" name="errorRedirectTo"
-                                       th:value="@{/proposals/{proposalId}/recommendations/results/{resultId}(proposalId=${view.proposalId}, resultId=${view.resultId})}">
-                                <button type="submit"
-                                        class="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700">
-                                    <i data-lucide="send" class="h-4 w-4"></i>
-                                    매칭 요청하기
-                                </button>
-                            </form>
-                        </th:block>
-
-                        <!-- 수락 대기 중(PROPOSED) -->
-                        <th:block th:if="${view.candidate.matchingStatus == 'PROPOSED'}">
-                            <a th:if="${view.candidate.matchingId != null}"
-                               th:href="@{/matchings/{id}(id=${view.candidate.matchingId})}"
-                               class="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-700 transition hover:bg-amber-100">
-                                <i data-lucide="clock" class="h-4 w-4"></i>
-                                수락 대기 중
-                                <i data-lucide="chevron-right" class="h-4 w-4 opacity-60"></i>
-                            </a>
-                            <div th:unless="${view.candidate.matchingId != null}"
-                                 class="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-700">
-                                <i data-lucide="clock" class="h-4 w-4"></i>
-                                수락 대기 중
-                            </div>
-                        </th:block>
-
-                        <!-- 매칭 진행 중(ACCEPTED / IN_PROGRESS) -->
-                        <th:block th:if="${view.candidate.matchingStatus == 'ACCEPTED' or view.candidate.matchingStatus == 'IN_PROGRESS'}">
-                            <a th:if="${view.candidate.matchingId != null}"
-                               th:href="@{/matchings/{id}(id=${view.candidate.matchingId})}"
-                               class="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100">
-                                <i data-lucide="check-circle" class="h-4 w-4"></i>
-                                매칭 진행 중
-                                <i data-lucide="chevron-right" class="h-4 w-4 opacity-60"></i>
-                            </a>
-                            <div th:unless="${view.candidate.matchingId != null}"
-                                 class="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-700">
-                                <i data-lucide="check-circle" class="h-4 w-4"></i>
-                                매칭 진행 중
-                            </div>
-                        </th:block>
-
-
-                        <!-- 거절됨 (REJECTED) -->
-                        <div th:if="${view.candidate.matchingStatus == 'REJECTED'}"
-                             class="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-bold text-slate-400">
-                            <i data-lucide="x-circle" class="h-4 w-4"></i>
-                            거절됨
-                        </div>
-
-                        <!-- 완료 / 취소 (COMPLETED / CANCELED) -->
-                        <div th:if="${view.candidate.matchingStatus == 'COMPLETED' or view.candidate.matchingStatus == 'CANCELED'}"
-                             class="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-bold text-slate-400">
-                            <i data-lucide="archive" class="h-4 w-4"></i>
-                            <span th:text="${view.candidate.matchingStatus == 'COMPLETED'} ? '매칭 완료' : '취소됨'">매칭 완료</span>
-                        </div>
-                    </article>
-
-                    <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/50">
-                        <div class="mb-2 flex items-center gap-2">
-                            <i data-lucide="sparkles" class="h-4 w-4 text-blue-400"></i>
-                            <h2 class="text-sm font-bold text-slate-900">AI 추천 사유</h2>
-                        </div>
-                        <p th:if="${view.candidate.llmReady and view.candidate.llmReason != null}"
-                           class="text-sm leading-relaxed text-slate-700"
-                           th:text="${view.candidate.llmReason}">AI 추천 사유 내용</p>
-                        <p th:unless="${view.candidate.llmReady and view.candidate.llmReason != null}"
-                           class="text-xs text-slate-400 italic">AI 분석을 준비 중입니다.</p>
-                    </article>
-
-                    <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/50"
-                             th:if="${!#lists.isEmpty(view.candidate.highlights)}">
-                        <div class="mb-2 flex items-center gap-2">
-                            <i data-lucide="star" class="h-4 w-4 text-emerald-500"></i>
-                            <h2 class="text-sm font-bold text-slate-900">주요 강점</h2>
-                        </div>
-                        <ul class="space-y-2">
-                            <li th:each="h : ${view.candidate.highlights}"
-                                class="rounded-xl bg-emerald-50/70 px-4 py-3 text-sm text-slate-700"
-                                th:text="${h}">강점</li>
-                        </ul>
-                    </article>
-                </section>
-
-                <!-- 우측: 이력서 상세 -->
-                <section class="lg:col-span-3 space-y-6">
-                    <article class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
-                        <div class="mb-3 flex items-center justify-between">
-                            <h2 class="text-base font-bold text-slate-900">이력서</h2>
-                            <a th:if="${view.portfolioUrl != null}"
-                               th:href="${view.portfolioUrl}"
-                               target="_blank" rel="noreferrer noopener"
-                               class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50">
-                                <i data-lucide="link" class="h-3.5 w-3.5"></i>
-                                포트폴리오
-                            </a>
-                        </div>
-
-                        <div class="space-y-3">
-                            <div class="rounded-xl bg-slate-50 px-4 py-3">
-                                <p class="text-xs font-bold text-slate-500">자기소개</p>
-                                <p class="mt-1 text-sm leading-relaxed text-slate-800"
-                                   th:text="${view.candidate.introduction}">소개</p>
-                            </div>
-                        </div>
-                    </article>
-
-                    <article class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
-                        <h2 class="mb-3 text-base font-bold text-slate-900">보유 기술</h2>
-                        <div th:if="${#lists.isEmpty(view.resumeSkills)}"
-                             class="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-center text-sm text-slate-500">
-                            등록된 기술이 없습니다.
-                        </div>
-                        <div th:unless="${#lists.isEmpty(view.resumeSkills)}"
-                             class="flex flex-wrap gap-2">
-                            <span th:each="skill : ${view.resumeSkills}"
-                                  class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                                <span class="font-semibold" th:text="${skill.name}">Spring</span>
-                                <span class="rounded-md bg-slate-50 px-2 py-0.5 text-xs font-bold text-slate-500"
-                                      th:text="${skill.proficiencyLabel}">중급</span>
-                            </span>
-                        </div>
-                    </article>
-
-                    <article class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
-                        <h2 class="mb-3 text-base font-bold text-slate-900">경력</h2>
-                        <div th:if="${#lists.isEmpty(view.careerItems)}"
-                             class="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-center text-sm text-slate-500">
-                            등록된 경력이 없습니다.
-                        </div>
-                        <div th:unless="${#lists.isEmpty(view.careerItems)}" class="space-y-4">
-                            <div th:each="c : ${view.careerItems}"
-                                 class="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4">
-                                <div class="flex flex-wrap items-center justify-between gap-2">
-                                    <div>
-                                        <p class="text-sm font-bold text-slate-900"
-                                           th:text="${c.companyName + ' · ' + c.position}">회사 · 직무</p>
-                                        <p class="mt-0.5 text-xs text-slate-500"
-                                           th:text="${c.employmentTypeLabel + ' · ' + c.periodLabel}">고용형태 · 기간</p>
-                                    </div>
-                                </div>
-
-                                <p th:if="${c.summary != null and !#strings.isEmpty(c.summary)}"
-                                   class="mt-3 text-sm leading-relaxed text-slate-700"
-                                   th:text="${c.summary}">요약</p>
-
-                                <div class="mt-3 flex flex-wrap gap-1.5" th:if="${!#lists.isEmpty(c.techStack)}">
-                                    <span th:each="t : ${c.techStack}"
-                                          class="rounded-md border border-slate-200 bg-white px-2.5 py-0.5 text-xs font-medium text-slate-600"
-                                          th:text="${t}">Java</span>
-                                </div>
-                            </div>
-                        </div>
-                    </article>
-                </section>
-            </div>
-        </div>
-    </main>
+        <th:block th:if="${profile.hasRecommendationContext()}"
+                  th:replace="~{fragments/profileFragments :: recommendationContextPanel(profile=${profile})}">
+        </th:block>
+      </div>
+    </div>
+  </main>
 </div>
 </body>
 </html>
