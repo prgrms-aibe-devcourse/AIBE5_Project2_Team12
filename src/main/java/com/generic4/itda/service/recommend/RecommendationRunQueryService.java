@@ -16,6 +16,7 @@ import com.generic4.itda.dto.recommend.RecommendationResumeCareerItem;
 import com.generic4.itda.dto.recommend.RecommendationResumeDetailViewModel;
 import com.generic4.itda.dto.recommend.RecommendationResumeSkillItem;
 import com.generic4.itda.dto.recommend.RecommendationRunStatusViewModel;
+import com.generic4.itda.dto.matching.LatestMatchingSummary;
 import com.generic4.itda.repository.MatchingRepository;
 import com.generic4.itda.repository.RecommendationResultRepository;
 import com.generic4.itda.repository.RecommendationRunRepository;
@@ -70,11 +71,11 @@ public class RecommendationRunQueryService {
         List<Long> resumeIds = results.stream()
                 .map(r -> r.getResume().getId())
                 .toList();
-        Map<Long, MatchingStatus> matchingStatusMap = loadMatchingStatusMap(
+        Map<Long, LatestMatchingSummary> matchingSummaryMap = loadMatchingSummaryMap(
                 proposalPosition.getId(), resumeIds);
 
         List<RecommendationCandidateItem> candidates = results.stream()
-                .map(r -> toCandidateItem(r, matchingStatusMap.get(r.getResume().getId())))
+                .map(r -> toCandidateItem(r, matchingSummaryMap.get(r.getResume().getId())))
                 .toList();
 
         return new RecommendationResultsViewModel(
@@ -107,8 +108,8 @@ public class RecommendationRunQueryService {
         Resume resume = result.getResume();
 
         // 해당 후보의 매칭 상태 조회
-        MatchingStatus matchingStatus = matchingRepository
-                .getLatestMatchingStatus(proposalPosition.getId(), resume.getId())
+        LatestMatchingSummary matchingSummary = matchingRepository
+                .getLatestMatchingSummary(proposalPosition.getId(), resume.getId())
                 .orElse(null);
 
         return new RecommendationResumeDetailViewModel(
@@ -118,21 +119,21 @@ public class RecommendationRunQueryService {
                 proposal.getTitle(),
                 resolvePositionTitle(proposalPosition),
                 "/proposals/%d/recommendations/results?runId=%d".formatted(proposal.getId(), run.getId()),
-                toCandidateItem(result, matchingStatus),
+                toCandidateItem(result, matchingSummary),
                 resume.getPortfolioUrl(),
                 toSkillItems(resume.getSkills()),
                 toCareerItems(resume)
         );
     }
 
-    private Map<Long, MatchingStatus> loadMatchingStatusMap(Long positionId, Collection<Long> resumeIds) {
+    private Map<Long, LatestMatchingSummary> loadMatchingSummaryMap(Long positionId, Collection<Long> resumeIds) {
         if (resumeIds.isEmpty()) {
             return Map.of();
         }
-        return matchingRepository.getLatestMatchingStatusMap(positionId, resumeIds);
+        return matchingRepository.getLatestMatchingSummaryMap(positionId, resumeIds);
     }
 
-    private RecommendationCandidateItem toCandidateItem(RecommendationResult result, MatchingStatus matchingStatus) {
+    private RecommendationCandidateItem toCandidateItem(RecommendationResult result, LatestMatchingSummary matchingSummary) {
         Resume resume = result.getResume();
         Member member = resume.getMember();
         ReasonFacts facts = result.getReasonFacts();
@@ -164,6 +165,9 @@ public class RecommendationRunQueryService {
         List<String> highlights = facts != null && facts.highlights() != null
                 ? facts.highlights() : List.of();
 
+        MatchingStatus matchingStatus = matchingSummary != null ? matchingSummary.status() : null;
+        Long matchingId = matchingSummary != null ? matchingSummary.matchingId() : null;
+
         return new RecommendationCandidateItem(
                 result.getId(),
                 result.getRank(),
@@ -178,6 +182,7 @@ public class RecommendationRunQueryService {
                 result.getLlmReason(),
                 result.getLlmStatus().getDescription(),
                 result.getLlmStatus() == LlmStatus.READY,
+                matchingId,
                 matchingStatus != null ? matchingStatus.name() : null
         );
     }

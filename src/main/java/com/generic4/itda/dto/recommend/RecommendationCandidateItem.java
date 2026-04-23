@@ -16,6 +16,7 @@ public record RecommendationCandidateItem(
         String llmReason,
         String llmStatusLabel,
         boolean llmReady,
+        Long matchingId,
         /**
          * 현재 매칭 상태. null이면 매칭 요청이 없는 상태 (버튼 활성).
          * 값이 있으면 MatchingStatus.name() 문자열 (예: "PROPOSED", "ACCEPTED", ...).

@@ -127,10 +127,14 @@
                         <span th:text="${#temporals.format(item.receivedAt(), 'yyyy.MM.dd')}">날짜</span>
                     </div>
                     <div class="flex justify-end">
-                        <a th:href="${item.detailPath()}"
-                           class="flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-700 whitespace-nowrap">
-                            상세 보기<i data-lucide="chevron-right" class="w-4 h-4"></i>
-                        </a>
+                        <button type="button"
+                                th:attr="data-matching-id=${item.matchingId},
+                                         data-proposal-id=${item.proposalId},
+                                         data-proposal-position-id=${item.proposalPositionId},
+                                         data-dash-status=${item.status().name()}"
+                                class="menu-trigger inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-300 transition hover:bg-slate-100 hover:text-slate-500">
+                            <i data-lucide="ellipsis" class="w-4 h-4"></i>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -139,6 +143,19 @@
     </div>
 </div>
 </main>
+
+    <!-- 공유 액션 메뉴 (position: fixed로 overflow-hidden 부모 탈출) -->
+    <div id="actionMenu" class="hidden fixed z-[9999] w-52 rounded-2xl border border-slate-200 bg-white py-2 shadow-lg shadow-slate-200/80">
+        <a id="menuDetail" href="#"
+           class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            <i data-lucide="file-text" class="h-4 w-4 text-slate-400"></i>제안서 보기
+        </a>
+        <a id="menuMatching" href="#"
+           class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            <i data-lucide="activity" class="h-4 w-4 text-slate-400"></i>매칭 결과 보기
+        </a>
+    </div>
+
 </div>
 
 <th:block layout:fragment="scripts">
@@ -164,14 +181,87 @@
     var inp  = document.getElementById('searchInput');
     if (form) form.addEventListener('submit', function() { cur_query = inp ? inp.value.trim() : ''; loadList(cur_status, cur_query); });
 
+    // ── 공유 액션 메뉴 ──────────────────────────────────────
+    var actionMenu   = document.getElementById('actionMenu');
+    var menuDetail   = document.getElementById('menuDetail');
+    var menuMatching = document.getElementById('menuMatching');
+    var menuOpen     = false;
+
+    // body 아래로 이동해 overflow/transform 부모의 영향을 피함
+    if (actionMenu && actionMenu.parentElement !== document.body) {
+        document.body.appendChild(actionMenu);
+    }
+
+    function closeActionMenu() {
+        if (!menuOpen) return;
+        actionMenu.classList.add('hidden');
+        menuOpen = false;
+    }
+
+    function openActionMenu(trigger) {
+        var matchingId         = trigger.dataset.matchingId;
+        var proposalId         = trigger.dataset.proposalId;
+        var proposalPositionId = trigger.dataset.proposalPositionId;
+        var dashStatus         = trigger.dataset.dashStatus; // NEW | IN_PROGRESS | COMPLETED
+
+        // "제안서 보기" — NEW 상태는 positionId 쿼리 포함
+        menuDetail.href = (proposalPositionId && dashStatus === 'NEW')
+            ? '/proposals/' + proposalId + '?proposalPositionId=' + proposalPositionId
+            : '/proposals/' + proposalId;
+
+        // "매칭 결과 보기" — 수락 이후 상태(IN_PROGRESS, COMPLETED)에서만 노출
+        var showMatching = (dashStatus === 'IN_PROGRESS' || dashStatus === 'COMPLETED') && matchingId;
+        menuMatching.classList.toggle('hidden', !showMatching);
+        if (showMatching) {
+            menuMatching.href = '/matchings/' + matchingId;
+        }
+
+        // 버튼 기준 위치 계산 (fixed)
+        actionMenu.classList.remove('hidden');
+        if (window.lucide) lucide.createIcons();
+
+        var rect       = trigger.getBoundingClientRect();
+        var menuHeight = actionMenu.offsetHeight;
+        var spaceBelow = window.innerHeight - rect.bottom;
+
+        actionMenu.style.left  = 'auto';
+        actionMenu.style.right = (window.innerWidth - rect.right) + 'px';
+
+        if (spaceBelow < menuHeight + 8) {
+            actionMenu.style.top    = 'auto';
+            actionMenu.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+        } else {
+            actionMenu.style.bottom = 'auto';
+            actionMenu.style.top    = (rect.bottom + 4) + 'px';
+        }
+
+        menuOpen = true;
+    }
+
+    // 스크롤 시 메뉴 닫기
+    window.addEventListener('scroll', closeActionMenu, true);
+
     // Row click navigation (works for both initial render and AJAX-replaced list).
     document.addEventListener('click', function (e) {
+        // ... 메뉴 트리거
+        var trigger = e.target.closest('.menu-trigger');
+        if (trigger) {
+            e.stopPropagation();
+            if (menuOpen) { closeActionMenu(); return; }
+            openActionMenu(trigger);
+            return;
+        }
+
+        // 액션 메뉴 내부 클릭은 그대로 통과
+        if (actionMenu && actionMenu.contains(e.target)) return;
+
+        // 외부 클릭 시 메뉴 닫기
+        if (menuOpen) { closeActionMenu(); return; }
+
+        // 행 클릭 → detailPath 이동
         var row = e.target.closest('#listSection [data-href]');
         if (!row) return;
-
-        // Let explicit interactive elements handle their own clicks.
         if (e.target.closest('a, button, input, select, textarea, label')) return;
-
         var href = row.dataset.href;
         if (href) window.location.href = href;
     });

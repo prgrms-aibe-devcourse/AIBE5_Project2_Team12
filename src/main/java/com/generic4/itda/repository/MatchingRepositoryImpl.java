@@ -6,6 +6,7 @@ import com.generic4.itda.domain.member.QMember;
 import com.generic4.itda.domain.proposal.QProposal;
 import com.generic4.itda.domain.proposal.QProposalPosition;
 import com.generic4.itda.dto.freelancer.FreelancerDashboardItem;
+import com.generic4.itda.dto.matching.LatestMatchingSummary;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.CaseBuilder;
 import com.querydsl.core.types.dsl.BooleanExpression;
@@ -175,5 +176,79 @@ public class MatchingRepositoryImpl implements MatchingRepositoryCustom {
                 .fetchFirst();
 
         return Optional.ofNullable(status);
+    }
+
+    @Override
+    public Map<Long, LatestMatchingSummary> getLatestMatchingSummaryMap(Long proposalPositionId, Collection<Long> resumeIds) {
+        if (proposalPositionId == null || resumeIds == null || resumeIds.isEmpty()) {
+            return Map.of();
+        }
+
+        NumberExpression<Integer> activeFirst = new CaseBuilder()
+                .when(matching.status.in(ACTIVE_STATUSES)).then(0)
+                .otherwise(1);
+
+        List<com.querydsl.core.Tuple> rows = queryFactory
+                .select(matching.resume.id, matching.id, matching.status)
+                .from(matching)
+                .where(
+                        matching.proposalPosition.id.eq(proposalPositionId),
+                        matching.resume.id.in(resumeIds)
+                )
+                .orderBy(
+                        matching.resume.id.asc(),
+                        activeFirst.asc(),
+                        matching.createdAt.desc(),
+                        matching.id.desc()
+                )
+                .fetch();
+
+        Map<Long, LatestMatchingSummary> map = new LinkedHashMap<>();
+        for (com.querydsl.core.Tuple row : rows) {
+            Long resumeId = row.get(matching.resume.id);
+            Long matchingId = row.get(matching.id);
+            MatchingStatus status = row.get(matching.status);
+            if (resumeId != null && matchingId != null && status != null) {
+                map.putIfAbsent(resumeId, new LatestMatchingSummary(matchingId, status));
+            }
+        }
+        return map;
+    }
+
+    @Override
+    public Optional<LatestMatchingSummary> getLatestMatchingSummary(Long proposalPositionId, Long resumeId) {
+        if (proposalPositionId == null || resumeId == null) {
+            return Optional.empty();
+        }
+
+        NumberExpression<Integer> activeFirst = new CaseBuilder()
+                .when(matching.status.in(ACTIVE_STATUSES)).then(0)
+                .otherwise(1);
+
+        com.querydsl.core.Tuple row = queryFactory
+                .select(matching.id, matching.status)
+                .from(matching)
+                .where(
+                        matching.proposalPosition.id.eq(proposalPositionId),
+                        matching.resume.id.eq(resumeId)
+                )
+                .orderBy(
+                        activeFirst.asc(),
+                        matching.createdAt.desc(),
+                        matching.id.desc()
+                )
+                .fetchFirst();
+
+        if (row == null) {
+            return Optional.empty();
+        }
+
+        Long matchingId = row.get(matching.id);
+        MatchingStatus status = row.get(matching.status);
+        if (matchingId == null || status == null) {
+            return Optional.empty();
+        }
+
+        return Optional.of(new LatestMatchingSummary(matchingId, status));
     }
 }
