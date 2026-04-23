@@ -177,6 +177,37 @@ class MatchingTest {
                 .hasMessage("후기 작성 후 프로젝트 완료를 확인할 수 있습니다.");
     }
 
+    @Test
+    @DisplayName("취소 요청 중인 매칭은 후기를 작성할 수 없다")
+    void submitReview_throwsWhenCancellationRequested() {
+        Matching matching = inProgressMatching();
+        matching.requestCancellation(
+                MatchingParticipantRole.CLIENT,
+                MatchingCancellationReason.CLIENT_AFTER_PROJECT_SUSPENDED,
+                null
+        );
+
+        assertThatThrownBy(() -> matching.submitReview(MatchingParticipantRole.CLIENT, "좋은 협업이었습니다."))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("취소 요청 중인 매칭은 후기를 작성할 수 없습니다.");
+    }
+
+    @Test
+    @DisplayName("취소 요청 중인 매칭은 프로젝트 완료 확인을 할 수 없다")
+    void confirmCompletion_throwsWhenCancellationRequested() {
+        Matching matching = inProgressMatching();
+        matching.submitReview(MatchingParticipantRole.CLIENT, "좋은 협업이었습니다.");
+        matching.requestCancellation(
+                MatchingParticipantRole.FREELANCER,
+                MatchingCancellationReason.FREELANCER_AFTER_SCOPE_CHANGED,
+                null
+        );
+
+        assertThatThrownBy(() -> matching.confirmCompletion(MatchingParticipantRole.CLIENT))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("취소 요청 중인 매칭은 완료 확인을 할 수 없습니다.");
+    }
+
     private Matching acceptedMatching() {
         Matching matching = proposedMatching();
         matching.accept();

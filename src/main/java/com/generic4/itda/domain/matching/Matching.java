@@ -252,6 +252,9 @@ public class Matching extends BaseTimeEntity {
         if (this.status != MatchingStatus.IN_PROGRESS) {
             throw new IllegalStateException("진행 중인 매칭에서만 후기를 작성할 수 있습니다.");
         }
+        if (hasCancellationRequest()) {
+            throw new IllegalStateException("취소 요청 중인 매칭은 후기를 작성할 수 없습니다.");
+        }
         String normalizedReview = normalize(review);
         if (normalizedReview == null) {
             throw new IllegalArgumentException("후기 내용은 필수입니다.");
@@ -270,6 +273,9 @@ public class Matching extends BaseTimeEntity {
     public void confirmCompletion(MatchingParticipantRole participantRole) {
         if (this.status != MatchingStatus.IN_PROGRESS) {
             throw new IllegalStateException("진행 중인 매칭만 완료 확인을 할 수 있습니다.");
+        }
+        if (hasCancellationRequest()) {
+            throw new IllegalStateException("취소 요청 중인 매칭은 완료 확인을 할 수 없습니다.");
         }
         if (!hasReviewBy(participantRole)) {
             throw new IllegalStateException("후기 작성 후 프로젝트 완료를 확인할 수 있습니다.");
