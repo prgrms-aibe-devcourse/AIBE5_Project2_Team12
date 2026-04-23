@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<th:block th:fragment="profileHeader(profile)">
+    <div class="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur">
+        <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-4">
+                <a th:href="${profile.backUrl}"
+                   class="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700">
+                    <i data-lucide="arrow-left" class="h-4 w-4"></i>
+                </a>
+                <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h1 class="text-lg font-bold text-slate-900" th:text="${profile.title}">프로필</h1>
+                        <span class="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700"
+                              th:text="${profile.statusLabel}">미리보기</span>
+                    </div>
+                    <p class="mt-0.5 text-xs text-slate-400" th:text="${profile.subtitle}">제안서 · 포지션</p>
+                    <p class="mt-0.5 text-[11px] font-semibold text-slate-400"
+                       th:text="${profile.contextType.label() + ' · ' + profile.subjectType.label()}">
+                        추천 후보 검토 · 프리랜서
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</th:block>
+
+<th:block th:fragment="profileAlerts">
+    <div class="mx-auto max-w-7xl px-4 pt-5 lg:px-6">
+        <section th:if="${errorMessage != null}"
+                 class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-600">
+            <p th:text="${errorMessage}">오류 메시지</p>
+        </section>
+        <section th:if="${noticeMessage != null}"
+                 class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+            <p th:text="${noticeMessage}">안내 메시지</p>
+        </section>
+    </div>
+</th:block>
+
+<th:block th:fragment="freelancerBody(profile)" th:with="body=${profile.freelancer}">
+    <section class="space-y-6">
+        <article class="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">FREELANCER PROFILE</p>
+                    <h2 class="mt-2 text-2xl font-black tracking-tight text-slate-950" th:text="${body.displayName}">
+                        김*수
+                    </h2>
+                    <p class="mt-2 text-sm leading-relaxed text-slate-500" th:text="${body.headline}">
+                        프리랜서 프로필
+                    </p>
+                </div>
+                <a th:if="${body.portfolioUrl != null}"
+                   th:href="${body.portfolioUrl}"
+                   target="_blank" rel="noreferrer noopener"
+                   class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50">
+                    <i data-lucide="link" class="h-3.5 w-3.5"></i>
+                    포트폴리오
+                </a>
+            </div>
+
+            <div class="mt-6 grid gap-3 sm:grid-cols-3">
+                <div class="rounded-2xl bg-slate-50 px-4 py-4">
+                    <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">경력</p>
+                    <p class="mt-2 text-base font-bold text-slate-900"
+                       th:text="${body.careerYears != null ? body.careerYears + '년' : '미정'}">5년</p>
+                </div>
+                <div class="rounded-2xl bg-slate-50 px-4 py-4">
+                    <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">선호 근무 형태</p>
+                    <p class="mt-2 text-base font-bold text-slate-900" th:text="${body.preferredWorkTypeLabel}">
+                        원격
+                    </p>
+                </div>
+                <div class="rounded-2xl bg-slate-50 px-4 py-4">
+                    <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">공개 범위</p>
+                    <p class="mt-2 text-base font-bold text-slate-900" th:text="${profile.accessLevel.label()}">
+                        미리보기
+                    </p>
+                </div>
+            </div>
+        </article>
+
+        <article class="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
+            <h2 class="text-base font-bold text-slate-900">자기소개</h2>
+            <p class="mt-3 rounded-2xl bg-slate-50 px-5 py-4 text-sm leading-relaxed text-slate-700"
+               th:text="${#strings.isEmpty(body.introduction) ? '등록된 자기소개가 없습니다.' : body.introduction}">
+                자기소개
+            </p>
+        </article>
+
+        <article class="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
+            <h2 class="mb-3 text-base font-bold text-slate-900">보유 기술</h2>
+            <div th:if="${#lists.isEmpty(body.skills)}"
+                 class="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-center text-sm text-slate-500">
+                등록된 기술이 없습니다.
+            </div>
+            <div th:unless="${#lists.isEmpty(body.skills)}" class="flex flex-wrap gap-2">
+                <span th:each="skill : ${body.skills}"
+                      class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                    <span class="font-semibold" th:text="${skill.name}">Spring</span>
+                    <span class="rounded-md bg-slate-50 px-2 py-0.5 text-xs font-bold text-slate-500"
+                          th:text="${skill.proficiencyLabel}">중급</span>
+                </span>
+            </div>
+        </article>
+
+        <article class="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
+            <h2 class="mb-3 text-base font-bold text-slate-900">경력</h2>
+            <div th:if="${#lists.isEmpty(body.careerItems)}"
+                 class="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-center text-sm text-slate-500">
+                등록된 경력이 없습니다.
+            </div>
+            <div th:unless="${#lists.isEmpty(body.careerItems)}" class="space-y-4">
+                <div th:each="career : ${body.careerItems}"
+                     class="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4">
+                    <p class="text-sm font-bold text-slate-900"
+                       th:text="${career.companyName + ' · ' + career.position}">회사 · 직무</p>
+                    <p class="mt-0.5 text-xs text-slate-500"
+                       th:text="${career.employmentTypeLabel + ' · ' + career.periodLabel}">고용형태 · 기간</p>
+                    <p th:if="${career.summary != null and !#strings.isEmpty(career.summary)}"
+                       class="mt-3 text-sm leading-relaxed text-slate-700"
+                       th:text="${career.summary}">요약</p>
+                    <div class="mt-3 flex flex-wrap gap-1.5" th:if="${!#lists.isEmpty(career.techStack)}">
+                        <span th:each="tech : ${career.techStack}"
+                              class="rounded-md border border-slate-200 bg-white px-2.5 py-0.5 text-xs font-medium text-slate-600"
+                              th:text="${tech}">Java</span>
+                    </div>
+                </div>
+            </div>
+        </article>
+    </section>
+</th:block>
+
+<th:block th:fragment="clientBody(profile)" th:with="body=${profile.client}, project=${profile.client != null ? profile.client.project : null}">
+    <section class="space-y-6">
+        <article class="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
+            <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">CLIENT PROFILE</p>
+            <h2 class="mt-2 text-2xl font-black tracking-tight text-slate-950"
+                th:text="${body != null ? body.displayName : '클라이언트'}">클라이언트</h2>
+            <p class="mt-2 text-sm text-slate-500"
+               th:text="${body != null ? body.userTypeLabel : '회원 유형 미정'}">개인 회원</p>
+            <p class="mt-5 rounded-2xl bg-slate-50 px-5 py-4 text-sm leading-relaxed text-slate-600"
+               th:text="${body != null and !#strings.isEmpty(body.memo) ? body.memo : '클라이언트 소개는 추후 확장 예정입니다.'}">
+                클라이언트 소개
+            </p>
+        </article>
+
+        <article class="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
+            <h2 class="text-base font-bold text-slate-900">요청 프로젝트 요약</h2>
+            <div th:if="${project == null}"
+                 class="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-center text-sm text-slate-500">
+                연결된 프로젝트 요약이 없습니다.
+            </div>
+            <div th:if="${project != null}" class="mt-4 space-y-4">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">제안서</p>
+                    <p class="mt-1 text-lg font-bold text-slate-900" th:text="${project.proposalTitle}">제안서 제목</p>
+                    <p class="mt-2 text-sm leading-relaxed text-slate-600"
+                       th:text="${#strings.isEmpty(project.description) ? '제안서 설명이 없습니다.' : project.description}">
+                        제안서 설명
+                    </p>
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <div class="rounded-2xl bg-slate-50 px-4 py-4">
+                        <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">포지션</p>
+                        <p class="mt-2 text-sm font-bold text-slate-900" th:text="${project.positionTitle}">백엔드</p>
+                    </div>
+                    <div class="rounded-2xl bg-slate-50 px-4 py-4">
+                        <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">근무 형태</p>
+                        <p class="mt-2 text-sm font-bold text-slate-900" th:text="${project.workTypeLabel}">원격</p>
+                    </div>
+                    <div class="rounded-2xl bg-slate-50 px-4 py-4">
+                        <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">예산</p>
+                        <p class="mt-2 text-sm font-bold text-slate-900" th:text="${project.budgetText}">미정</p>
+                    </div>
+                    <div class="rounded-2xl bg-slate-50 px-4 py-4">
+                        <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">예상 기간</p>
+                        <p class="mt-2 text-sm font-bold text-slate-900" th:text="${project.expectedPeriodText}">미정</p>
+                    </div>
+                </div>
+            </div>
+        </article>
+    </section>
+</th:block>
+
+<th:block th:fragment="recommendationContextPanel(profile)" th:with="ctx=${profile.recommendationContext}">
+    <aside class="space-y-6">
+        <article class="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">RECOMMENDATION CONTEXT</p>
+                    <h2 class="mt-2 text-lg font-bold text-slate-900">추천 판단 정보</h2>
+                </div>
+                <span class="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600"
+                      th:text="${'TOP ' + ctx.rank}">TOP 1</span>
+            </div>
+
+            <div class="mt-5 grid grid-cols-2 gap-3">
+                <div class="rounded-2xl bg-slate-50 px-4 py-4">
+                    <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">최종 점수</p>
+                    <p th:classappend="${ctx.finalScorePercent >= 80} ? 'text-blue-600' :
+                                        (${ctx.finalScorePercent >= 60} ? 'text-indigo-500' : 'text-slate-700')"
+                       class="mt-2 text-2xl font-black tracking-tight"
+                       th:text="${ctx.finalScorePercent + '%'}">92%</p>
+                </div>
+                <div class="rounded-2xl bg-slate-50 px-4 py-4">
+                    <p class="text-[10px] font-bold uppercase tracking-widest text-slate-400">매칭 점수</p>
+                    <p class="mt-2 text-2xl font-black tracking-tight text-slate-800"
+                       th:text="${ctx.embeddingScorePercent + '%'}">88%</p>
+                </div>
+            </div>
+
+            <div class="mt-5" th:if="${!#lists.isEmpty(ctx.matchedSkills)}">
+                <p class="text-xs font-bold text-slate-500">일치 기술</p>
+                <div class="mt-2 flex flex-wrap gap-1.5">
+                    <span th:each="skill : ${ctx.matchedSkills}"
+                          class="rounded-md border border-slate-100 bg-slate-50 px-2.5 py-0.5 text-xs font-medium text-slate-600"
+                          th:text="${skill}">Java</span>
+                </div>
+            </div>
+        </article>
+
+        <article class="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
+            <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">ACTIONS</p>
+            <h2 class="mt-2 text-lg font-bold text-slate-900">현재 가능한 작업</h2>
+
+            <form th:if="${ctx.requestable()}"
+                  class="mt-5"
+                  th:action="@{/recommendation-results/{id}/matchings(id=${ctx.resultId})}"
+                  method="post">
+                <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+                <input type="hidden" name="redirectTo" th:value="${ctx.requestRedirectUrl}">
+                <input type="hidden" name="errorRedirectTo" th:value="${ctx.requestErrorRedirectUrl}">
+                <button type="submit"
+                        class="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-700">
+                    <i data-lucide="send" class="h-4 w-4"></i>
+                    매칭 요청하기
+                </button>
+            </form>
+
+            <div th:if="${ctx.proposed()}"
+                 class="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm font-bold text-amber-700">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="clock" class="h-4 w-4"></i>
+                    수락 대기 중
+                </div>
+                <a th:if="${ctx.hasMatchingDetail()}"
+                   th:href="${ctx.matchingDetailUrl}"
+                   class="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-amber-700 transition hover:text-amber-800">
+                    매칭 상세 보기
+                    <i data-lucide="chevron-right" class="h-3.5 w-3.5"></i>
+                </a>
+            </div>
+
+            <div th:if="${ctx.active()}"
+                 class="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-700">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="check-circle" class="h-4 w-4"></i>
+                    매칭 진행 중
+                </div>
+                <a th:if="${ctx.hasMatchingDetail()}"
+                   th:href="${ctx.matchingDetailUrl}"
+                   class="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 transition hover:text-emerald-800">
+                    매칭 상세 보기
+                    <i data-lucide="chevron-right" class="h-3.5 w-3.5"></i>
+                </a>
+            </div>
+
+            <div th:if="${ctx.rejected()}"
+                 class="mt-5 flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-bold text-slate-400">
+                <i data-lucide="x-circle" class="h-4 w-4"></i>
+                거절됨
+            </div>
+
+            <div th:if="${ctx.closed()}"
+                 class="mt-5 flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm font-bold text-slate-400">
+                <i data-lucide="archive" class="h-4 w-4"></i>
+                <span th:text="${ctx.matchingStatus == 'COMPLETED'} ? '매칭 완료' : '취소됨'">매칭 완료</span>
+            </div>
+
+            <a th:href="${profile.backUrl}"
+               class="mt-4 inline-flex items-center gap-2 text-sm font-bold text-slate-500 transition hover:text-slate-700">
+                <i data-lucide="arrow-left" class="h-4 w-4"></i>
+                추천 결과로 돌아가기
+            </a>
+        </article>
+
+        <article class="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
+            <div class="mb-2 flex items-center gap-2">
+                <i data-lucide="sparkles" class="h-4 w-4 text-blue-400"></i>
+                <h2 class="text-sm font-bold text-slate-900">AI 추천 사유</h2>
+            </div>
+            <p th:if="${ctx.llmReady and ctx.llmReason != null}"
+               class="text-sm leading-relaxed text-slate-700"
+               th:text="${ctx.llmReason}">AI 추천 사유</p>
+            <p th:unless="${ctx.llmReady and ctx.llmReason != null}"
+               class="text-xs italic text-slate-400">AI 분석을 준비 중입니다.</p>
+        </article>
+
+        <article class="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50"
+                 th:if="${!#lists.isEmpty(ctx.highlights)}">
+            <div class="mb-2 flex items-center gap-2">
+                <i data-lucide="star" class="h-4 w-4 text-emerald-500"></i>
+                <h2 class="text-sm font-bold text-slate-900">주요 강점</h2>
+            </div>
+            <ul class="space-y-2">
+                <li th:each="highlight : ${ctx.highlights}"
+                    class="rounded-xl bg-emerald-50/70 px-4 py-3 text-sm text-slate-700"
+                    th:text="${highlight}">강점</li>
+            </ul>
+        </article>
+
+        <article class="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
+            <div class="flex items-start gap-3">
+                <i data-lucide="shield-check" class="mt-0.5 h-4 w-4 shrink-0 text-slate-400"></i>
+                <div>
+                    <p class="text-sm font-bold text-slate-800" th:text="${profile.accessLevel.label()}">미리보기</p>
+                    <p class="mt-1 text-sm leading-relaxed text-slate-500"
+                       th:text="${profile.accessLevel.guideMessage()}">
+                        추천/요청 판단에 필요한 정보만 공개됩니다.
+                    </p>
+                </div>
+            </div>
+        </article>
+    </aside>
+</th:block>
+
+<th:block th:fragment="matchingContextPanel(profile)" th:with="ctx=${profile.matchingContext}">
+    <aside class="space-y-6">
+        <article class="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
+            <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">MATCHING CONTEXT</p>
+            <h2 class="mt-2 text-lg font-bold text-slate-900">매칭 상태</h2>
+            <div class="mt-5 rounded-2xl bg-slate-50 px-5 py-4">
+                <p class="text-sm font-bold text-slate-800" th:text="${ctx.statusLabel}">매칭 요청</p>
+                <p class="mt-2 text-sm leading-relaxed text-slate-500" th:text="${ctx.helperMessage}">
+                    매칭 상태 안내입니다.
+                </p>
+            </div>
+            <div class="mt-4 flex items-center gap-2 rounded-2xl border px-5 py-4 text-sm font-bold"
+                 th:classappend="${ctx.contactVisible} ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500'">
+                <i th:if="${ctx.contactVisible}" data-lucide="phone" class="h-4 w-4"></i>
+                <i th:unless="${ctx.contactVisible}" data-lucide="phone-off" class="h-4 w-4"></i>
+                <span th:text="${ctx.contactVisible ? '연락처 공개됨' : '연락처 비공개'}">연락처 비공개</span>
+            </div>
+        </article>
+
+        <article class="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">
+            <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">ACTIONS</p>
+            <h2 class="mt-2 text-lg font-bold text-slate-900">현재 가능한 작업</h2>
+
+            <div th:if="${ctx.canRespond()}" class="mt-5 space-y-3">
+                <form th:action="${ctx.acceptActionUrl}" method="post">
+                    <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+                    <input type="hidden" name="redirectTo" th:value="${ctx.matchingDetailUrl}">
+                    <input type="hidden" name="errorRedirectTo" th:value="${ctx.matchingDetailUrl}">
+                    <button type="submit"
+                            class="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-700">
+                        <i data-lucide="check" class="h-4 w-4"></i>
+                        매칭 요청 수락
+                    </button>
+                </form>
+                <form th:action="${ctx.rejectActionUrl}" method="post">
+                    <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+                    <input type="hidden" name="redirectTo" th:value="${ctx.matchingDetailUrl}">
+                    <input type="hidden" name="errorRedirectTo" th:value="${ctx.matchingDetailUrl}">
+                    <button type="submit"
+                            class="flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-white px-4 py-3 text-sm font-bold text-rose-600 transition hover:bg-rose-50">
+                        <i data-lucide="x" class="h-4 w-4"></i>
+                        매칭 요청 거절
+                    </button>
+                </form>
+            </div>
+
+            <a th:href="${ctx.matchingDetailUrl}"
+               class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
+                <i data-lucide="users" class="h-4 w-4"></i>
+                매칭 상세 보기
+            </a>
+            <a th:href="${ctx.proposalDetailUrl}"
+               class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
+                <i data-lucide="file-text" class="h-4 w-4"></i>
+                제안서 보기
+            </a>
+        </article>
+    </aside>
+</th:block>
+
+</body>
+</html>
