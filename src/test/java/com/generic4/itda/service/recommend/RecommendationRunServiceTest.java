@@ -81,8 +81,8 @@ class RecommendationRunServiceTest {
         // given
         Member owner = createMemberWithId(OWNER_ID, OWNER_EMAIL);
         Proposal proposal = createProposalWithStatus(owner, PROPOSAL_ID, ProposalStatus.MATCHING);
-        addPosition(proposal, 10L, "디자이너", ProposalPositionStatus.OPEN);
-        ProposalPosition selectedPosition = addPosition(proposal, SELECTED_POSITION_ID, "백엔드", ProposalPositionStatus.OPEN);
+        addPosition(proposal, 10L, "UI/UX 디자이너", ProposalPositionStatus.OPEN);
+        ProposalPosition selectedPosition = addPosition(proposal, SELECTED_POSITION_ID, "백엔드 개발자", ProposalPositionStatus.OPEN);
 
         RecommendationRun existingRun = RecommendationRun.create(
                 selectedPosition,
@@ -129,8 +129,8 @@ class RecommendationRunServiceTest {
         // given
         Member owner = createMemberWithId(OWNER_ID, OWNER_EMAIL);
         Proposal proposal = createProposalWithStatus(owner, PROPOSAL_ID, ProposalStatus.MATCHING);
-        addPosition(proposal, 10L, "디자이너", ProposalPositionStatus.OPEN);
-        ProposalPosition selectedPosition = addPosition(proposal, SELECTED_POSITION_ID, "백엔드", ProposalPositionStatus.OPEN);
+        addPosition(proposal, 10L, "UI/UX 디자이너", ProposalPositionStatus.OPEN);
+        ProposalPosition selectedPosition = addPosition(proposal, SELECTED_POSITION_ID, "백엔드 개발자", ProposalPositionStatus.OPEN);
 
         stubProposalDetailLoad(proposal);
         given(memberRepository.findByEmail_Value(OWNER_EMAIL)).willReturn(owner);
@@ -184,8 +184,8 @@ class RecommendationRunServiceTest {
         // given
         Member owner = createMemberWithId(OWNER_ID, OWNER_EMAIL);
         Proposal proposal = createProposalWithStatus(owner, PROPOSAL_ID, ProposalStatus.MATCHING);
-        addPosition(proposal, 10L, "디자이너", ProposalPositionStatus.OPEN);
-        ProposalPosition selectedPosition = addPosition(proposal, SELECTED_POSITION_ID, "백엔드", ProposalPositionStatus.OPEN);
+        addPosition(proposal, 10L, "UI/UX 디자이너", ProposalPositionStatus.OPEN);
+        ProposalPosition selectedPosition = addPosition(proposal, SELECTED_POSITION_ID, "백엔드 개발자", ProposalPositionStatus.OPEN);
         List<Long> excludedResumeIds = List.of(1L, 2L, 3L);
 
         RecommendationRun existingRun = RecommendationRun.create(
@@ -258,8 +258,8 @@ class RecommendationRunServiceTest {
         // given
         Member owner = createMemberWithId(OWNER_ID, OWNER_EMAIL);
         Proposal proposal = createProposalWithStatus(owner, PROPOSAL_ID, ProposalStatus.MATCHING);
-        addPosition(proposal, 10L, "디자이너", ProposalPositionStatus.OPEN);
-        ProposalPosition selectedPosition = addPosition(proposal, SELECTED_POSITION_ID, "백엔드", ProposalPositionStatus.OPEN);
+        addPosition(proposal, 10L, "UI/UX 디자이너", ProposalPositionStatus.OPEN);
+        ProposalPosition selectedPosition = addPosition(proposal, SELECTED_POSITION_ID, "백엔드 개발자", ProposalPositionStatus.OPEN);
         List<Long> excludedResumeIds = List.of(1L, 2L, 3L);
 
         stubProposalDetailLoad(proposal);
@@ -339,7 +339,7 @@ class RecommendationRunServiceTest {
         // given
         Member owner = createMemberWithId(OWNER_ID, OWNER_EMAIL);
         Proposal proposal = createProposalWithStatus(owner, PROPOSAL_ID, ProposalStatus.MATCHING);
-        addPosition(proposal, SELECTED_POSITION_ID, "백엔드", ProposalPositionStatus.FULL);
+        addPosition(proposal, SELECTED_POSITION_ID, "백엔드 개발자", ProposalPositionStatus.FULL);
 
         stubProposalDetailLoad(proposal);
         given(memberRepository.findByEmail_Value(OWNER_EMAIL)).willReturn(owner);
@@ -380,7 +380,7 @@ class RecommendationRunServiceTest {
         // given
         Member owner = createMemberWithId(OWNER_ID, OWNER_EMAIL);
         Proposal proposal = createProposalWithStatus(owner, PROPOSAL_ID, ProposalStatus.MATCHING);
-        addPosition(proposal, SELECTED_POSITION_ID, "백엔드", ProposalPositionStatus.OPEN);
+        addPosition(proposal, SELECTED_POSITION_ID, "백엔드 개발자", ProposalPositionStatus.OPEN);
 
         stubProposalDetailLoad(proposal);
         given(memberRepository.findByEmail_Value(OWNER_EMAIL)).willReturn(null);
@@ -406,7 +406,7 @@ class RecommendationRunServiceTest {
         Member owner = createMemberWithId(OWNER_ID, OWNER_EMAIL);
         Member other = createMemberWithId(2L, "other@example.com");
         Proposal proposal = createProposalWithStatus(owner, PROPOSAL_ID, ProposalStatus.MATCHING);
-        addPosition(proposal, SELECTED_POSITION_ID, "백엔드", ProposalPositionStatus.OPEN);
+        addPosition(proposal, SELECTED_POSITION_ID, "백엔드 개발자", ProposalPositionStatus.OPEN);
 
         stubProposalDetailLoad(proposal);
         given(memberRepository.findByEmail_Value("other@example.com")).willReturn(other);
@@ -431,7 +431,7 @@ class RecommendationRunServiceTest {
         // given
         Member owner = createMemberWithId(OWNER_ID, OWNER_EMAIL);
         Proposal proposal = createProposalWithStatus(owner, PROPOSAL_ID, ProposalStatus.WRITING);
-        addPosition(proposal, SELECTED_POSITION_ID, "백엔드", ProposalPositionStatus.OPEN);
+        addPosition(proposal, SELECTED_POSITION_ID, "백엔드 개발자", ProposalPositionStatus.OPEN);
 
         stubProposalDetailLoad(proposal);
         given(memberRepository.findByEmail_Value(OWNER_EMAIL)).willReturn(owner);
@@ -481,7 +481,7 @@ class RecommendationRunServiceTest {
         // given
         Member owner = createMemberWithId(OWNER_ID, OWNER_EMAIL);
         Proposal proposal = createProposalWithStatus(owner, PROPOSAL_ID, ProposalStatus.MATCHING);
-        addPosition(proposal, SELECTED_POSITION_ID, "백엔드", ProposalPositionStatus.FULL);
+        addPosition(proposal, SELECTED_POSITION_ID, "백엔드 개발자", ProposalPositionStatus.FULL);
 
         stubProposalDetailLoad(proposal);
         given(memberRepository.findByEmail_Value(OWNER_EMAIL)).willReturn(owner);

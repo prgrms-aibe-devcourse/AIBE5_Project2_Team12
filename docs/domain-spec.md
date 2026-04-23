@@ -71,6 +71,8 @@
   `expected_period`, `career_min_years`, `career_max_years`, `work_place`, `status`를 가진다.
 - `proposal_position.status`는 `OPEN`, `FULL`, `CLOSED`를 저장한다.
 - `proposal_position_skills`는 `proposal_position`별 요구 스킬을 저장한다.
+- `position`은 현재 `백엔드 개발자`, `프론트엔드 개발자`, `풀스택 개발자`, `모바일 앱 개발자`, `AI 엔지니어`, `데이터 엔지니어`, `DevOps 엔지니어`, `UI/UX 디자이너`, `서비스 기획자`, `QA 엔지니어` 10종의 canonical 마스터를 사용한다.
+- AI 브리프/AI 인터뷰는 alias 정규화 후 canonical `position`에 매핑되는 경우에만 모집 단위를 반영하며, 목록 밖 직무로 신규 `position`을 생성하지 않는다.
 - `matching`은 `proposal_position`과 `resume`의 조합을 표현하되, 당사자 판정 anchor로 `client_member_id`, `freelancer_member_id`를 함께 가진다.
 - `matching`은 `status` 단일 필드와 참여자별 계약 시작 확인, 취소 요청, 후기, 완료 확인 필드로 흐름을 관리한다.
 - 현재 ERD에는 `initiator_type`, `participation_status`, 시작/종료 승인 시각이 없다.

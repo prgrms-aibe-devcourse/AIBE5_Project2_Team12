@@ -206,7 +206,7 @@ class RecommendationCandidateFinderTest {
     }
 
     private ProposalPosition createProposalPosition(SkillRequirement... requirements) {
-        return createProposalPosition("백엔드", null, null, null, requirements);
+        return createProposalPosition("백엔드 개발자", null, null, null, requirements);
     }
 
     private ProposalPosition createProposalPosition(
