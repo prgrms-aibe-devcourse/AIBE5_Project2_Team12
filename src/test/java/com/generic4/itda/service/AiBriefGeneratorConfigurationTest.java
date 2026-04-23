@@ -78,6 +78,7 @@ class AiBriefGeneratorConfigurationTest {
             DisabledAiInterviewGenerator.class,
             OpenAiAiBriefGenerator.class,
             OpenAiAiInterviewGenerator.class,
+            PositionResolver.class,
             SkillResolver.class,
             AiBriefProposalMapper.class,
             ProposalAiBriefService.class
