@@ -1,13 +1,12 @@
 package com.generic4.itda.dto.freelancer;
 
 import com.generic4.itda.domain.matching.constant.MatchingStatus;
-import lombok.Getter;
-
 import java.time.LocalDateTime;
-import java.util.List;
 
 public record FreelancerDashboardItem(
+        Long matchingId,
         Long proposalId,
+        Long proposalPositionId,
         String proposalTitle,
         String companyName,
         String positionName,
@@ -38,6 +37,17 @@ public record FreelancerDashboardItem(
             case COMPLETED, REJECTED, CANCELED -> DashboardProposalStatus.COMPLETED;
 
             default -> DashboardProposalStatus.NEW;
+        };
+    }
+
+    public String detailPath() {
+        return switch (getStatus()) {
+            case NEW -> proposalPositionId != null
+                    ? "/proposals/%d?proposalPositionId=%d".formatted(proposalId, proposalPositionId)
+                    : "/proposals/%d".formatted(proposalId);
+            case IN_PROGRESS, COMPLETED -> matchingId != null
+                    ? "/matchings/%d".formatted(matchingId)
+                    : "/proposals/%d".formatted(proposalId);
         };
     }
 
