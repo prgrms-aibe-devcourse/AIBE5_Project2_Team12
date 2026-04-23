@@ -9,6 +9,26 @@ import org.springframework.data.repository.query.Param;
 
 public interface RecommendationResultRepository extends JpaRepository<RecommendationResult, Long> {
 
+    @Query("""
+            select distinct r.resume.id
+            from RecommendationResult r
+            where r.recommendationRun.proposalPosition.id = :proposalPositionId
+            order by r.resume.id asc
+            """)
+    List<Long> findRecommendedResumeIdsByProposalPositionId(Long proposalPositionId);
+
+    @Query("""
+            select distinct r.resume.id
+            from RecommendationResult r
+            where r.recommendationRun.proposalPosition.id = :proposalPositionId
+                and r.recommendationRun.id != :runId
+            order by r.resume.id asc
+            """)
+    List<Long> findRecommendedResumeIdsByProposalPositionIdExceptRunId(
+            Long proposalPositionId,
+            Long runId
+    );
+
     void deleteAllByRecommendationRun_ProposalPosition_Proposal_Id(Long proposalId);
 
     void deleteAllByRecommendationRun_Id(Long runId);

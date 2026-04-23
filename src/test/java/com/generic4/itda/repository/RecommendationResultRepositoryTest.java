@@ -216,13 +216,155 @@ class RecommendationResultRepositoryTest {
             assertThat(util.isLoaded(found, "resume")).isTrue();
             assertThat(util.isLoaded(found.getRecommendationRun(), "proposalPosition")).isTrue();
             assertThat(util.isLoaded(found.getRecommendationRun().getProposalPosition(), "proposal")).isTrue();
-            assertThat(util.isLoaded(found.getRecommendationRun().getProposalPosition().getProposal(), "member")).isTrue();
+            assertThat(
+                    util.isLoaded(found.getRecommendationRun().getProposalPosition().getProposal(), "member")).isTrue();
             assertThat(util.isLoaded(found.getResume(), "member")).isTrue();
 
             assertThat(found.getRecommendationRun().getId()).isEqualTo(run.getId());
-            assertThat(found.getRecommendationRun().getProposalPosition().getProposal().getMember().getEmail().getValue())
+            assertThat(
+                    found.getRecommendationRun().getProposalPosition().getProposal().getMember().getEmail().getValue())
                     .isEqualTo("proposer@test.com");
             assertThat(found.getResume().getMember().getEmail().getValue()).isEqualTo("applicant@test.com");
+        }
+    }
+
+    @Nested
+    @DisplayName("포지션별 추천 이력서 ID 조회")
+    class FindRecommendedResumeIds {
+
+        @Test
+        @DisplayName("proposalPosition 기준으로 추천된 resumeId를 중복 없이 정렬하여 조회한다")
+        void findRecommendedResumeIdsByProposalPositionId_returnsDistinctSortedResumeIds() {
+            // given
+            Member proposalMember = memberRepository.save(createMember("p2@test.com", "pw", "제안자2", "010-1000-0001"));
+            Position p = persistPosition("프론트엔드 개발자");
+            Proposal proposal = Proposal.create(proposalMember, "프로젝트", "원문", null, null, null, null);
+            ProposalPosition pp = proposal.addPosition(p, "프론트", null, 1L, null, null, null, null, null, null);
+            proposalRepository.saveAndFlush(proposal);
+
+            RecommendationRun run1 = recommendationRunRepository.save(
+                    RecommendationRun.create(pp, "fp-1", RecommendationAlgorithm.HEURISTIC_V1, 5));
+            RecommendationRun run2 = recommendationRunRepository.save(
+                    RecommendationRun.create(pp, "fp-2", RecommendationAlgorithm.HEURISTIC_V1, 5));
+
+            Resume res1 = createAndSaveResume("u1@test.com");
+            Resume res2 = createAndSaveResume("u2@test.com");
+            Resume res3 = createAndSaveResume("u3@test.com");
+
+            ReasonFacts facts = new ReasonFacts(List.of(), List.of(), 0, List.of());
+            recommendationResultRepository.save(
+                    RecommendationResult.create(run1, res1, 1, new BigDecimal("0.9"), new BigDecimal("0.9"), facts));
+            recommendationResultRepository.save(
+                    RecommendationResult.create(run1, res2, 2, new BigDecimal("0.8"), new BigDecimal("0.8"), facts));
+            recommendationResultRepository.save(
+                    RecommendationResult.create(run2, res2, 1, new BigDecimal("0.9"), new BigDecimal("0.9"),
+                            facts)); // 중복
+            recommendationResultRepository.save(
+                    RecommendationResult.create(run2, res3, 2, new BigDecimal("0.8"), new BigDecimal("0.8"), facts));
+            recommendationResultRepository.flush();
+            em.clear();
+
+            // when
+            List<Long> resumeIds = recommendationResultRepository.findRecommendedResumeIdsByProposalPositionId(
+                    pp.getId());
+
+            // then
+            assertThat(resumeIds).hasSize(3);
+            assertThat(resumeIds).isSorted();
+            assertThat(resumeIds).containsExactlyInAnyOrder(res1.getId(), res2.getId(), res3.getId());
+        }
+
+        @Test
+        @DisplayName("특정 runId를 제외하고 proposalPositionId 기준 추천된 resumeId를 조회한다")
+        void findRecommendedResumeIdsByProposalPositionIdExceptRunId_excludesTargetRunResults() {
+            // given
+            Member proposalMember = memberRepository.save(createMember("p3@test.com", "pw", "제안자3", "010-2000-0001"));
+            Position p = persistPosition("데이터 엔지니어");
+            Proposal proposal = Proposal.create(proposalMember, "프로젝트2", "원문", null, null, null, null);
+            ProposalPosition pp = proposal.addPosition(p, "데이터", null, 1L, null, null, null, null, null, null);
+            proposalRepository.saveAndFlush(proposal);
+
+            RecommendationRun run1 = recommendationRunRepository.save(
+                    RecommendationRun.create(pp, "fp-1", RecommendationAlgorithm.HEURISTIC_V1, 5));
+            RecommendationRun run2 = recommendationRunRepository.save(
+                    RecommendationRun.create(pp, "fp-2", RecommendationAlgorithm.HEURISTIC_V1, 5));
+
+            Resume res1 = createAndSaveResume("u4@test.com");
+            Resume res2 = createAndSaveResume("u5@test.com");
+            Resume res3 = createAndSaveResume("u6@test.com");
+
+            ReasonFacts facts = new ReasonFacts(List.of(), List.of(), 0, List.of());
+            recommendationResultRepository.save(
+                    RecommendationResult.create(run1, res1, 1, new BigDecimal("0.9"), new BigDecimal("0.9"), facts));
+            recommendationResultRepository.save(
+                    RecommendationResult.create(run1, res2, 2, new BigDecimal("0.8"), new BigDecimal("0.8"), facts));
+            recommendationResultRepository.save(
+                    RecommendationResult.create(run2, res3, 1, new BigDecimal("0.9"), new BigDecimal("0.9"), facts));
+            recommendationResultRepository.flush();
+            em.clear();
+
+            // when: run2 제외
+            List<Long> resumeIds = recommendationResultRepository.findRecommendedResumeIdsByProposalPositionIdExceptRunId(
+                    pp.getId(), run2.getId());
+
+            // then: run1의 결과인 res1, res2만 조회되어야 함
+            assertThat(resumeIds).hasSize(2);
+            assertThat(resumeIds).containsExactlyInAnyOrder(res1.getId(), res2.getId());
+            assertThat(resumeIds).doesNotContain(res3.getId());
+            assertThat(resumeIds).isSorted();
+        }
+
+        @Test
+        @DisplayName("다른 proposalPosition의 결과는 포함되지 않는다")
+        void findRecommendedResumeIdsByProposalPositionId_onlyReturnsTargetPositionResults() {
+            // given
+            Member proposalMember = memberRepository.save(createMember("p4@test.com", "pw", "제안자4", "010-3000-0001"));
+            Position p = persistPosition("QA");
+            Proposal proposal = Proposal.create(proposalMember, "프로젝트3", "원문", null, null, null, null);
+            ProposalPosition pp1 = proposal.addPosition(p, "QA1", null, 1L, null, null, null, null, null, null);
+            ProposalPosition pp2 = proposal.addPosition(p, "QA2", null, 1L, null, null, null, null, null, null);
+            proposalRepository.saveAndFlush(proposal);
+
+            RecommendationRun run1 = recommendationRunRepository.save(
+                    RecommendationRun.create(pp1, "fp-1", RecommendationAlgorithm.HEURISTIC_V1, 5));
+            RecommendationRun run2 = recommendationRunRepository.save(
+                    RecommendationRun.create(pp2, "fp-2", RecommendationAlgorithm.HEURISTIC_V1, 5));
+
+            Resume res1 = createAndSaveResume("u7@test.com");
+            Resume res2 = createAndSaveResume("u8@test.com");
+
+            ReasonFacts facts = new ReasonFacts(List.of(), List.of(), 0, List.of());
+            recommendationResultRepository.save(
+                    RecommendationResult.create(run1, res1, 1, new BigDecimal("0.9"), new BigDecimal("0.9"), facts));
+            recommendationResultRepository.save(
+                    RecommendationResult.create(run2, res2, 1, new BigDecimal("0.9"), new BigDecimal("0.9"), facts));
+            recommendationResultRepository.flush();
+            em.clear();
+
+            // when
+            List<Long> resumeIds = recommendationResultRepository.findRecommendedResumeIdsByProposalPositionId(
+                    pp1.getId());
+
+            // then
+            assertThat(resumeIds).isSorted();
+            assertThat(resumeIds).containsExactly(res1.getId());
+            assertThat(resumeIds).doesNotContain(res2.getId());
+        }
+
+        @Test
+        @DisplayName("결과가 없으면 빈 리스트를 반환한다")
+        void findRecommendedResumeIdsByProposalPositionId_returnsEmptyListWhenNoResults() {
+            // when
+            List<Long> resumeIds = recommendationResultRepository.findRecommendedResumeIdsByProposalPositionId(999L);
+
+            // then
+            assertThat(resumeIds).isEmpty();
+        }
+
+        private Resume createAndSaveResume(String email) {
+            Member member = memberRepository.save(createMember(email, "pw", "지원자", "010-9999-9999"));
+            return resumeRepository.save(Resume.create(member, "소개", (byte) 3, new CareerPayload(), WorkType.REMOTE,
+                    ResumeWritingStatus.WRITING, null));
         }
     }
 
