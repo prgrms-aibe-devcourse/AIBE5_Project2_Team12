@@ -42,7 +42,11 @@ public record RecommendationResumeDetailViewModel(
                         candidate.preferredWorkTypeLabel(),
                         portfolioUrl,
                         safeSkills.stream()
-                                .map(skill -> new ProfileSkillItemViewModel(skill.name(), skill.proficiencyLabel()))
+                                .map(skill -> new ProfileSkillItemViewModel(
+                                        skill.name(),
+                                        skill.proficiencyLabel(),
+                                        skill.proficiencyCode()
+                                ))
                                 .toList(),
                         safeCareers.stream()
                                 .map(career -> new ProfileCareerItemViewModel(
