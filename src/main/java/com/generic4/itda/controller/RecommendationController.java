@@ -2,8 +2,8 @@ package com.generic4.itda.controller;
 
 import com.generic4.itda.dto.recommend.RecommendationEntryViewModel;
 import com.generic4.itda.dto.recommend.RecommendationRequestForm;
-import com.generic4.itda.dto.recommend.RecommendationResumeDetailViewModel;
 import com.generic4.itda.dto.recommend.RecommendationResultsViewModel;
+import com.generic4.itda.dto.recommend.RecommendationResumeDetailViewModel;
 import com.generic4.itda.dto.recommend.RecommendationRunStatusViewModel;
 import com.generic4.itda.dto.security.ItDaPrincipal;
 import com.generic4.itda.service.recommend.RecommendationEntryService;
@@ -74,6 +74,32 @@ public class RecommendationController {
         } catch (IllegalArgumentException | IllegalStateException e) {
             log.warn("추천 실행 요청 실패. proposalId={}, proposalPositionId={}, email={}",
                     proposalId, form.proposalPositionId(), principal.getEmail(), e);
+
+            redirectAttributes.addFlashAttribute("errorMessage", toUserMessage(e));
+            return "redirect:/proposals/{proposalId}/recommendations";
+        }
+    }
+
+    @PostMapping("/proposal-positions/{proposalPositionId}/recommendations/more")
+    public String more(
+            @PathVariable Long proposalPositionId,
+            @RequestParam Long proposalId,
+            @AuthenticationPrincipal ItDaPrincipal principal,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            Long runId = recommendationRunService.createAdditional(
+                    proposalId,
+                    proposalPositionId,
+                    principal.getEmail()
+            );
+
+            redirectAttributes.addAttribute("runId", runId);
+            redirectAttributes.addAttribute("proposalId", proposalId);
+            return "redirect:/proposals/{proposalId}/runs/{runId}";
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            log.warn("추가 추천 요청 실패. proposalId={}, proposalPositionId={}, email={}",
+                    proposalId, proposalPositionId, principal.getEmail(), e);
 
             redirectAttributes.addFlashAttribute("errorMessage", toUserMessage(e));
             return "redirect:/proposals/{proposalId}/recommendations";
