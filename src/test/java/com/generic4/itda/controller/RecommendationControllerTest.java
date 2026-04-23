@@ -34,6 +34,7 @@ import org.springframework.test.web.servlet.MockMvc;
 class RecommendationControllerTest {
 
     private static final Long PROPOSAL_ID = 10L;
+    private static final Long PROPOSAL_POSITION_ID = 20L;
     private static final Long RUN_ID = 301L;
     private static final Long RESULT_ID = 100L;
 
@@ -62,6 +63,7 @@ class RecommendationControllerTest {
 
         RecommendationResultsViewModel viewModel = new RecommendationResultsViewModel(
                 PROPOSAL_ID,
+                PROPOSAL_POSITION_ID,
                 RUN_ID,
                 "추천 테스트 제안서",
                 "백엔드 개발자",
@@ -194,4 +196,3 @@ class RecommendationControllerTest {
                 .getRecommendationCandidateResume(eq(PROPOSAL_ID), eq(RESULT_ID), eq("client@example.com"));
     }
 }
-

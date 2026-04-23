@@ -4,10 +4,13 @@ import java.util.List;
 
 public record RecommendationResultsViewModel(
         Long proposalId,
+        Long proposalPositionId,
         Long runId,
         String proposalTitle,
         String positionTitle,
         int topK,
         Integer candidateCount,
         List<RecommendationCandidateItem> candidates
-) {}
+) {
+
+}
