@@ -8,6 +8,7 @@ public record MatchingDetailLifecycleViewModel(
         boolean currentUserContractAccepted,
         boolean counterpartContractAccepted,
         boolean canAcceptContractStart,
+        boolean contractCancellation,
         MatchingDetailCancellationViewModel cancellation,
         boolean clientReviewed,
         boolean freelancerReviewed,

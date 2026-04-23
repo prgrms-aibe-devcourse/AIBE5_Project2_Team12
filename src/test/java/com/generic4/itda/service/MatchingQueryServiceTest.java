@@ -123,6 +123,76 @@ class MatchingQueryServiceTest {
     }
 
     @Test
+    @DisplayName("IN_PROGRESS 상세는 완료 전 작성한 후기를 다시 수정할 수 있다")
+    void getDetail_allowsReviewUpdateBeforeCompleted() {
+        Matching matching = createInProgressMatching();
+        matching.submitReview(MatchingParticipantRole.CLIENT, "수정 전 후기입니다.");
+        given(matchingRepository.findDetailById(401L)).willReturn(Optional.of(matching));
+
+        MatchingDetailViewModel result = matchingQueryService.getDetail(401L, CLIENT_EMAIL);
+
+        assertThat(result.status()).isEqualTo(MatchingStatus.IN_PROGRESS);
+        assertThat(result.lifecycle().currentUserReviewed()).isTrue();
+        assertThat(result.lifecycle().currentUserReview()).isEqualTo("수정 전 후기입니다.");
+        assertThat(result.lifecycle().canSubmitReview()).isTrue();
+        assertThat(result.lifecycle().canConfirmCompletion()).isTrue();
+
+        verify(matchingRepository).findDetailById(401L);
+        verifyNoMoreInteractions(matchingRepository);
+    }
+
+    @Test
+    @DisplayName("계약 진행 후 취소된 상세는 계약 취소 문구를 반환한다")
+    void getDetail_returnsContractCancellationLabelsWhenCanceledAfterContractStart() {
+        Matching matching = createContractCanceledMatching();
+        given(matchingRepository.findDetailById(401L)).willReturn(Optional.of(matching));
+
+        MatchingDetailViewModel result = matchingQueryService.getDetail(401L, CLIENT_EMAIL);
+
+        assertThat(result.status()).isEqualTo(MatchingStatus.CANCELED);
+        assertThat(result.header().statusLabel()).isEqualTo("계약 취소");
+        assertThat(result.summary().headline()).isEqualTo("계약이 취소되었습니다.");
+        assertThat(result.summary().helperMessage()).isEqualTo("취소된 계약입니다. 필요한 경우 진행 이력과 연락처 정보를 확인해보세요.");
+        assertThat(result.lifecycle().contractCancellation()).isTrue();
+        assertThat(result.lifecycle().cancellation().requested()).isTrue();
+        assertThat(result.lifecycle().cancellation().canConfirm()).isFalse();
+        assertThat(result.lifecycle().cancellation().canWithdraw()).isFalse();
+        assertThat(result.lifecycle().cancellation().requesterRoleLabel()).isEqualTo("클라이언트");
+        assertThat(result.lifecycle().cancellation().receiverRoleLabel()).isEqualTo("프리랜서");
+        assertThat(result.lifecycle().cancellation().reasonLabel()).isEqualTo("프로젝트가 중단되었어요");
+        assertThat(result.lifecycle().cancellation().requestedAt()).isNotNull();
+        assertThat(result.timeline().get(result.timeline().size() - 1).actionLabel()).isEqualTo("계약 취소");
+        assertThat(result.timeline().get(result.timeline().size() - 1).description()).isEqualTo("계약이 취소되었습니다.");
+
+        verify(matchingRepository).findDetailById(401L);
+        verifyNoMoreInteractions(matchingRepository);
+    }
+
+    @Test
+    @DisplayName("계약 전 취소된 상세도 취소 요청 사유 정보를 반환한다")
+    void getDetail_returnsCancellationReasonWhenCanceledBeforeContractStart() {
+        Matching matching = createMatchingCanceledMatching();
+        given(matchingRepository.findDetailById(401L)).willReturn(Optional.of(matching));
+
+        MatchingDetailViewModel result = matchingQueryService.getDetail(401L, FREELANCER_EMAIL);
+
+        assertThat(result.status()).isEqualTo(MatchingStatus.CANCELED);
+        assertThat(result.header().statusLabel()).isEqualTo("매칭 취소");
+        assertThat(result.lifecycle().contractCancellation()).isFalse();
+        assertThat(result.lifecycle().cancellation().requested()).isTrue();
+        assertThat(result.lifecycle().cancellation().requestedByCurrentUser()).isFalse();
+        assertThat(result.lifecycle().cancellation().canConfirm()).isFalse();
+        assertThat(result.lifecycle().cancellation().canWithdraw()).isFalse();
+        assertThat(result.lifecycle().cancellation().requesterRoleLabel()).isEqualTo("클라이언트");
+        assertThat(result.lifecycle().cancellation().receiverRoleLabel()).isEqualTo("프리랜서");
+        assertThat(result.lifecycle().cancellation().reasonLabel()).isEqualTo("프로젝트 요구사항이 변경되었어요");
+        assertThat(result.lifecycle().cancellation().requestedAt()).isNotNull();
+
+        verify(matchingRepository).findDetailById(401L);
+        verifyNoMoreInteractions(matchingRepository);
+    }
+
+    @Test
     @DisplayName("매칭 당사자가 아니면 상세를 조회할 수 없다")
     void getDetail_throwsWhenViewerIsNotParticipant() {
         Matching matching = createAcceptedMatching();
@@ -143,13 +213,40 @@ class MatchingQueryServiceTest {
     }
 
     private Matching createCompletedMatching() {
-        Matching matching = createAcceptedMatching();
-        matching.acceptContractStart(MatchingParticipantRole.CLIENT);
-        matching.acceptContractStart(MatchingParticipantRole.FREELANCER);
+        Matching matching = createInProgressMatching();
         matching.submitReview(MatchingParticipantRole.CLIENT, "좋은 협업이었습니다.");
         matching.submitReview(MatchingParticipantRole.FREELANCER, "명확한 요구사항 덕분에 원활했습니다.");
         matching.confirmCompletion(MatchingParticipantRole.CLIENT);
         matching.confirmCompletion(MatchingParticipantRole.FREELANCER);
+        return matching;
+    }
+
+    private Matching createInProgressMatching() {
+        Matching matching = createAcceptedMatching();
+        matching.acceptContractStart(MatchingParticipantRole.CLIENT);
+        matching.acceptContractStart(MatchingParticipantRole.FREELANCER);
+        return matching;
+    }
+
+    private Matching createContractCanceledMatching() {
+        Matching matching = createInProgressMatching();
+        matching.requestCancellation(
+                MatchingParticipantRole.CLIENT,
+                MatchingCancellationReason.CLIENT_AFTER_PROJECT_SUSPENDED,
+                null
+        );
+        matching.confirmCancellation(MatchingParticipantRole.FREELANCER);
+        return matching;
+    }
+
+    private Matching createMatchingCanceledMatching() {
+        Matching matching = createAcceptedMatching();
+        matching.requestCancellation(
+                MatchingParticipantRole.CLIENT,
+                MatchingCancellationReason.CLIENT_BEFORE_REQUIREMENT_CHANGED,
+                null
+        );
+        matching.confirmCancellation(MatchingParticipantRole.FREELANCER);
         return matching;
     }
 
