@@ -90,6 +90,8 @@
                                 <input type="hidden" name="_csrf" th:value="${_csrf.token}">
                                 <input type="hidden" name="redirectTo"
                                        th:value="@{/proposals/{proposalId}/recommendations/results/{resultId}(proposalId=${view.proposalId}, resultId=${view.resultId})}">
+                                <input type="hidden" name="errorRedirectTo"
+                                       th:value="@{/proposals/{proposalId}/recommendations/results/{resultId}(proposalId=${view.proposalId}, resultId=${view.resultId})}">
                                 <button type="submit"
                                         class="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700">
                                     <i data-lucide="send" class="h-4 w-4"></i>
