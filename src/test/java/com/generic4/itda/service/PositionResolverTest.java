@@ -1,14 +1,17 @@
 package com.generic4.itda.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.repository.PositionRepository;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class PositionResolverTest {
@@ -85,5 +88,35 @@ class PositionResolverTest {
     void findAllowedCategoryNames_returnsCanonicalCategories() {
         assertThat(positionResolver.findAllowedCategoryNames())
                 .containsExactlyElementsOf(CANONICAL_POSITIONS);
+    }
+
+    @Test
+    @DisplayName("Position 검색은 영어 alias와 대소문자를 무시하고 정규 카테고리를 반환한다")
+    void search_returnsCanonicalCategoriesByAlias() {
+        Position mobile = Position.create("모바일 앱 개발자");
+        ReflectionTestUtils.setField(mobile, "id", 4L);
+        Position planner = Position.create("서비스 기획자");
+        ReflectionTestUtils.setField(planner, "id", 9L);
+
+        org.mockito.BDDMockito.given(positionRepository.findByName("백엔드 개발자")).willReturn(java.util.Optional.empty());
+        org.mockito.BDDMockito.given(positionRepository.findByName("프론트엔드 개발자")).willReturn(java.util.Optional.empty());
+        org.mockito.BDDMockito.given(positionRepository.findByName("풀스택 개발자")).willReturn(java.util.Optional.empty());
+        org.mockito.BDDMockito.given(positionRepository.findByName("모바일 앱 개발자")).willReturn(java.util.Optional.of(mobile));
+        org.mockito.BDDMockito.given(positionRepository.findByName("AI 엔지니어")).willReturn(java.util.Optional.empty());
+        org.mockito.BDDMockito.given(positionRepository.findByName("데이터 엔지니어")).willReturn(java.util.Optional.empty());
+        org.mockito.BDDMockito.given(positionRepository.findByName("DevOps 엔지니어")).willReturn(java.util.Optional.empty());
+        org.mockito.BDDMockito.given(positionRepository.findByName("UI/UX 디자이너")).willReturn(java.util.Optional.empty());
+        org.mockito.BDDMockito.given(positionRepository.findByName("서비스 기획자")).willReturn(java.util.Optional.of(planner));
+        org.mockito.BDDMockito.given(positionRepository.findByName("QA 엔지니어")).willReturn(java.util.Optional.empty());
+
+        List<Position> mobileResults = positionResolver.search("ReAcT NaTiVe");
+        List<Position> plannerResults = positionResolver.search("pm");
+
+        assertThat(mobileResults)
+                .extracting(Position::getId, Position::getName)
+                .containsExactly(tuple(4L, "모바일 앱 개발자"));
+        assertThat(plannerResults)
+                .extracting(Position::getId, Position::getName)
+                .containsExactly(tuple(9L, "서비스 기획자"));
     }
 }

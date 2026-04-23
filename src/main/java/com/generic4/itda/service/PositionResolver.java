@@ -2,6 +2,7 @@ package com.generic4.itda.service;
 
 import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.repository.PositionRepository;
+import java.util.Comparator;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -51,6 +52,17 @@ public class PositionResolver {
                 .toList();
     }
 
+    public List<Position> search(String query) {
+        String normalizedQuery = normalizeQuery(query);
+
+        return findAllowedPositions().stream()
+                .filter(position -> matchesSearch(position, normalizedQuery))
+                .sorted(Comparator
+                        .comparingInt((Position position) -> searchScore(position, normalizedQuery))
+                        .thenComparing(Position::getName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
+
     public Optional<String> resolveCanonicalName(String positionCategoryName) {
         if (!StringUtils.hasText(positionCategoryName)) {
             return Optional.empty();
@@ -72,6 +84,50 @@ public class PositionResolver {
 
     private String normalize(String value) {
         return normalizeStatic(value);
+    }
+
+    private boolean matchesSearch(Position position, String normalizedQuery) {
+        return searchScore(position, normalizedQuery) < Integer.MAX_VALUE;
+    }
+
+    private int searchScore(Position position, String normalizedQuery) {
+        String positionName = position.getName();
+        if (!ALLOWED_CATEGORY_NAMES.contains(positionName)) {
+            return Integer.MAX_VALUE;
+        }
+
+        String normalizedPositionName = normalize(positionName);
+        if (!StringUtils.hasText(normalizedQuery)) {
+            return 0;
+        }
+
+        String resolvedCanonicalName = CANONICAL_ALIAS_TO_NAME.get(normalizedQuery);
+        if (positionName.equals(resolvedCanonicalName) || normalizedPositionName.equals(normalizedQuery)) {
+            return 0;
+        }
+
+        for (Map.Entry<String, String> entry : CANONICAL_ALIAS_TO_NAME.entrySet()) {
+            if (!entry.getValue().equals(positionName)) {
+                continue;
+            }
+
+            String alias = entry.getKey();
+            if (alias.equals(normalizedQuery)) {
+                return 0;
+            }
+            if (alias.startsWith(normalizedQuery) || normalizedPositionName.startsWith(normalizedQuery)) {
+                return 1;
+            }
+            if (alias.contains(normalizedQuery) || normalizedPositionName.contains(normalizedQuery)) {
+                return 2;
+            }
+        }
+
+        return Integer.MAX_VALUE;
+    }
+
+    private String normalizeQuery(String value) {
+        return StringUtils.hasText(value) ? normalize(value) : "";
     }
 
     private static Map<String, String> createAliasMap() {
