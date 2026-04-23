@@ -4,19 +4,15 @@ import com.generic4.itda.domain.matching.Matching;
 import com.generic4.itda.domain.matching.constant.MatchingStatus;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
-import com.generic4.itda.domain.proposal.ProposalPositionStatus;
-import com.generic4.itda.dto.matching.ClientMatchingFreelancerItemViewModel;
-import com.generic4.itda.dto.matching.ClientMatchingFreelancerSelectionViewModel;
-import com.generic4.itda.dto.matching.ClientMatchingPositionItemViewModel;
-import com.generic4.itda.dto.matching.ClientMatchingPositionSelectionViewModel;
+import com.generic4.itda.dto.matching.ClientMatchingListItemViewModel;
+import com.generic4.itda.dto.matching.ClientMatchingListViewModel;
+import com.generic4.itda.dto.matching.ClientMatchingListViewModel.PositionFilterItem;
 import com.generic4.itda.dto.security.ItDaPrincipal;
 import com.generic4.itda.exception.ProposalNotFoundException;
 import com.generic4.itda.repository.MatchingRepository;
 import com.generic4.itda.service.ProposalService;
 import java.time.LocalDateTime;
-import java.util.Collection;
 import java.util.Comparator;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -38,58 +34,16 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @RequiredArgsConstructor
 public class MatchingEntryController {
 
-    private static final EnumSet<MatchingStatus> ACTIVE_STATUSES = EnumSet.of(
-            MatchingStatus.PROPOSED,
-            MatchingStatus.ACCEPTED,
-            MatchingStatus.IN_PROGRESS
-    );
-
     private final ProposalService proposalService;
     private final MatchingRepository matchingRepository;
 
+    /**
+     * 단일 매칭 목록 페이지 — 포지션/상태 필터를 쿼리 파라미터로 받아 초기 렌더링
+     */
     @GetMapping
-    public String selectPosition(
+    public String list(
             @PathVariable Long proposalId,
-            @RequestParam(name = "openOnly", defaultValue = "false") boolean openOnly,
-            @AuthenticationPrincipal ItDaPrincipal principal,
-            Model model,
-            RedirectAttributes redirectAttributes
-    ) {
-        try {
-            Proposal proposal = proposalService.findOwnedProposal(proposalId, principal.getEmail());
-
-            List<Matching> matchings = matchingRepository
-                    .findByProposalPosition_Proposal_IdAndClientMember_Email_Value(proposalId, principal.getEmail());
-
-            Map<Long, List<Matching>> byPositionId = matchings.stream()
-                    .collect(Collectors.groupingBy(matching -> matching.getProposalPosition().getId()));
-
-            List<ClientMatchingPositionItemViewModel> positions = proposal.getPositions().stream()
-                    .filter(position -> !openOnly || position.getStatus() == ProposalPositionStatus.OPEN)
-                    .sorted(positionSortComparator())
-                    .map(position -> toPositionItem(position, byPositionId.getOrDefault(position.getId(), List.of())))
-                    .toList();
-
-            model.addAttribute("view", new ClientMatchingPositionSelectionViewModel(
-                    proposal.getId(),
-                    proposal.getTitle(),
-                    openOnly,
-                    positions
-            ));
-            return "matching/positions";
-        } catch (ProposalNotFoundException e) {
-            redirectAttributes.addFlashAttribute("errorMessage", "존재하지 않는 제안서입니다.");
-            return "redirect:/client/dashboard";
-        } catch (AccessDeniedException e) {
-            redirectAttributes.addFlashAttribute("errorMessage", "본인 제안서만 조회할 수 있습니다.");
-            return "redirect:/client/dashboard";
-        }
-    }
-
-    @GetMapping("/positions/{proposalPositionId}")
-    public String selectFreelancer(
-            @PathVariable Long proposalId,
-            @PathVariable Long proposalPositionId,
+            @RequestParam(name = "positionId", required = false) Long positionId,
             @RequestParam(name = "status", required = false) String status,
             @AuthenticationPrincipal ItDaPrincipal principal,
             Model model,
@@ -97,51 +51,112 @@ public class MatchingEntryController {
     ) {
         try {
             Proposal proposal = proposalService.findOwnedProposal(proposalId, principal.getEmail());
-
-            ProposalPosition proposalPosition = findPosition(proposal, proposalPositionId)
-                    .orElseThrow(() -> new IllegalArgumentException("잘못된 포지션입니다."));
-
             List<Matching> matchings = matchingRepository
-                    .findWithFreelancerMemberByProposalPositionIdAndClientEmail(proposalPositionId, principal.getEmail());
+                    .findWithPositionAndFreelancerByProposalIdAndClientEmail(proposalId, principal.getEmail());
 
             MatchingStatus filterStatus = parseStatus(status).orElse(null);
 
-            List<ClientMatchingFreelancerItemViewModel> items = matchings.stream()
-                    .filter(matching -> filterStatus == null || matching.getStatus() == filterStatus)
-                    .sorted(matchingSortComparator())
-                    .map(this::toFreelancerItem)
-                    .toList();
+            List<ClientMatchingListItemViewModel> items = applyFiltersAndSort(
+                    matchings, positionId, filterStatus);
 
-            model.addAttribute("view", new ClientMatchingFreelancerSelectionViewModel(
+            model.addAttribute("view", new ClientMatchingListViewModel(
                     proposal.getId(),
                     proposal.getTitle(),
-                    proposalPosition.getId(),
-                    resolvePositionTitle(proposalPosition),
-                    toPositionStatusLabel(proposalPosition.getStatus()),
-                    filterStatus != null ? filterStatus.name() : "",
-                    availableFilterStatuses(),
+                    buildPositionFilters(proposal, matchings),
+                    positionId,
+                    filterStatus != null ? filterStatus.name() : null,
                     items
             ));
-            return "matching/freelancers";
+            model.addAttribute("items", items);
+            return "matching/list";
         } catch (ProposalNotFoundException e) {
             redirectAttributes.addFlashAttribute("errorMessage", "존재하지 않는 제안서입니다.");
             return "redirect:/client/dashboard";
         } catch (AccessDeniedException e) {
             redirectAttributes.addFlashAttribute("errorMessage", "본인 제안서만 조회할 수 있습니다.");
             return "redirect:/client/dashboard";
-        } catch (IllegalArgumentException e) {
-            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
-            return "redirect:/proposals/" + proposalId + "/matchings";
         }
     }
 
-    private static List<MatchingStatus> availableFilterStatuses() {
-        return List.of(
-                MatchingStatus.PROPOSED,
-                MatchingStatus.ACCEPTED,
-                MatchingStatus.IN_PROGRESS,
-                MatchingStatus.COMPLETED
+    /**
+     * AJAX 필터 요청 — 포지션/상태 필터 변경 시 목록 영역만 교체
+     */
+    @GetMapping("/items")
+    public String listItems(
+            @PathVariable Long proposalId,
+            @RequestParam(name = "positionId", required = false) Long positionId,
+            @RequestParam(name = "status", required = false) String status,
+            @AuthenticationPrincipal ItDaPrincipal principal,
+            Model model
+    ) {
+        proposalService.findOwnedProposal(proposalId, principal.getEmail());
+
+        List<Matching> matchings = matchingRepository
+                .findWithPositionAndFreelancerByProposalIdAndClientEmail(proposalId, principal.getEmail());
+
+        MatchingStatus filterStatus = parseStatus(status).orElse(null);
+
+        model.addAttribute("items", applyFiltersAndSort(matchings, positionId, filterStatus));
+        return "matching/fragments :: itemList";
+    }
+
+    // ── 내부 헬퍼 ────────────────────────────────────────────────
+
+    private List<ClientMatchingListItemViewModel> applyFiltersAndSort(
+            List<Matching> matchings,
+            Long positionId,
+            MatchingStatus filterStatus
+    ) {
+        return matchings.stream()
+                .filter(m -> positionId == null || m.getProposalPosition().getId().equals(positionId))
+                .filter(m -> filterStatus == null || m.getStatus() == filterStatus)
+                .sorted(matchingSortComparator())
+                .map(this::toListItem)
+                .toList();
+    }
+
+    private List<PositionFilterItem> buildPositionFilters(Proposal proposal, List<Matching> allMatchings) {
+        Map<Long, Long> countByPosition = allMatchings.stream()
+                .collect(Collectors.groupingBy(
+                        m -> m.getProposalPosition().getId(),
+                        Collectors.counting()
+                ));
+
+        return proposal.getPositions().stream()
+                .sorted(Comparator.comparing(ProposalPosition::getId))
+                .map(position -> new PositionFilterItem(
+                        position.getId(),
+                        resolvePositionTitle(position),
+                        countByPosition.getOrDefault(position.getId(), 0L)
+                ))
+                .toList();
+    }
+
+    private ClientMatchingListItemViewModel toListItem(Matching matching) {
+        String freelancerName = StringUtils.hasText(matching.getFreelancerMember().getNickname())
+                ? matching.getFreelancerMember().getNickname().trim()
+                : matching.getFreelancerMember().getName();
+
+        return new ClientMatchingListItemViewModel(
+                matching.getId(),
+                matching.getProposalPosition().getId(),
+                resolvePositionTitle(matching.getProposalPosition()),
+                freelancerName,
+                matching.getStatus(),
+                matching.getStatus().getDescription(),
+                resolveRequestedAt(matching)
         );
+    }
+
+    private static LocalDateTime resolveRequestedAt(Matching matching) {
+        return matching.getRequestedAt() != null ? matching.getRequestedAt() : matching.getCreatedAt();
+    }
+
+    private static String resolvePositionTitle(ProposalPosition position) {
+        if (StringUtils.hasText(position.getTitle())) {
+            return position.getTitle().trim();
+        }
+        return position.getPosition().getName();
     }
 
     private static Optional<MatchingStatus> parseStatus(String status) {
@@ -155,65 +170,6 @@ public class MatchingEntryController {
         }
     }
 
-    private static Optional<ProposalPosition> findPosition(Proposal proposal, Long proposalPositionId) {
-        if (proposal.getPositions() == null || proposal.getPositions().isEmpty()) {
-            return Optional.empty();
-        }
-        return proposal.getPositions().stream()
-                .filter(position -> position.getId().equals(proposalPositionId))
-                .findFirst();
-    }
-
-    private static ClientMatchingPositionItemViewModel toPositionItem(ProposalPosition position, Collection<Matching> matchings) {
-        long requestedCount = matchings.size();
-        long activeCount = matchings.stream()
-                .map(Matching::getStatus)
-                .filter(ACTIVE_STATUSES::contains)
-                .count();
-
-        return new ClientMatchingPositionItemViewModel(
-                position.getId(),
-                resolvePositionTitle(position),
-                position.getStatus(),
-                toPositionStatusLabel(position.getStatus()),
-                requestedCount,
-                activeCount
-        );
-    }
-
-    private ClientMatchingFreelancerItemViewModel toFreelancerItem(Matching matching) {
-        String freelancerName = matching.getFreelancerMember().getNickname() != null
-                && !matching.getFreelancerMember().getNickname().isBlank()
-                ? matching.getFreelancerMember().getNickname().trim()
-                : matching.getFreelancerMember().getName();
-
-        return new ClientMatchingFreelancerItemViewModel(
-                matching.getId(),
-                freelancerName,
-                matching.getStatus(),
-                matching.getStatus().getDescription(),
-                resolveRequestedAt(matching)
-        );
-    }
-
-    private static LocalDateTime resolveRequestedAt(Matching matching) {
-        if (matching.getRequestedAt() != null) {
-            return matching.getRequestedAt();
-        }
-        return matching.getCreatedAt();
-    }
-
-    private static Comparator<ProposalPosition> positionSortComparator() {
-        Map<ProposalPositionStatus, Integer> weight = Map.of(
-                ProposalPositionStatus.OPEN, 0,
-                ProposalPositionStatus.FULL, 1,
-                ProposalPositionStatus.CLOSED, 2
-        );
-        return Comparator
-                .comparing((ProposalPosition position) -> weight.getOrDefault(position.getStatus(), 99))
-                .thenComparing(ProposalPosition::getId);
-    }
-
     private static Comparator<Matching> matchingSortComparator() {
         Map<MatchingStatus, Integer> weight = Map.of(
                 MatchingStatus.PROPOSED, 0,
@@ -224,26 +180,8 @@ public class MatchingEntryController {
                 MatchingStatus.CANCELED, 5
         );
         return Comparator
-                .comparing((Matching matching) -> weight.getOrDefault(matching.getStatus(), 99))
+                .comparing((Matching m) -> weight.getOrDefault(m.getStatus(), 99))
                 .thenComparing(Matching::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder()))
                 .thenComparing(Matching::getId, Comparator.nullsLast(Comparator.reverseOrder()));
-    }
-
-    private static String resolvePositionTitle(ProposalPosition position) {
-        if (StringUtils.hasText(position.getTitle())) {
-            return position.getTitle().trim();
-        }
-        return position.getPosition().getName();
-    }
-
-    private static String toPositionStatusLabel(ProposalPositionStatus status) {
-        if (status == null) {
-            return "미정";
-        }
-        return switch (status) {
-            case OPEN -> "모집 중";
-            case FULL -> "모집 완료";
-            case CLOSED -> "모집 종료";
-        };
     }
 }

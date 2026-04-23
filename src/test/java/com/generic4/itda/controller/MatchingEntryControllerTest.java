@@ -2,6 +2,7 @@ package com.generic4.itda.controller;
 
 import static com.generic4.itda.fixture.MemberFixture.createMember;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -14,23 +15,23 @@ import com.generic4.itda.annotation.ControllerTest;
 import com.generic4.itda.domain.matching.Matching;
 import com.generic4.itda.domain.matching.constant.MatchingStatus;
 import com.generic4.itda.domain.member.Member;
-import com.generic4.itda.exception.ProposalNotFoundException;
-import org.springframework.security.access.AccessDeniedException;
 import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
-import com.generic4.itda.domain.proposal.ProposalPositionStatus;
 import com.generic4.itda.domain.proposal.ProposalWorkType;
-import com.generic4.itda.dto.matching.ClientMatchingFreelancerSelectionViewModel;
-import com.generic4.itda.dto.matching.ClientMatchingPositionSelectionViewModel;
+import com.generic4.itda.dto.matching.ClientMatchingListItemViewModel;
+import com.generic4.itda.dto.matching.ClientMatchingListViewModel;
 import com.generic4.itda.dto.security.ItDaPrincipal;
+import com.generic4.itda.exception.ProposalNotFoundException;
 import com.generic4.itda.repository.MatchingRepository;
 import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.service.ProposalService;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -40,6 +41,9 @@ import org.springframework.test.web.servlet.MvcResult;
 
 @ControllerTest(MatchingEntryController.class)
 class MatchingEntryControllerTest {
+
+    private static final Long PROPOSAL_ID = 10L;
+    private static final String CLIENT_EMAIL = "client@example.com";
 
     @Autowired
     private MockMvc mockMvc;
@@ -53,262 +57,409 @@ class MatchingEntryControllerTest {
     @MockitoBean
     private MemberRepository memberRepository;
 
-    @Test
-    void selectPosition_rendersPositionsSortedAndCounts() throws Exception {
-        Proposal proposal = createProposalWithThreePositions();
-        given(proposalService.findOwnedProposal(10L, "client@example.com"))
-                .willReturn(proposal);
+    // ── 매칭 목록 진입 ───────────────────────────────────────────
 
-        List<Matching> matchings = createMatchingsForPositions(proposal);
-        given(matchingRepository.findByProposalPosition_Proposal_IdAndClientMember_Email_Value(10L, "client@example.com"))
+    @Test
+    @DisplayName("매칭 목록 페이지 렌더링 — 포지션 필터 및 전체 목록 포함")
+    void list_rendersAllMatchingsWithPositionFilters() throws Exception {
+        Proposal proposal = createProposalWithTwoPositions();
+        List<Matching> matchings = createMatchingsForBothPositions(proposal);
+
+        given(proposalService.findOwnedProposal(PROPOSAL_ID, CLIENT_EMAIL)).willReturn(proposal);
+        given(matchingRepository.findWithPositionAndFreelancerByProposalIdAndClientEmail(PROPOSAL_ID, CLIENT_EMAIL))
                 .willReturn(matchings);
 
-        MvcResult result = mockMvc.perform(get("/proposals/10/matchings")
-                        .with(authentication(authToken("client@example.com", "클라이언트"))))
+        MvcResult result = mockMvc.perform(get("/proposals/{id}/matchings", PROPOSAL_ID)
+                        .with(authentication(authToken(CLIENT_EMAIL, "클라이언트"))))
                 .andExpect(status().isOk())
-                .andExpect(view().name("matching/positions"))
+                .andExpect(view().name("matching/list"))
                 .andReturn();
 
-        ClientMatchingPositionSelectionViewModel viewModel = (ClientMatchingPositionSelectionViewModel)
+        ClientMatchingListViewModel view = (ClientMatchingListViewModel)
                 result.getModelAndView().getModel().get("view");
 
-        assertThat(viewModel.proposalId()).isEqualTo(10L);
-        assertThat(viewModel.openOnly()).isFalse();
-        assertThat(viewModel.positions()).hasSize(3);
-
-        // 정렬: OPEN -> FULL -> CLOSED
-        assertThat(viewModel.positions().get(0).status()).isEqualTo(ProposalPositionStatus.OPEN);
-        assertThat(viewModel.positions().get(1).status()).isEqualTo(ProposalPositionStatus.FULL);
-        assertThat(viewModel.positions().get(2).status()).isEqualTo(ProposalPositionStatus.CLOSED);
-
-        // 카운트: pos1(OPEN) = 2요청, 1활성 / pos2(FULL)=1요청, 1활성 / pos3(CLOSED)=0
-        assertThat(viewModel.positions().get(0).requestedCount()).isEqualTo(2);
-        assertThat(viewModel.positions().get(0).activeCount()).isEqualTo(1);
-        assertThat(viewModel.positions().get(1).requestedCount()).isEqualTo(1);
-        assertThat(viewModel.positions().get(1).activeCount()).isEqualTo(1);
-        assertThat(viewModel.positions().get(2).requestedCount()).isZero();
-        assertThat(viewModel.positions().get(2).activeCount()).isZero();
+        assertThat(view.proposalId()).isEqualTo(PROPOSAL_ID);
+        assertThat(view.positionFilters()).hasSize(2);
+        assertThat(view.items()).hasSize(3);
+        assertThat(view.selectedPositionId()).isNull();
+        assertThat(view.selectedStatus()).isNull();
     }
 
     @Test
-    void selectPosition_openOnly_filtersOpen() throws Exception {
-        Proposal proposal = createProposalWithThreePositions();
-        given(proposalService.findOwnedProposal(10L, "client@example.com"))
-                .willReturn(proposal);
+    @DisplayName("포지션 필터 적용 — 해당 포지션 매칭만 반환")
+    void list_positionFilter_returnsOnlyMatchingsForPosition() throws Exception {
+        Proposal proposal = createProposalWithTwoPositions();
+        List<Matching> matchings = createMatchingsForBothPositions(proposal);
 
-        List<Matching> matchings = createMatchingsForPositions(proposal);
-        given(matchingRepository.findByProposalPosition_Proposal_IdAndClientMember_Email_Value(10L, "client@example.com"))
+        given(proposalService.findOwnedProposal(PROPOSAL_ID, CLIENT_EMAIL)).willReturn(proposal);
+        given(matchingRepository.findWithPositionAndFreelancerByProposalIdAndClientEmail(PROPOSAL_ID, CLIENT_EMAIL))
                 .willReturn(matchings);
 
-        MvcResult result = mockMvc.perform(get("/proposals/10/matchings")
-                        .param("openOnly", "true")
-                        .with(authentication(authToken("client@example.com", "클라이언트"))))
+        MvcResult result = mockMvc.perform(get("/proposals/{id}/matchings", PROPOSAL_ID)
+                        .param("positionId", "1")
+                        .with(authentication(authToken(CLIENT_EMAIL, "클라이언트"))))
                 .andExpect(status().isOk())
-                .andExpect(view().name("matching/positions"))
                 .andReturn();
 
-        ClientMatchingPositionSelectionViewModel viewModel = (ClientMatchingPositionSelectionViewModel)
+        ClientMatchingListViewModel view = (ClientMatchingListViewModel)
                 result.getModelAndView().getModel().get("view");
 
-        assertThat(viewModel.openOnly()).isTrue();
-        assertThat(viewModel.positions()).hasSize(1);
-        assertThat(viewModel.positions().get(0).status()).isEqualTo(ProposalPositionStatus.OPEN);
+        assertThat(view.selectedPositionId()).isEqualTo(1L);
+        assertThat(view.items()).hasSize(2); // pos1에 매칭 2개
+        assertThat(view.items()).allMatch(item -> item.proposalPositionId().equals(1L));
     }
 
     @Test
-    void selectFreelancer_rendersFreelancersSortedAndFilterable() throws Exception {
+    @DisplayName("상태 필터 적용 — 해당 상태 매칭만 반환")
+    void list_statusFilter_returnsOnlyMatchingsForStatus() throws Exception {
+        Proposal proposal = createProposalWithTwoPositions();
+        List<Matching> matchings = createMatchingsForBothPositions(proposal);
+
+        given(proposalService.findOwnedProposal(PROPOSAL_ID, CLIENT_EMAIL)).willReturn(proposal);
+        given(matchingRepository.findWithPositionAndFreelancerByProposalIdAndClientEmail(PROPOSAL_ID, CLIENT_EMAIL))
+                .willReturn(matchings);
+
+        MvcResult result = mockMvc.perform(get("/proposals/{id}/matchings", PROPOSAL_ID)
+                        .param("status", "PROPOSED")
+                        .with(authentication(authToken(CLIENT_EMAIL, "클라이언트"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        ClientMatchingListViewModel view = (ClientMatchingListViewModel)
+                result.getModelAndView().getModel().get("view");
+
+        assertThat(view.selectedStatus()).isEqualTo("PROPOSED");
+        assertThat(view.items()).allMatch(item -> item.status() == MatchingStatus.PROPOSED);
+    }
+
+    @Test
+    @DisplayName("목록 정렬 — PROPOSED > IN_PROGRESS > ACCEPTED > REJECTED > COMPLETED > CANCELED 순")
+    void list_sortOrder_followsStatusPriority() throws Exception {
         Proposal proposal = createProposalWithSinglePosition();
-        given(proposalService.findOwnedProposal(10L, "client@example.com"))
-                .willReturn(proposal);
-
         List<Matching> matchings = List.of(
-                createMatching(101L, MatchingStatus.REJECTED, "프리랜서A", LocalDateTime.of(2026, 4, 22, 10, 0)),
-                createMatching(103L, MatchingStatus.IN_PROGRESS, "프리랜서B", LocalDateTime.of(2026, 4, 22, 12, 0)),
-                createMatching(102L, MatchingStatus.PROPOSED, "프리랜서C", LocalDateTime.of(2026, 4, 22, 11, 0))
+                createMatching(103L, MatchingStatus.REJECTED, "프리C", proposal, LocalDateTime.of(2026, 4, 20, 0, 0)),
+                createMatching(101L, MatchingStatus.PROPOSED, "프리A", proposal, LocalDateTime.of(2026, 4, 22, 0, 0)),
+                createMatching(102L, MatchingStatus.IN_PROGRESS, "프리B", proposal, LocalDateTime.of(2026, 4, 21, 0, 0))
         );
-        given(matchingRepository.findWithFreelancerMemberByProposalPositionIdAndClientEmail(1L, "client@example.com"))
+
+        given(proposalService.findOwnedProposal(PROPOSAL_ID, CLIENT_EMAIL)).willReturn(proposal);
+        given(matchingRepository.findWithPositionAndFreelancerByProposalIdAndClientEmail(PROPOSAL_ID, CLIENT_EMAIL))
                 .willReturn(matchings);
 
-        MvcResult result = mockMvc.perform(get("/proposals/10/matchings/positions/1")
-                        .with(authentication(authToken("client@example.com", "클라이언트"))))
+        MvcResult result = mockMvc.perform(get("/proposals/{id}/matchings", PROPOSAL_ID)
+                        .with(authentication(authToken(CLIENT_EMAIL, "클라이언트"))))
                 .andExpect(status().isOk())
-                .andExpect(view().name("matching/freelancers"))
                 .andReturn();
 
-        ClientMatchingFreelancerSelectionViewModel viewModel = (ClientMatchingFreelancerSelectionViewModel)
+        ClientMatchingListViewModel view = (ClientMatchingListViewModel)
                 result.getModelAndView().getModel().get("view");
 
-        assertThat(viewModel.proposalId()).isEqualTo(10L);
-        assertThat(viewModel.proposalPositionId()).isEqualTo(1L);
-        assertThat(viewModel.items()).hasSize(3);
+        assertThat(view.items().get(0).status()).isEqualTo(MatchingStatus.PROPOSED);
+        assertThat(view.items().get(1).status()).isEqualTo(MatchingStatus.IN_PROGRESS);
+        assertThat(view.items().get(2).status()).isEqualTo(MatchingStatus.REJECTED);
+    }
 
-        // 정렬: PROPOSED -> IN_PROGRESS -> REJECTED
-        assertThat(viewModel.items().get(0).status()).isEqualTo(MatchingStatus.PROPOSED);
-        assertThat(viewModel.items().get(1).status()).isEqualTo(MatchingStatus.IN_PROGRESS);
-        assertThat(viewModel.items().get(2).status()).isEqualTo(MatchingStatus.REJECTED);
+    @Test
+    @DisplayName("포지션+상태 복합 필터 — 해당 포지션의 해당 상태 매칭만 반환")
+    void list_combinedFilter_returnsMatchingBothConditions() throws Exception {
+        Proposal proposal = createProposalWithTwoPositions();
+        List<Matching> matchings = createMatchingsForBothPositions(proposal);
 
-        MvcResult filtered = mockMvc.perform(get("/proposals/10/matchings/positions/1")
-                        .param("status", "IN_PROGRESS")
-                        .with(authentication(authToken("client@example.com", "클라이언트"))))
+        given(proposalService.findOwnedProposal(PROPOSAL_ID, CLIENT_EMAIL)).willReturn(proposal);
+        given(matchingRepository.findWithPositionAndFreelancerByProposalIdAndClientEmail(PROPOSAL_ID, CLIENT_EMAIL))
+                .willReturn(matchings);
+
+        MvcResult result = mockMvc.perform(get("/proposals/{id}/matchings", PROPOSAL_ID)
+                        .param("positionId", "1")
+                        .param("status", "PROPOSED")
+                        .with(authentication(authToken(CLIENT_EMAIL, "클라이언트"))))
                 .andExpect(status().isOk())
                 .andReturn();
 
-        ClientMatchingFreelancerSelectionViewModel filteredView = (ClientMatchingFreelancerSelectionViewModel)
-                filtered.getModelAndView().getModel().get("view");
+        ClientMatchingListViewModel view = (ClientMatchingListViewModel)
+                result.getModelAndView().getModel().get("view");
 
-        assertThat(filteredView.filterStatusKey()).isEqualTo("IN_PROGRESS");
-        assertThat(filteredView.items()).hasSize(1);
-        assertThat(filteredView.items().get(0).matchingId()).isEqualTo(103L);
+        assertThat(view.selectedPositionId()).isEqualTo(1L);
+        assertThat(view.selectedStatus()).isEqualTo("PROPOSED");
+        assertThat(view.items()).hasSize(1);
+        assertThat(view.items().get(0).proposalPositionId()).isEqualTo(1L);
+        assertThat(view.items().get(0).status()).isEqualTo(MatchingStatus.PROPOSED);
     }
 
-    // ── 포지션 선택: 권한/미존재 케이스 ────────────────────────
+    @Test
+    @DisplayName("포지션 필터 카운트 — 각 포지션별 매칭 수 정확히 반영")
+    void list_positionFilterCounts_areCorrect() throws Exception {
+        Proposal proposal = createProposalWithTwoPositions();
+        List<Matching> matchings = createMatchingsForBothPositions(proposal); // pos1:2개, pos2:1개
+
+        given(proposalService.findOwnedProposal(PROPOSAL_ID, CLIENT_EMAIL)).willReturn(proposal);
+        given(matchingRepository.findWithPositionAndFreelancerByProposalIdAndClientEmail(PROPOSAL_ID, CLIENT_EMAIL))
+                .willReturn(matchings);
+
+        MvcResult result = mockMvc.perform(get("/proposals/{id}/matchings", PROPOSAL_ID)
+                        .with(authentication(authToken(CLIENT_EMAIL, "클라이언트"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        ClientMatchingListViewModel view = (ClientMatchingListViewModel)
+                result.getModelAndView().getModel().get("view");
+
+        var pos1Filter = view.positionFilters().stream().filter(f -> f.proposalPositionId().equals(1L)).findFirst().orElseThrow();
+        var pos2Filter = view.positionFilters().stream().filter(f -> f.proposalPositionId().equals(2L)).findFirst().orElseThrow();
+
+        assertThat(pos1Filter.count()).isEqualTo(2L);
+        assertThat(pos2Filter.count()).isEqualTo(1L);
+    }
 
     @Test
-    void selectPosition_proposalNotFound_redirectsToDashboard() throws Exception {
-        given(proposalService.findOwnedProposal(99L, "client@example.com"))
+    @DisplayName("매칭 없는 경우 — 빈 목록 반환")
+    void list_noMatchings_returnsEmptyItems() throws Exception {
+        Proposal proposal = createProposalWithTwoPositions();
+
+        given(proposalService.findOwnedProposal(PROPOSAL_ID, CLIENT_EMAIL)).willReturn(proposal);
+        given(matchingRepository.findWithPositionAndFreelancerByProposalIdAndClientEmail(PROPOSAL_ID, CLIENT_EMAIL))
+                .willReturn(List.of());
+
+        MvcResult result = mockMvc.perform(get("/proposals/{id}/matchings", PROPOSAL_ID)
+                        .with(authentication(authToken(CLIENT_EMAIL, "클라이언트"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        ClientMatchingListViewModel view = (ClientMatchingListViewModel)
+                result.getModelAndView().getModel().get("view");
+
+        assertThat(view.items()).isEmpty();
+        assertThat(view.positionFilters()).allMatch(f -> f.count() == 0L);
+    }
+
+    @Test
+    @DisplayName("잘못된 status 파라미터 — 무시하고 전체 목록 반환")
+    void list_invalidStatus_ignoresFilterAndReturnsAll() throws Exception {
+        Proposal proposal = createProposalWithTwoPositions();
+        List<Matching> matchings = createMatchingsForBothPositions(proposal);
+
+        given(proposalService.findOwnedProposal(PROPOSAL_ID, CLIENT_EMAIL)).willReturn(proposal);
+        given(matchingRepository.findWithPositionAndFreelancerByProposalIdAndClientEmail(PROPOSAL_ID, CLIENT_EMAIL))
+                .willReturn(matchings);
+
+        MvcResult result = mockMvc.perform(get("/proposals/{id}/matchings", PROPOSAL_ID)
+                        .param("status", "INVALID_STATUS_XYZ")
+                        .with(authentication(authToken(CLIENT_EMAIL, "클라이언트"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        ClientMatchingListViewModel view = (ClientMatchingListViewModel)
+                result.getModelAndView().getModel().get("view");
+
+        assertThat(view.selectedStatus()).isNull();
+        assertThat(view.items()).hasSize(3);
+    }
+
+    @Test
+    @DisplayName("프리랜서 이름 — 닉네임이 있으면 닉네임, 없으면 name 사용")
+    void list_freelancerName_usesNicknameIfPresent() throws Exception {
+        Proposal proposal = createProposalWithSinglePosition();
+        Member client = proposal.getMember();
+        ProposalPosition pos = proposal.getPositions().iterator().next();
+
+        Member withNickname = createMember("fn1@example.com", "pw", "실명A", "닉네임A", "010-1111-0001");
+        Member withoutNickname = createMember("fn2@example.com", "pw", "실명B", "010-1111-0002");
+
+        Matching m1 = Matching.create(null, pos, client, withNickname);
+        Matching m2 = Matching.create(null, pos, client, withoutNickname);
+        ReflectionTestUtils.setField(m1, "id", 31L);
+        ReflectionTestUtils.setField(m1, "status", MatchingStatus.PROPOSED);
+        ReflectionTestUtils.setField(m2, "id", 32L);
+        ReflectionTestUtils.setField(m2, "status", MatchingStatus.PROPOSED);
+
+        given(proposalService.findOwnedProposal(PROPOSAL_ID, CLIENT_EMAIL)).willReturn(proposal);
+        given(matchingRepository.findWithPositionAndFreelancerByProposalIdAndClientEmail(PROPOSAL_ID, CLIENT_EMAIL))
+                .willReturn(List.of(m1, m2));
+
+        MvcResult result = mockMvc.perform(get("/proposals/{id}/matchings", PROPOSAL_ID)
+                        .with(authentication(authToken(CLIENT_EMAIL, "클라이언트"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        ClientMatchingListViewModel view = (ClientMatchingListViewModel)
+                result.getModelAndView().getModel().get("view");
+
+        assertThat(view.items()).anyMatch(item -> item.freelancerName().equals("닉네임A"));
+        assertThat(view.items()).anyMatch(item -> item.freelancerName().equals("실명B"));
+    }
+
+    // ── AJAX 필터 엔드포인트 ─────────────────────────────────────
+
+    @Test
+    @DisplayName("AJAX 아이템 요청 — 상태 필터 적용 후 fragment 반환")
+    void listItems_ajaxStatusFilter_returnsFragment() throws Exception {
+        Proposal proposal = createProposalWithTwoPositions();
+        List<Matching> matchings = createMatchingsForBothPositions(proposal);
+
+        given(proposalService.findOwnedProposal(PROPOSAL_ID, CLIENT_EMAIL)).willReturn(proposal);
+        given(matchingRepository.findWithPositionAndFreelancerByProposalIdAndClientEmail(PROPOSAL_ID, CLIENT_EMAIL))
+                .willReturn(matchings);
+
+        mockMvc.perform(get("/proposals/{id}/matchings/items", PROPOSAL_ID)
+                        .param("status", "ACCEPTED")
+                        .with(authentication(authToken(CLIENT_EMAIL, "클라이언트"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("AJAX 아이템 요청 — 포지션 필터 적용 후 해당 포지션 매칭만 반환")
+    void listItems_ajaxPositionFilter_returnsOnlyMatchingsForPosition() throws Exception {
+        Proposal proposal = createProposalWithTwoPositions();
+        List<Matching> matchings = createMatchingsForBothPositions(proposal);
+
+        given(proposalService.findOwnedProposal(PROPOSAL_ID, CLIENT_EMAIL)).willReturn(proposal);
+        given(matchingRepository.findWithPositionAndFreelancerByProposalIdAndClientEmail(PROPOSAL_ID, CLIENT_EMAIL))
+                .willReturn(matchings);
+
+        MvcResult result = mockMvc.perform(get("/proposals/{id}/matchings/items", PROPOSAL_ID)
+                        .param("positionId", "2")
+                        .with(authentication(authToken(CLIENT_EMAIL, "클라이언트"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        @SuppressWarnings("unchecked")
+        List<ClientMatchingListItemViewModel> items = (List<ClientMatchingListItemViewModel>)
+                result.getModelAndView().getModel().get("items");
+
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).proposalPositionId()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("AJAX 아이템 요청 — 포지션+상태 복합 필터 적용")
+    void listItems_ajaxCombinedFilter_returnsMatchingBothConditions() throws Exception {
+        Proposal proposal = createProposalWithTwoPositions();
+        List<Matching> matchings = createMatchingsForBothPositions(proposal);
+
+        given(proposalService.findOwnedProposal(PROPOSAL_ID, CLIENT_EMAIL)).willReturn(proposal);
+        given(matchingRepository.findWithPositionAndFreelancerByProposalIdAndClientEmail(PROPOSAL_ID, CLIENT_EMAIL))
+                .willReturn(matchings);
+
+        MvcResult result = mockMvc.perform(get("/proposals/{id}/matchings/items", PROPOSAL_ID)
+                        .param("positionId", "1")
+                        .param("status", "REJECTED")
+                        .with(authentication(authToken(CLIENT_EMAIL, "클라이언트"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        @SuppressWarnings("unchecked")
+        List<ClientMatchingListItemViewModel> items = (List<ClientMatchingListItemViewModel>)
+                result.getModelAndView().getModel().get("items");
+
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).proposalPositionId()).isEqualTo(1L);
+        assertThat(items.get(0).status()).isEqualTo(MatchingStatus.REJECTED);
+    }
+
+    @Test
+    @DisplayName("AJAX 아이템 요청 — 존재하지 않는 제안서는 예외 전파")
+    void listItems_proposalNotFound_throwsException() {
+        given(proposalService.findOwnedProposal(99L, CLIENT_EMAIL))
+                .willThrow(new ProposalNotFoundException("제안서를 찾을 수 없습니다."));
+
+        assertThatThrownBy(() ->
+                mockMvc.perform(get("/proposals/99/matchings/items")
+                        .with(authentication(authToken(CLIENT_EMAIL, "클라이언트"))))
+        ).hasCauseInstanceOf(ProposalNotFoundException.class);
+    }
+
+    // ── 권한/예외 처리 ───────────────────────────────────────────
+
+    @Test
+    @DisplayName("존재하지 않는 제안서 접근 시 대시보드로 리다이렉트")
+    void list_proposalNotFound_redirectsToDashboard() throws Exception {
+        given(proposalService.findOwnedProposal(99L, CLIENT_EMAIL))
                 .willThrow(new ProposalNotFoundException("제안서를 찾을 수 없습니다."));
 
         mockMvc.perform(get("/proposals/99/matchings")
-                        .with(authentication(authToken("client@example.com", "클라이언트"))))
+                        .with(authentication(authToken(CLIENT_EMAIL, "클라이언트"))))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/client/dashboard"))
                 .andExpect(flash().attribute("errorMessage", "존재하지 않는 제안서입니다."));
     }
 
     @Test
-    void selectPosition_accessDenied_redirectsToDashboard() throws Exception {
-        given(proposalService.findOwnedProposal(10L, "other@example.com"))
+    @DisplayName("타인 제안서 접근 시 대시보드로 리다이렉트")
+    void list_accessDenied_redirectsToDashboard() throws Exception {
+        given(proposalService.findOwnedProposal(PROPOSAL_ID, "other@example.com"))
                 .willThrow(new AccessDeniedException("접근 불가"));
 
-        mockMvc.perform(get("/proposals/10/matchings")
+        mockMvc.perform(get("/proposals/{id}/matchings", PROPOSAL_ID)
                         .with(authentication(authToken("other@example.com", "타인"))))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/client/dashboard"))
                 .andExpect(flash().attribute("errorMessage", "본인 제안서만 조회할 수 있습니다."));
     }
 
-    // ── 프리랜서 선택: 권한/미존재 케이스 ───────────────────────
-
-    @Test
-    void selectFreelancer_proposalNotFound_redirectsToDashboard() throws Exception {
-        given(proposalService.findOwnedProposal(99L, "client@example.com"))
-                .willThrow(new ProposalNotFoundException("제안서를 찾을 수 없습니다."));
-
-        mockMvc.perform(get("/proposals/99/matchings/positions/1")
-                        .with(authentication(authToken("client@example.com", "클라이언트"))))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/client/dashboard"))
-                .andExpect(flash().attribute("errorMessage", "존재하지 않는 제안서입니다."));
-    }
-
-    @Test
-    void selectFreelancer_accessDenied_redirectsToDashboard() throws Exception {
-        given(proposalService.findOwnedProposal(10L, "other@example.com"))
-                .willThrow(new AccessDeniedException("접근 불가"));
-
-        mockMvc.perform(get("/proposals/10/matchings/positions/1")
-                        .with(authentication(authToken("other@example.com", "타인"))))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/client/dashboard"))
-                .andExpect(flash().attribute("errorMessage", "본인 제안서만 조회할 수 있습니다."));
-    }
-
-    @Test
-    void selectFreelancer_invalidPositionId_redirectsToPositionList() throws Exception {
-        Proposal proposal = createProposalWithSinglePosition(); // positionId=1만 있음
-        given(proposalService.findOwnedProposal(10L, "client@example.com"))
-                .willReturn(proposal);
-        // proposalPositionId=999 는 proposal 안에 없으므로 repository 호출 없이 예외 발생
-
-        mockMvc.perform(get("/proposals/10/matchings/positions/999")
-                        .with(authentication(authToken("client@example.com", "클라이언트"))))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/proposals/10/matchings"))
-                .andExpect(flash().attribute("errorMessage", "잘못된 포지션입니다."));
-    }
+    // ── 헬퍼 ────────────────────────────────────────────────────
 
     private UsernamePasswordAuthenticationToken authToken(String email, String name) {
         ItDaPrincipal principal = ItDaPrincipal.from(
                 createMember(email, "hashed-password", name, "010-1234-5678")
         );
         return new UsernamePasswordAuthenticationToken(
-                principal,
-                null,
+                principal, null,
                 List.of(new SimpleGrantedAuthority("ROLE_USER"))
         );
     }
 
-    private Proposal createProposalWithThreePositions() {
-        Member client = createMember("client@example.com", "pw", "클라이언트", "010-0000-0001");
+    private Proposal createProposalWithTwoPositions() {
+        Member client = createMember(CLIENT_EMAIL, "pw", "클라이언트", "010-0000-0001");
         Proposal proposal = Proposal.create(client, "테스트 제안서", "", "설명", null, null, 8L);
         proposal.startMatching();
-        ReflectionTestUtils.setField(proposal, "id", 10L);
+        ReflectionTestUtils.setField(proposal, "id", PROPOSAL_ID);
 
         Position backend = Position.create("백엔드");
         Position frontend = Position.create("프론트엔드");
-        Position design = Position.create("디자인");
 
         ProposalPosition pos1 = proposal.addPosition(backend, "백엔드", ProposalWorkType.REMOTE, 1L, 1_000_000L, 2_000_000L, 4L, null, null, null);
         ProposalPosition pos2 = proposal.addPosition(frontend, "프론트엔드", ProposalWorkType.REMOTE, 1L, 1_000_000L, 2_000_000L, 4L, null, null, null);
-        ProposalPosition pos3 = proposal.addPosition(design, "디자인", ProposalWorkType.REMOTE, 1L, 1_000_000L, 2_000_000L, 4L, null, null, null);
-
         ReflectionTestUtils.setField(pos1, "id", 1L);
         ReflectionTestUtils.setField(pos2, "id", 2L);
-        ReflectionTestUtils.setField(pos3, "id", 3L);
-
-        pos2.changeStatus(ProposalPositionStatus.FULL);
-        pos3.changeStatus(ProposalPositionStatus.CLOSED);
         return proposal;
     }
 
     private Proposal createProposalWithSinglePosition() {
-        Member client = createMember("client@example.com", "pw", "클라이언트", "010-0000-0001");
+        Member client = createMember(CLIENT_EMAIL, "pw", "클라이언트", "010-0000-0001");
         Proposal proposal = Proposal.create(client, "테스트 제안서", "", "설명", null, null, 8L);
         proposal.startMatching();
-        ReflectionTestUtils.setField(proposal, "id", 10L);
+        ReflectionTestUtils.setField(proposal, "id", PROPOSAL_ID);
 
         Position backend = Position.create("백엔드");
-        ProposalPosition pos1 = proposal.addPosition(backend, "백엔드", ProposalWorkType.REMOTE, 1L, 1_000_000L, 2_000_000L, 4L, null, null, null);
-        ReflectionTestUtils.setField(pos1, "id", 1L);
+        ProposalPosition pos = proposal.addPosition(backend, "백엔드", ProposalWorkType.REMOTE, 1L, 1_000_000L, 2_000_000L, 4L, null, null, null);
+        ReflectionTestUtils.setField(pos, "id", 1L);
         return proposal;
     }
 
-    private List<Matching> createMatchingsForPositions(Proposal proposal) {
+    private List<Matching> createMatchingsForBothPositions(Proposal proposal) {
         Member client = proposal.getMember();
         ProposalPosition pos1 = proposal.getPositions().stream().filter(p -> p.getId().equals(1L)).findFirst().orElseThrow();
         ProposalPosition pos2 = proposal.getPositions().stream().filter(p -> p.getId().equals(2L)).findFirst().orElseThrow();
 
-        Matching openActive = Matching.create(null, pos1, client,
-                createMember("freelancer1@example.com", "pw", "프리랜서1", "010-0000-0002"));
-        ReflectionTestUtils.setField(openActive, "id", 11L);
-        ReflectionTestUtils.setField(openActive, "status", MatchingStatus.PROPOSED);
-
-        Matching openInactive = Matching.create(null, pos1, client,
-                createMember("freelancer2@example.com", "pw", "프리랜서2", "010-0000-0003"));
-        ReflectionTestUtils.setField(openInactive, "id", 12L);
-        ReflectionTestUtils.setField(openInactive, "status", MatchingStatus.REJECTED);
-
-        Matching fullActive = Matching.create(null, pos2, client,
-                createMember("freelancer3@example.com", "pw", "프리랜서3", "010-0000-0004"));
-        ReflectionTestUtils.setField(fullActive, "id", 21L);
-        ReflectionTestUtils.setField(fullActive, "status", MatchingStatus.ACCEPTED);
-
-        return List.of(openActive, openInactive, fullActive);
+        Matching m1 = Matching.create(null, pos1, client, createMember("f1@example.com", "pw", "프리1", "010-0000-0002"));
+        Matching m2 = Matching.create(null, pos1, client, createMember("f2@example.com", "pw", "프리2", "010-0000-0003"));
+        Matching m3 = Matching.create(null, pos2, client, createMember("f3@example.com", "pw", "프리3", "010-0000-0004"));
+        ReflectionTestUtils.setField(m1, "id", 11L);
+        ReflectionTestUtils.setField(m1, "status", MatchingStatus.PROPOSED);
+        ReflectionTestUtils.setField(m2, "id", 12L);
+        ReflectionTestUtils.setField(m2, "status", MatchingStatus.REJECTED);
+        ReflectionTestUtils.setField(m3, "id", 21L);
+        ReflectionTestUtils.setField(m3, "status", MatchingStatus.ACCEPTED);
+        return List.of(m1, m2, m3);
     }
 
-    private Matching createMatching(Long matchingId, MatchingStatus status, String freelancerName, LocalDateTime createdAt) {
-        Member client = createMember("client@example.com", "pw", "클라이언트", "010-0000-0001");
-        Member freelancer = createMember("freelancer+" + matchingId + "@example.com", "pw", freelancerName, "010-0000-0002");
+    private Matching createMatching(Long matchingId, MatchingStatus status, String freelancerName,
+                                    Proposal proposal, LocalDateTime createdAt) {
+        Member client = proposal.getMember();
+        Member freelancer = createMember("f" + matchingId + "@example.com", "pw", freelancerName, "010-0000-0099");
+        ProposalPosition pos = proposal.getPositions().iterator().next();
 
-        Proposal proposal = Proposal.create(client, "테스트 제안서", "", "설명", null, null, 8L);
-        proposal.startMatching();
-        ReflectionTestUtils.setField(proposal, "id", 10L);
-
-        Position backend = Position.create("백엔드");
-        ProposalPosition position = proposal.addPosition(backend, "백엔드", ProposalWorkType.REMOTE, 1L, 1_000_000L, 2_000_000L, 4L, null, null, null);
-        ReflectionTestUtils.setField(position, "id", 1L);
-
-        Matching matching = Matching.create(null, position, client, freelancer);
+        Matching matching = Matching.create(null, pos, client, freelancer);
         ReflectionTestUtils.setField(matching, "id", matchingId);
         ReflectionTestUtils.setField(matching, "status", status);
         ReflectionTestUtils.setField(matching, "createdAt", createdAt);

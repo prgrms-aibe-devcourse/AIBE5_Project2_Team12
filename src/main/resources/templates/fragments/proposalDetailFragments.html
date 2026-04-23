@@ -7,22 +7,32 @@
             <div class="space-y-1">
                 <h4 class="text-lg font-bold tracking-tight text-slate-900"
                     th:text="${pos.title}">Node.js 백엔드 개발자</h4>
-                <p class="text-sm font-medium text-slate-500"
-                   th:text="${pos.position.name}">백엔드 개발자</p>
+                <div class="flex items-center gap-2">
+                    <p class="text-base font-medium text-slate-500"
+                       th:text="${pos.position.name}">백엔드 개발자</p>
+                    <!-- 포지션 모집 상태 배지 -->
+                    <span th:classappend="${
+                              pos.status.name() == 'OPEN'   ? 'border-blue-200 bg-blue-50 text-blue-600' :
+                              (pos.status.name() == 'FULL'  ? 'border-amber-200 bg-amber-50 text-amber-600' :
+                                                               'border-slate-200 bg-slate-100 text-slate-500')
+                          }"
+                          class="inline-flex rounded-full border px-3 py-1 text-xs font-semibold"
+                          th:text="${pos.status.name() == 'OPEN' ? '모집 중' :
+                                     (pos.status.name() == 'FULL' ? '정원 충족' : '모집 종료')}">
+                        모집 중
+                    </span>
+                </div>
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
-                <!-- 포지션 모집 상태 배지 -->
-                <span th:classappend="${
-                          pos.status.name() == 'OPEN'   ? 'border-blue-200 bg-blue-50 text-blue-600' :
-                          (pos.status.name() == 'FULL'  ? 'border-amber-200 bg-amber-50 text-amber-600' :
-                                                           'border-slate-200 bg-slate-100 text-slate-500')
-                      }"
-                      class="inline-flex rounded-full border px-4 py-1.5 text-xs font-bold"
-                      th:text="${pos.status.name() == 'OPEN' ? '모집 중' :
-                                 (pos.status.name() == 'FULL' ? '정원 충족' : '모집 종료')}">
-                    모집 중
-                </span>
+
+                <!-- 클라이언트: 해당 포지션 매칭 결과 바로가기 (매칭이 존재하는 포지션에만 표시) -->
+                <a th:if="${viewerRole != 'FREELANCER' and positionsWithMatchings != null and positionsWithMatchings.contains(pos.id)}"
+                   th:href="@{/proposals/{id}/matchings(id=${pos.proposal.id}, positionId=${pos.id})}"
+                   class="inline-flex items-center gap-2 rounded-2xl border border-blue-600 bg-white px-5 py-3 text-sm font-bold text-blue-600 transition hover:bg-blue-600 hover:text-white">
+                    <i data-lucide="users" class="h-4 w-4"></i>
+                    매칭 결과 보기
+                </a>
 
                 <!-- 프리랜서: 이 포지션에 매칭 요청이 온 경우 상태 배지 (수락/거절은 상단 액션바에서 처리) -->
                 <th:block th:if="${viewerRole == 'FREELANCER' and matchingByPositionId != null and matchingByPositionId[pos.id] != null}">
@@ -81,7 +91,7 @@
                     <div class="mt-3 flex flex-wrap gap-2">
                         <th:block th:each="skill : ${pos.skills}">
                             <span th:if="${skill.importance.name() == 'ESSENTIAL'}"
-                                  class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700"
+                                  class="rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-600"
                                   th:text="${skill.skill.name}">React</span>
                         </th:block>
                         <span th:if="${!#lists.isEmpty(pos.skills) and #lists.isEmpty(pos.skills.?[importance.name() == 'ESSENTIAL'])}"
@@ -97,7 +107,7 @@
                     <div class="mt-3 flex flex-wrap gap-2">
                         <th:block th:each="skill : ${pos.skills}">
                             <span th:if="${skill.importance.name() == 'PREFERENCE'}"
-                                  class="rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-600"
+                                  class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700"
                                   th:text="${skill.skill.name}">TypeScript</span>
                         </th:block>
                         <span th:if="${!#lists.isEmpty(pos.skills) and #lists.isEmpty(pos.skills.?[importance.name() == 'PREFERENCE'])}"
@@ -142,6 +152,7 @@
                 </div>
             </div>
         </div>
+
     </th:block>
 </body>
 </html>

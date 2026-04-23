@@ -116,7 +116,15 @@ public class ProposalController {
         // 1) 클라이언트(소유자) 접근 시도
         try {
             Proposal proposal = proposalService.findOwnedProposal(proposalId, principal.getEmail());
+
+            Set<Long> positionsWithMatchings = matchingRepository
+                    .findWithPositionAndFreelancerByProposalIdAndClientEmail(proposalId, principal.getEmail())
+                    .stream()
+                    .map(m -> m.getProposalPosition().getId())
+                    .collect(Collectors.toSet());
+
             model.addAttribute("proposal", proposal);
+            model.addAttribute("positionsWithMatchings", positionsWithMatchings);
             model.addAttribute("viewerRole", "CLIENT");
             addMemberAttributes(model, principal);
             return "client/proposalDetail";

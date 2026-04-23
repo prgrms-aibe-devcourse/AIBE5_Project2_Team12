@@ -58,6 +58,20 @@ public interface MatchingRepository extends JpaRepository<Matching, Long>, Match
     );
 
     @Query("""
+            select m
+            from Matching m
+            join fetch m.freelancerMember
+            join fetch m.proposalPosition pp
+            join fetch pp.position
+            where pp.proposal.id = :proposalId
+              and m.clientMember.email.value = :clientEmail
+            """)
+    List<Matching> findWithPositionAndFreelancerByProposalIdAndClientEmail(
+            @Param("proposalId") Long proposalId,
+            @Param("clientEmail") String clientEmail
+    );
+
+    @Query("""
             select distinct m
             from Matching m
             join fetch m.proposalPosition pp
