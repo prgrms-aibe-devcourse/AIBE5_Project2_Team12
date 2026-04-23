@@ -11,8 +11,8 @@ import com.generic4.itda.dto.proposal.ProposalPositionForm;
 import com.generic4.itda.dto.security.ItDaPrincipal;
 import com.generic4.itda.exception.ProposalNotFoundException;
 import com.generic4.itda.repository.MatchingRepository;
-import com.generic4.itda.repository.PositionRepository;
 import com.generic4.itda.service.ProposalAiInterviewService;
+import com.generic4.itda.service.PositionResolver;
 import com.generic4.itda.service.ProposalService;
 import jakarta.validation.Valid;
 import java.util.HashSet;
@@ -21,7 +21,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -46,7 +45,7 @@ public class ProposalController {
 
     private final ProposalService proposalService;
     private final ProposalAiInterviewService proposalAiInterviewService;
-    private final PositionRepository positionRepository;
+    private final PositionResolver positionResolver;
     private final MatchingRepository matchingRepository;
 
     @GetMapping("/new")
@@ -331,7 +330,7 @@ public class ProposalController {
 
     private void addCommonAttributes(Model model) {
         model.addAttribute("workTypes", ProposalWorkType.values());
-        model.addAttribute("positionOptions", positionRepository.findAll(Sort.by(Sort.Direction.ASC, "name")));
+        model.addAttribute("positionOptions", positionResolver.findAllowedPositions());
     }
 
     private void addMemberAttributes(Model model, ItDaPrincipal principal) {

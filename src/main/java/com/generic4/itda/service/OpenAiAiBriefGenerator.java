@@ -49,7 +49,7 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
             - REMOTE인 경우 workPlace는 null로 둔다.
             - SITE 또는 HYBRID인데 근무지를 알 수 없으면 workPlace는 "협의"로 둔다.
             - headCount가 명확하지 않으면 1로 둔다.
-            - positionCategoryName은 공용 직무 마스터에 대응하는 큰 분류명이다. 예: 백엔드 개발자, 프론트엔드 개발자, 앱 개발자
+            - positionCategoryName은 공용 직무 마스터에 대응하는 큰 분류명이다. 예: 백엔드 개발자, 모바일 앱 개발자, QA 엔지니어
             - title은 사용자가 화면에서 보게 될 구체 포지션 제목이다. 예: Java Spring 백엔드 개발자, React 프론트엔드 개발자
             - 같은 positionCategoryName을 중복 생성하지 않는다.
             - 같은 positionCategoryName 아래에서도 title이 다르면 별도 position으로 분리할 수 있다.
@@ -126,14 +126,16 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
     private final AiBriefProperties properties;
+    private final PositionResolver positionResolver;
 
     public OpenAiAiBriefGenerator(RestClient.Builder restClientBuilder, ObjectMapper objectMapper,
-                                  AiBriefProperties properties) {
+                                  AiBriefProperties properties, PositionResolver positionResolver) {
         Assert.hasText(properties.getApiKey(), "AI 브리프 API 키는 필수값입니다.");
 
         this.restClient = restClientBuilder.build();
         this.objectMapper = objectMapper;
         this.properties = properties;
+        this.positionResolver = positionResolver;
     }
 
     @Override
@@ -170,7 +172,7 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
     private Map<String, Object> buildRequestBody(AiBriefGenerateRequest request) {
         Map<String, Object> requestBody = new LinkedHashMap<>();
         requestBody.put("model", properties.getModel());
-        requestBody.put("instructions", BRIEF_GENERATION_INSTRUCTIONS);
+        requestBody.put("instructions", buildInstructions());
         requestBody.put("input", request.getRawInputText());
         requestBody.put("max_output_tokens", properties.getMaxOutputTokens());
 
@@ -179,6 +181,25 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
         requestBody.put("text", text);
 
         return requestBody;
+    }
+
+    private String buildInstructions() {
+        String positionCategoryGuide = positionResolver.findAllowedCategoryNames().stream()
+                .map(name -> "- " + name)
+                .reduce((left, right) -> left + System.lineSeparator() + right)
+                .orElse("");
+
+        return BRIEF_GENERATION_INSTRUCTIONS + """
+
+                허용 가능한 Position 카테고리 목록:
+                %s
+
+                Position 카테고리 추가 규칙:
+                - positionCategoryName은 반드시 허용 가능한 Position 카테고리 목록 중 하나만 사용한다.
+                - 목록에 없는 직무 카테고리는 절대 새로 만들거나 비슷하게 지어내지 않는다.
+                - 사용자의 표현이 목록과 다르면 가장 가까운 기존 Position 카테고리로만 매핑한다.
+                - 어떤 기존 Position 카테고리에도 안전하게 매핑되지 않으면 그 포지션은 positions에 포함하지 않는다.
+                """.formatted(positionCategoryGuide);
     }
 
     private Map<String, Object> buildJsonSchemaFormat() {
@@ -218,6 +239,7 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
 
     private Map<String, Object> buildPositionSchema() {
         Map<String, Object> schema = objectSchema();
+        List<String> allowedCategoryNames = positionResolver.findAllowedCategoryNames();
         schema.put("required", List.of(
                 "positionCategoryName",
                 "title",
@@ -232,7 +254,7 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
                 "skills"
         ));
         Map<String, Object> properties = new LinkedHashMap<>();
-        properties.put("positionCategoryName", Map.of("type", "string"));
+        properties.put("positionCategoryName", enumSchema(allowedCategoryNames));
         properties.put("title", Map.of("type", "string"));
         properties.put("workType", nullableEnumSchema("SITE", "REMOTE", "HYBRID"));
         properties.put("headCount", nullableIntegerSchema());
@@ -273,6 +295,13 @@ public class OpenAiAiBriefGenerator implements AiBriefGenerator {
 
     private Map<String, Object> nullableIntegerSchema() {
         return Map.of("type", List.of("integer", "null"));
+    }
+
+    private Map<String, Object> enumSchema(List<String> values) {
+        return Map.of(
+                "type", "string",
+                "enum", values
+        );
     }
 
     private Map<String, Object> nullableEnumSchema(String... values) {
