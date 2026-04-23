@@ -101,6 +101,7 @@ public class RecommendationController {
             log.warn("추가 추천 요청 실패. proposalId={}, proposalPositionId={}, email={}",
                     proposalId, proposalPositionId, principal.getEmail(), e);
 
+            redirectAttributes.addAttribute("proposalId", proposalId);
             redirectAttributes.addFlashAttribute("errorMessage", toUserMessage(e));
             return "redirect:/proposals/{proposalId}/recommendations";
         }
