@@ -58,9 +58,11 @@
 - 활성 매칭은 `PROPOSED`, `ACCEPTED`, `IN_PROGRESS`로 본다.
 - `proposal_position.status = FULL`은 `matching.status in (ACCEPTED, IN_PROGRESS)` 수가 `head_count`에 도달했음을 의미한다.
 - 수락 취소나 완료로 정원 여유가 다시 생기면 `proposal_position.status`는 `OPEN`으로 재계산할 수 있다.
-- `ACCEPTED`는 상호 수락 완료 상태지만 아직 계약 체결 완료 상태는 아니다.
-- `ACCEPTED -> IN_PROGRESS`는 양측 계약서 업로드 완료를 조건으로 둔다.
-- `IN_PROGRESS -> COMPLETED`는 양측 완료 증빙 업로드와 상호 리뷰 작성을 조건으로 둔다.
+- `ACCEPTED`는 매칭 요청 수락 완료 상태지만 아직 계약 시작 완료 상태는 아니다.
+- `ACCEPTED -> IN_PROGRESS`는 양측 계약 시작 확인을 조건으로 둔다.
+- `IN_PROGRESS -> COMPLETED`는 양측 후기 작성과 완료 확인을 조건으로 둔다.
+- `ACCEPTED` 취소 요청은 상대방 확인 또는 24시간 경과 시 `CANCELED`로 전환한다.
+- `IN_PROGRESS` 취소 요청은 상대방의 명시적 확인으로만 `CANCELED`로 전환한다.
 - `MATCHING` 상태 제안서 수정은 현재 진행 중이거나 완료된 매칭이 없을 때만 허용한다.
 - 추천만 받은 상태라면 기존 제안서를 `WRITING`으로 되돌리고 추천 이력을 삭제한 뒤 수정한다.
 - `REJECTED`, `CANCELED`만 남아 있다면 원본 대신 새 `WRITING` 복제본을 만들어 그 초안에서 수정한다.
@@ -73,20 +75,16 @@
 - `matching`은 `proposal_position_id`, `resume_id`와 함께 `client_member_id`, `freelancer_member_id`를 유지한다.
 - `client_member_id`, `freelancer_member_id`는 목록 조회, 권한 검증, 첨부/리뷰 당사자 판정을 단순화하는 참여자 anchor다.
 - 연락처는 `matching.status = ACCEPTED` 이후에만 공개한다.
-- `matching.contract_date`는 양측 계약서가 모두 제출되어 계약이 체결된 시각으로 해석한다.
-- `matching.complete_date`는 양측 완료 증빙과 상호 리뷰가 모두 제출된 시각으로 해석한다.
+- `matching.contract_date`는 양측 계약 시작 확인이 모두 끝난 시각으로 해석한다.
+- `matching.complete_date`는 양측 후기 작성과 완료 확인이 모두 끝난 시각으로 해석한다.
 - 동일 `proposal_position + resume` 조합에는 동시에 하나의 활성 매칭만 둔다.
 
 ### 리뷰 모델
 
-- 리뷰는 `matching` 종속 집합 `matching_reviews`로 둔다.
-- 리뷰의 기준 FK는 `matching_id`다. `proposal_id + resume_id` 조합으로 식별하지 않는다.
-- `reviewer_member_id`와 `reviewee_member_id`는 모두 유지한다.
-- 역할은 `reviewer_role`, `reviewee_role` 2개 대신 `direction` 하나로 표현한다.
-- `created_at`은 리뷰 제출 시각으로 함께 사용하고 별도 `submitted_at`은 두지 않는다.
-- 리뷰 생성 시 작성자, 대상자, 방향은 `matching.client_member_id`, `matching.freelancer_member_id`, 로그인 회원으로 서버가 계산한다.
-- 리뷰 수정은 로그인 회원과 `reviewer_member_id`가 같은 경우에만 허용한다.
-- 리뷰 작성 화면도 `matching.client_member_id`, `matching.freelancer_member_id`, 로그인 회원 기준으로 작성 가능 여부와 상대방 정보를 계산한다.
+- 현재 구현에서는 클라이언트/프리랜서 후기를 `matching` 자체의 참여자별 필드로 저장한다.
+- 후기 작성 가능 여부는 `matching.client_member_id`, `matching.freelancer_member_id`, 로그인 회원 기준으로 계산한다.
+- 후기는 `IN_PROGRESS`에서만 작성할 수 있고, 프로젝트 완료 확인은 본인 후기 작성 후에만 가능하다.
+- 상대방 후기는 `COMPLETED` 이후에만 공개한다.
 
 ### 파일 자산
 
@@ -96,13 +94,8 @@
 - 현재 ERD와 코드 모두 `members.profile_image_id` FK 기준으로 이 관계를 표현한다.
 - `ProfileImage`는 아직 `StoredFile`에 흡수하지 않고, 프로필 이미지 전용 정책과 라이프사이클을 담는 별도 엔티티로 유지한다.
 - 다만 ERD에 `proposal_attachments`가 없으므로 제안서 파일은 아직 정식 도메인 연관 자산으로 취급하지 않는다.
-- 매칭 단위 계약서와 완료 증빙 파일은 `matching_attachments` 공통 집합으로 둔다.
-- `matching_attachments`는 `matching_id`, `member_id`, `file_id`, `attachment_type`를 유지한다.
-- `member_id`는 업로더가 아니라 해당 계약서/증빙의 당사자 회원이며 `matching.client_member_id`, `matching.freelancer_member_id` 중 하나다.
-- `attachment_type`은 `CONTRACT`, `COMPLETION_EVIDENCE`를 사용한다.
-- `UNIQUE (matching_id, member_id, attachment_type)`를 강제한다.
-- 상호 리뷰는 `matching_reviews` 종속 집합으로 둔다.
-- 구현 시 스키마 확장은 `matching_attachments`, `matching_reviews` 기준으로 진행한다.
+- 매칭 단위 계약서와 완료 증빙 파일 업로드는 현재 구현 범위에서 보류한다.
+- 계약 시작과 완료는 파일 첨부가 아니라 `matching`의 참여자별 확인 시각과 후기 필드로 처리한다.
 
 ## 2. 현재 보류 결정
 
@@ -137,7 +130,7 @@
 
 ### Q. 수락되면 바로 진행 중 상태인가?
 
-아니다. `ACCEPTED`는 상호 수락까지만 의미하고, 양측 계약서가 모두 업로드되어 계약이 체결돼야 `IN_PROGRESS`로 전이한다.
+아니다. `ACCEPTED`는 프리랜서가 매칭 요청을 수락한 상태이고, 양측 계약 시작 확인이 모두 끝나야 `IN_PROGRESS`로 전이한다.
 
 ### Q. 제안서 파일은 지금 도메인에서 어디까지 지원하나?
 
@@ -149,11 +142,11 @@
 
 ### Q. 프로젝트 완료는 언제 처리되나?
 
-`IN_PROGRESS` 상태에서 양측이 각각 완료 증빙 서류를 올리고 상대방 리뷰를 작성했을 때만 `COMPLETED`로 전이한다.
+`IN_PROGRESS` 상태에서 양측이 각각 후기를 작성하고 완료 확인을 눌렀을 때만 `COMPLETED`로 전이한다.
 
-### Q. 리뷰 작성 가능 여부는 무엇으로 판단하나?
+### Q. 후기 작성 가능 여부는 무엇으로 판단하나?
 
-`matching.client_member_id`, `matching.freelancer_member_id`, 로그인 회원 기준으로 판정한다. 생성은 현재 로그인 회원이 해당 매칭의 당사자인지와 이미 리뷰를 썼는지를 보고 작성자, 대상자, 방향을 서버가 계산한다. 수정은 로그인 회원과 `reviewer_member_id` 비교로 권한을 검증한다.
+`matching.client_member_id`, `matching.freelancer_member_id`, 로그인 회원 기준으로 판정한다. 생성은 현재 로그인 회원이 해당 매칭의 당사자인지와 이미 후기를 썼는지를 보고 서버가 작성 가능 여부와 공개 여부를 계산한다.
 
 ### Q. 포지션별 요구 스킬을 따로 저장하나?
 

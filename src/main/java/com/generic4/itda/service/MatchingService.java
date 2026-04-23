@@ -1,6 +1,8 @@
 package com.generic4.itda.service;
 
 import com.generic4.itda.domain.matching.Matching;
+import com.generic4.itda.domain.matching.constant.MatchingCancellationReason;
+import com.generic4.itda.domain.matching.constant.MatchingParticipantRole;
 import com.generic4.itda.domain.matching.constant.MatchingStatus;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
@@ -9,8 +11,11 @@ import com.generic4.itda.domain.proposal.ProposalStatus;
 import com.generic4.itda.domain.recommendation.RecommendationResult;
 import com.generic4.itda.domain.resume.Resume;
 import com.generic4.itda.repository.MatchingRepository;
+import com.generic4.itda.repository.ProposalPositionRepository;
 import com.generic4.itda.repository.RecommendationResultRepository;
+import java.time.LocalDateTime;
 import java.util.EnumSet;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -33,6 +38,7 @@ public class MatchingService {
 
     private final RecommendationResultRepository recommendationResultRepository;
     private final MatchingRepository matchingRepository;
+    private final ProposalPositionRepository proposalPositionRepository;
 
     public Matching request(Long recommendationResultId, String clientEmail) {
         RecommendationResult recommendationResult = recommendationResultRepository.findDetailById(recommendationResultId)
@@ -61,11 +67,12 @@ public class MatchingService {
                 .orElseThrow(() -> new IllegalArgumentException("매칭 요청을 찾을 수 없습니다. id=" + matchingId));
 
         validateFreelancerOwnership(matching, freelancerEmail);
-        validatePositionRespondable(matching.getProposalPosition());
-        validateCapacityAvailable(matching.getProposalPosition());
+        ProposalPosition proposalPosition = lockProposalPosition(matching.getProposalPosition());
+        validatePositionRespondable(proposalPosition);
+        validateCapacityAvailable(proposalPosition);
 
         matching.accept();
-        updatePositionStatusAfterAccept(matching.getProposalPosition());
+        updatePositionStatusAfterAccept(proposalPosition);
         return matching;
     }
 
@@ -76,6 +83,81 @@ public class MatchingService {
         validateFreelancerOwnership(matching, freelancerEmail);
         matching.reject();
         return matching;
+    }
+
+    public Matching acceptContractStart(Long matchingId, String email) {
+        Matching matching = getMatchingDetail(matchingId);
+        MatchingParticipantRole participantRole = resolveParticipantRole(matching, email);
+
+        matching.acceptContractStart(participantRole);
+        return matching;
+    }
+
+    public Matching requestCancellation(
+            Long matchingId,
+            String email,
+            MatchingCancellationReason reason,
+            String reasonDetail
+    ) {
+        Matching matching = getMatchingDetail(matchingId);
+        MatchingParticipantRole participantRole = resolveParticipantRole(matching, email);
+
+        matching.requestCancellation(participantRole, reason, reasonDetail);
+        return matching;
+    }
+
+    public Matching withdrawCancellation(Long matchingId, String email) {
+        Matching matching = getMatchingDetail(matchingId);
+        MatchingParticipantRole participantRole = resolveParticipantRole(matching, email);
+
+        matching.withdrawCancellation(participantRole);
+        return matching;
+    }
+
+    public Matching confirmCancellation(Long matchingId, String email) {
+        Matching matching = getMatchingDetail(matchingId);
+        MatchingParticipantRole participantRole = resolveParticipantRole(matching, email);
+
+        matching.confirmCancellation(participantRole);
+        recalculatePositionStatus(matching.getProposalPosition());
+        return matching;
+    }
+
+    public Matching submitReview(Long matchingId, String email, String review) {
+        Matching matching = getMatchingDetail(matchingId);
+        MatchingParticipantRole participantRole = resolveParticipantRole(matching, email);
+
+        matching.submitReview(participantRole, review);
+        return matching;
+    }
+
+    public Matching confirmCompletion(Long matchingId, String email) {
+        Matching matching = getMatchingDetail(matchingId);
+        MatchingParticipantRole participantRole = resolveParticipantRole(matching, email);
+        MatchingStatus beforeStatus = matching.getStatus();
+
+        matching.confirmCompletion(participantRole);
+        if (beforeStatus != matching.getStatus()) {
+            recalculatePositionStatus(matching.getProposalPosition());
+        }
+        return matching;
+    }
+
+    public int cancelOverdueAcceptedCancellationRequests(LocalDateTime now) {
+        List<Matching> matchings = matchingRepository.findAcceptedCancellationRequestsDue(now);
+        int canceledCount = 0;
+        for (Matching matching : matchings) {
+            if (matching.cancelAutomaticallyIfOverdue(now)) {
+                recalculatePositionStatus(matching.getProposalPosition());
+                canceledCount++;
+            }
+        }
+        return canceledCount;
+    }
+
+    private Matching getMatchingDetail(Long matchingId) {
+        return matchingRepository.findDetailById(matchingId)
+                .orElseThrow(() -> new IllegalArgumentException("매칭 요청을 찾을 수 없습니다. id=" + matchingId));
     }
 
     private void validateOwnership(Proposal proposal, String clientEmail) {
@@ -112,6 +194,21 @@ public class MatchingService {
         if (!matching.getFreelancerMember().getEmail().getValue().equals(freelancerEmail)) {
             throw new AccessDeniedException("본인에게 온 매칭 요청에만 응답할 수 있습니다.");
         }
+    }
+
+    private ProposalPosition lockProposalPosition(ProposalPosition proposalPosition) {
+        return proposalPositionRepository.findByIdForUpdate(proposalPosition.getId())
+                .orElseThrow(() -> new IllegalStateException("모집 포지션을 찾을 수 없습니다."));
+    }
+
+    private MatchingParticipantRole resolveParticipantRole(Matching matching, String email) {
+        if (matching.getClientMember().getEmail().getValue().equals(email)) {
+            return MatchingParticipantRole.CLIENT;
+        }
+        if (matching.getFreelancerMember().getEmail().getValue().equals(email)) {
+            return MatchingParticipantRole.FREELANCER;
+        }
+        throw new AccessDeniedException("해당 매칭의 당사자만 처리할 수 있습니다.");
     }
 
     private void validatePositionRespondable(ProposalPosition proposalPosition) {
@@ -153,5 +250,25 @@ public class MatchingService {
         if (occupiedCount >= headCount) {
             proposalPosition.changeStatus(ProposalPositionStatus.FULL);
         }
+    }
+
+    private void recalculatePositionStatus(ProposalPosition proposalPosition) {
+        if (proposalPosition.getStatus() == ProposalPositionStatus.CLOSED) {
+            return;
+        }
+
+        Long headCount = proposalPosition.getHeadCount();
+        if (headCount == null) {
+            return;
+        }
+
+        long occupiedCount = matchingRepository.countByProposalPosition_IdAndStatusIn(
+                proposalPosition.getId(),
+                OCCUPIED_MATCHING_STATUSES
+        );
+
+        proposalPosition.changeStatus(occupiedCount >= headCount
+                ? ProposalPositionStatus.FULL
+                : ProposalPositionStatus.OPEN);
     }
 }

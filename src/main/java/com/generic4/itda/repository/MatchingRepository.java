@@ -2,6 +2,7 @@ package com.generic4.itda.repository;
 
 import com.generic4.itda.domain.matching.Matching;
 import com.generic4.itda.domain.matching.constant.MatchingStatus;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -55,6 +56,17 @@ public interface MatchingRepository extends JpaRepository<Matching, Long>, Match
             @Param("proposalPositionId") Long proposalPositionId,
             @Param("clientEmail") String clientEmail
     );
+
+    @Query("""
+            select distinct m
+            from Matching m
+            join fetch m.proposalPosition pp
+            where m.status = com.generic4.itda.domain.matching.constant.MatchingStatus.ACCEPTED
+              and m.cancellationRequestedBy is not null
+              and m.cancellationAutoCancelAt is not null
+              and m.cancellationAutoCancelAt <= :now
+            """)
+    List<Matching> findAcceptedCancellationRequestsDue(@Param("now") LocalDateTime now);
 
     @Query("""
             select distinct m

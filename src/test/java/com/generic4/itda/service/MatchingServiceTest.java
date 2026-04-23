@@ -10,6 +10,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.generic4.itda.domain.matching.Matching;
+import com.generic4.itda.domain.matching.constant.MatchingCancellationReason;
+import com.generic4.itda.domain.matching.constant.MatchingParticipantRole;
 import com.generic4.itda.domain.matching.constant.MatchingStatus;
 import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.position.Position;
@@ -27,8 +29,10 @@ import com.generic4.itda.domain.resume.Resume;
 import com.generic4.itda.domain.resume.ResumeWritingStatus;
 import com.generic4.itda.domain.resume.WorkType;
 import com.generic4.itda.repository.MatchingRepository;
+import com.generic4.itda.repository.ProposalPositionRepository;
 import com.generic4.itda.repository.RecommendationResultRepository;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
@@ -56,6 +60,9 @@ class MatchingServiceTest {
 
     @Mock
     private MatchingRepository matchingRepository;
+
+    @Mock
+    private ProposalPositionRepository proposalPositionRepository;
 
     @Test
     @DisplayName("클라이언트는 추천 결과를 기준으로 PROPOSED 매칭 요청을 생성할 수 있다")
@@ -191,6 +198,8 @@ class MatchingServiceTest {
         );
 
         given(matchingRepository.findDetailById(401L)).willReturn(Optional.of(matching));
+        given(proposalPositionRepository.findByIdForUpdate(201L))
+                .willReturn(Optional.of(matching.getProposalPosition()));
         given(matchingRepository.countByProposalPosition_IdAndStatusIn(
                 eq(201L),
                 eq(EnumSet.of(MatchingStatus.ACCEPTED, MatchingStatus.IN_PROGRESS))
@@ -202,6 +211,7 @@ class MatchingServiceTest {
         assertThat(accepted.getAcceptedAt()).isNotNull();
         assertThat(accepted.getRejectedAt()).isNull();
         assertThat(accepted.getProposalPosition().getStatus()).isEqualTo(ProposalPositionStatus.FULL);
+        verify(proposalPositionRepository).findByIdForUpdate(201L);
     }
 
     @Test
@@ -214,6 +224,8 @@ class MatchingServiceTest {
         );
 
         given(matchingRepository.findDetailById(401L)).willReturn(Optional.of(matching));
+        given(proposalPositionRepository.findByIdForUpdate(201L))
+                .willReturn(Optional.of(matching.getProposalPosition()));
         given(matchingRepository.countByProposalPosition_IdAndStatusIn(
                 eq(201L),
                 eq(EnumSet.of(MatchingStatus.ACCEPTED, MatchingStatus.IN_PROGRESS))
@@ -237,6 +249,8 @@ class MatchingServiceTest {
         );
 
         given(matchingRepository.findDetailById(401L)).willReturn(Optional.of(matching));
+        given(proposalPositionRepository.findByIdForUpdate(201L))
+                .willReturn(Optional.of(matching.getProposalPosition()));
         given(matchingRepository.countByProposalPosition_IdAndStatusIn(
                 eq(201L),
                 eq(EnumSet.of(MatchingStatus.ACCEPTED, MatchingStatus.IN_PROGRESS))
@@ -261,6 +275,8 @@ class MatchingServiceTest {
         );
 
         given(matchingRepository.findDetailById(401L)).willReturn(Optional.of(matching));
+        given(proposalPositionRepository.findByIdForUpdate(201L))
+                .willReturn(Optional.of(matching.getProposalPosition()));
 
         assertThatThrownBy(() -> matchingService.accept(401L, "freelancer@example.com"))
                 .isInstanceOf(IllegalStateException.class)
@@ -325,6 +341,158 @@ class MatchingServiceTest {
 
         assertThat(matching.getAcceptedAt()).isNull();
         assertThat(matching.getRejectedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("양측이 계약 시작을 수락하면 IN_PROGRESS 상태가 된다")
+    void acceptContractStart_changesStatusWhenBothParticipantsAccepted() {
+        Matching matching = createMatching(
+                MatchingStatus.ACCEPTED,
+                ProposalPositionStatus.FULL,
+                1L
+        );
+        given(matchingRepository.findDetailById(401L)).willReturn(Optional.of(matching));
+
+        Matching waiting = matchingService.acceptContractStart(401L, CLIENT_EMAIL);
+
+        assertThat(waiting.getStatus()).isEqualTo(MatchingStatus.ACCEPTED);
+        assertThat(waiting.isContractStartAcceptedBy(MatchingParticipantRole.CLIENT)).isTrue();
+        assertThat(waiting.isContractStartAcceptedBy(MatchingParticipantRole.FREELANCER)).isFalse();
+
+        Matching inProgress = matchingService.acceptContractStart(401L, "freelancer@example.com");
+
+        assertThat(inProgress.getStatus()).isEqualTo(MatchingStatus.IN_PROGRESS);
+        assertThat(inProgress.isContractStartAcceptedBy(MatchingParticipantRole.FREELANCER)).isTrue();
+        assertThat(inProgress.getContractDate()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("매칭 당사자는 취소 요청을 보낼 수 있다")
+    void requestCancellation_createsCancellationRequest() {
+        Matching matching = createMatching(
+                MatchingStatus.ACCEPTED,
+                ProposalPositionStatus.FULL,
+                1L
+        );
+        given(matchingRepository.findDetailById(401L)).willReturn(Optional.of(matching));
+
+        Matching requested = matchingService.requestCancellation(
+                401L,
+                CLIENT_EMAIL,
+                MatchingCancellationReason.CLIENT_BEFORE_REQUIREMENT_CHANGED,
+                null
+        );
+
+        assertThat(requested.hasCancellationRequest()).isTrue();
+        assertThat(requested.getCancellationRequestedBy()).isEqualTo(MatchingParticipantRole.CLIENT);
+        assertThat(requested.getCancellationReason())
+                .isEqualTo(MatchingCancellationReason.CLIENT_BEFORE_REQUIREMENT_CHANGED);
+        assertThat(requested.getCancellationAutoCancelAt())
+                .isEqualTo(requested.getCancellationRequestedAt().plusHours(24));
+    }
+
+    @Test
+    @DisplayName("취소 요청자는 취소 요청을 철회할 수 있다")
+    void withdrawCancellation_clearsCancellationRequest() {
+        Matching matching = createMatching(
+                MatchingStatus.ACCEPTED,
+                ProposalPositionStatus.FULL,
+                1L
+        );
+        matching.requestCancellation(
+                MatchingParticipantRole.CLIENT,
+                MatchingCancellationReason.CLIENT_BEFORE_REQUIREMENT_CHANGED,
+                null
+        );
+        given(matchingRepository.findDetailById(401L)).willReturn(Optional.of(matching));
+
+        Matching withdrawn = matchingService.withdrawCancellation(401L, CLIENT_EMAIL);
+
+        assertThat(withdrawn.hasCancellationRequest()).isFalse();
+        assertThat(withdrawn.getCancellationRequestedBy()).isNull();
+        assertThat(withdrawn.getCancellationReason()).isNull();
+    }
+
+    @Test
+    @DisplayName("취소 요청 수신자가 확인하면 CANCELED 상태가 되고 포지션 정원을 재계산한다")
+    void confirmCancellation_changesStatusAndRecalculatesPositionStatus() {
+        Matching matching = createMatching(
+                MatchingStatus.ACCEPTED,
+                ProposalPositionStatus.FULL,
+                1L
+        );
+        matching.requestCancellation(
+                MatchingParticipantRole.CLIENT,
+                MatchingCancellationReason.CLIENT_BEFORE_REQUIREMENT_CHANGED,
+                null
+        );
+        given(matchingRepository.findDetailById(401L)).willReturn(Optional.of(matching));
+        given(matchingRepository.countByProposalPosition_IdAndStatusIn(
+                eq(201L),
+                eq(EnumSet.of(MatchingStatus.ACCEPTED, MatchingStatus.IN_PROGRESS))
+        )).willReturn(0L);
+
+        Matching canceled = matchingService.confirmCancellation(401L, "freelancer@example.com");
+
+        assertThat(canceled.getStatus()).isEqualTo(MatchingStatus.CANCELED);
+        assertThat(canceled.getCanceledAt()).isNotNull();
+        assertThat(canceled.getProposalPosition().getStatus()).isEqualTo(ProposalPositionStatus.OPEN);
+    }
+
+    @Test
+    @DisplayName("자동 취소 예정 시각이 지난 ACCEPTED 취소 요청을 CANCELED로 전환한다")
+    void cancelOverdueAcceptedCancellationRequests_cancelsDueRequests() {
+        Matching matching = createMatching(
+                MatchingStatus.ACCEPTED,
+                ProposalPositionStatus.FULL,
+                1L
+        );
+        matching.requestCancellation(
+                MatchingParticipantRole.CLIENT,
+                MatchingCancellationReason.CLIENT_BEFORE_REQUIREMENT_CHANGED,
+                null
+        );
+        LocalDateTime now = matching.getCancellationAutoCancelAt().plusSeconds(1);
+        given(matchingRepository.findAcceptedCancellationRequestsDue(now)).willReturn(List.of(matching));
+        given(matchingRepository.countByProposalPosition_IdAndStatusIn(
+                eq(201L),
+                eq(EnumSet.of(MatchingStatus.ACCEPTED, MatchingStatus.IN_PROGRESS))
+        )).willReturn(0L);
+
+        int canceledCount = matchingService.cancelOverdueAcceptedCancellationRequests(now);
+
+        assertThat(canceledCount).isEqualTo(1);
+        assertThat(matching.getStatus()).isEqualTo(MatchingStatus.CANCELED);
+        assertThat(matching.getProposalPosition().getStatus()).isEqualTo(ProposalPositionStatus.OPEN);
+    }
+
+    @Test
+    @DisplayName("진행 중인 매칭에서 양측 후기를 작성하고 완료 확인하면 COMPLETED 상태가 된다")
+    void submitReviewAndConfirmCompletion_changesStatusWhenBothParticipantsConfirmed() {
+        Matching matching = createMatching(
+                MatchingStatus.IN_PROGRESS,
+                ProposalPositionStatus.FULL,
+                1L
+        );
+        given(matchingRepository.findDetailById(401L)).willReturn(Optional.of(matching));
+        given(matchingRepository.countByProposalPosition_IdAndStatusIn(
+                eq(201L),
+                eq(EnumSet.of(MatchingStatus.ACCEPTED, MatchingStatus.IN_PROGRESS))
+        )).willReturn(0L);
+
+        matchingService.submitReview(401L, CLIENT_EMAIL, "좋은 협업이었습니다.");
+        matchingService.confirmCompletion(401L, CLIENT_EMAIL);
+
+        assertThat(matching.getStatus()).isEqualTo(MatchingStatus.IN_PROGRESS);
+        assertThat(matching.hasReviewBy(MatchingParticipantRole.CLIENT)).isTrue();
+        assertThat(matching.isCompletionConfirmedBy(MatchingParticipantRole.CLIENT)).isTrue();
+
+        matchingService.submitReview(401L, "freelancer@example.com", "명확한 요구사항 덕분에 원활했습니다.");
+        Matching completed = matchingService.confirmCompletion(401L, "freelancer@example.com");
+
+        assertThat(completed.getStatus()).isEqualTo(MatchingStatus.COMPLETED);
+        assertThat(completed.getCompleteDate()).isNotNull();
+        assertThat(completed.getProposalPosition().getStatus()).isEqualTo(ProposalPositionStatus.OPEN);
     }
 
     private RecommendationResult createRecommendationResult(

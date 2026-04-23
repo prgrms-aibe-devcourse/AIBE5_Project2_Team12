@@ -29,28 +29,23 @@
 - `proposal_position.status`는 `OPEN`, `FULL`, `CLOSED`다.
 - `proposal_position`은 `title`, `work_type`, `expected_period`, `career_min/max_years`, `work_place`를 포함하는 상세 모집 단위다.
 - `proposal_position.status = FULL`은 `matching.status in (ACCEPTED, IN_PROGRESS)` 수가 `head_count`에 도달했다는 뜻이고, `PROPOSED`는 정원을 점유하지 않는다.
-- `matching`은 `proposal_position_id`, `resume_id`, `client_member_id`, `freelancer_member_id`, `status`, `contract_date`, `complete_date`를 유지하되, `ACCEPTED -> IN_PROGRESS`는 양측 계약서 업로드 완료를 조건으로 둔다.
-- `contract_date`는 수락 시각이 아니라 양측 계약서가 모두 제출되어 계약이 체결된 시각이다.
-- `IN_PROGRESS -> COMPLETED`는 양측 완료 증빙 업로드와 상호 리뷰 작성을 조건으로 둔다.
-- `complete_date`는 완료 요청 시각이 아니라 완료 증빙과 리뷰 조건이 모두 충족된 시각이다.
+- `matching`은 `proposal_position_id`, `resume_id`, `client_member_id`, `freelancer_member_id`, `status`, `contract_date`, `complete_date`를 유지하되, `ACCEPTED -> IN_PROGRESS`는 양측 계약 시작 확인을 조건으로 둔다.
+- `contract_date`는 수락 시각이 아니라 양측 계약 시작 확인이 모두 끝난 시각이다.
+- `IN_PROGRESS -> COMPLETED`는 양측 후기 작성과 완료 확인을 조건으로 둔다.
+- `complete_date`는 완료 요청 시각이 아니라 후기 작성과 완료 확인 조건이 모두 충족된 시각이다.
 - 활성 매칭은 `PROPOSED`, `ACCEPTED`, `IN_PROGRESS`로 본다.
 - `client_member_id`, `freelancer_member_id`는 각각 제안서 소유 회원, 이력서 소유 회원과 일치해야 한다.
-- 계약서와 완료 증빙은 `matching_attachments` 공통 집합으로 두고 `matching_id`, `member_id`, `file_id`, `attachment_type`를 유지한다.
-- `matching_attachments.member_id`는 업로더가 아니라 해당 계약서/증빙의 당사자 회원이며 `matching.client_member_id`, `matching.freelancer_member_id` 중 하나다.
-- `matching_attachments.attachment_type`은 `CONTRACT`, `COMPLETION_EVIDENCE`다.
-- `UNIQUE (matching_id, member_id, attachment_type)`를 강제한다.
-- 리뷰는 `matching_reviews`를 `matching` 종속 집합으로 두고 `matching_id`, `reviewer_member_id`, `reviewee_member_id`, `direction`을 유지한다.
-- 리뷰 생성 시 작성자, 대상자, 방향은 `matching.client_member_id`, `matching.freelancer_member_id`, 로그인 회원 기준으로 서버가 계산한다.
-- 리뷰 수정은 로그인 회원과 `reviewer_member_id`가 같은 경우에만 허용한다.
-- 리뷰는 별도 초안 상태 없이 `created_at`을 제출 시각으로 함께 사용하고 `submitted_at`은 두지 않는다.
+- 취소 요청은 `ACCEPTED`에서는 상대방 확인 또는 24시간 경과 시 자동 취소, `IN_PROGRESS`에서는 상대방 명시 확인으로만 취소한다.
+- 현재 구현에서 후기는 `matching` 자체의 참여자별 필드로 저장한다.
+- 상대방 후기는 `COMPLETED` 이후에만 공개한다.
 - 현재 ERD에는 `proposal_position_skills`가 존재하고, 요구 스킬의 정규화 source로 사용한다.
 - 현재 애플리케이션에는 `/files/proposal/**` 저장 경로가 있지만, ERD에는 `proposal_attachments`가 없어서 제안서 파일은 아직 정식 도메인 연관 자산이 아니다.
-- 구현 스키마 확장은 `matching_attachments`, `matching_reviews` 기준으로 진행한다.
+- 현재 구현 스키마는 `matching` 자체의 참여자별 계약 시작, 취소, 후기, 완료 확인 필드 기준으로 진행한다.
 - 현재 ERD에는 `initiator_type`, `participation_status`가 없다.
-- 현재 인증 principal에는 `memberId`가 없으므로 리뷰 생성/수정 검증에는 principal 확장 또는 `email` 기반 회원 재조회가 필요하다.
+- 현재 인증 principal에는 `memberId`가 없으므로 후기 작성/완료 확인 검증에는 principal 확장 또는 `email` 기반 회원 재조회가 필요하다.
 - 현재 ERD와 코드 모두 `members.profile_image_id` 기준으로 프로필 이미지 1:1을 관리한다.
 - `resume_attachments(resume_id, display_order)`, `resume_skills(resume_id, skill_id)`, `proposal_position_skills(proposal_position_id, skill_id)`는 중복 없이 관리한다.
-- 명시적 시작 승인 / 종료 승인 버튼 모델은 현재 MVP 백로그에 포함하지 않는다.
+- 계약 시작 확인 / 완료 확인 버튼 모델은 현재 MVP 백로그에 포함한다.
 - `StoredFile.contentType`은 MIME 문자열(`String` / `varchar`)로 유지하고, enum 대신 허용 MIME type 검증으로 다룬다.
 - 현재 ERD와 코드 모두 `Member`가 `ProfileImage` 1:1 연관관계 주인이고, `ProfileImage`는 `StoredFile`을 참조하는 별도 엔티티다.
 - `ProfileImage`를 제거하고 `StoredFile`로 통합할지 여부는 프로필 이미지 서비스 책임을 먼저 정리한 뒤 다시 결정한다.
@@ -62,7 +57,7 @@
 - `Member`, `Resume`, `ProfileImage`, `ResumeAttachment`, `StoredFile`, `ResumeSkill` 정렬
 - `Position`, `Proposal`, `ProposalPosition`, `ProposalPositionSkill`, `Matching` 엔티티/리포지토리
 - 제안서 저장/모집 시작 흐름
-- 매칭 요청/수락/계약 체결/진행/완료 흐름
+- 매칭 요청/수락/계약 시작 확인/진행/완료 흐름
 - `MatchingAttachment`, `MatchingReview` 모델
 - 추천 엔진의 하드 필터 + Top 3 응답 뼈대
 - 상태 전이와 노출 조건을 검증하는 테스트 세트
@@ -207,27 +202,21 @@
 
 ### Phase 5. 매칭 MVP
 
-목표는 요청, 수락, 계약 체결, 진행, 완료를 현재 상태 모델 위에서 구현하는 것이다.
+목표는 요청, 수락, 계약 시작 확인, 진행, 완료를 현재 상태 모델 위에서 구현하는 것이다.
 
 작업 항목은 아래와 같다.
 
 - `Matching` 엔티티, 리포지토리, 테스트 추가
-- `MatchingAttachment` 엔티티, 리포지토리, 테스트 추가
-- `MatchingReview` 엔티티, 리포지토리, 테스트 추가
 - `status`, `contract_date`, `complete_date` 구현
 - 클라이언트 요청 플로우 구현
 - 프리랜서 직접 지원 플로우 구현
 - 수락/거절/취소 처리 구현
-- 양측 계약서 업로드 플로우 구현
-- 양측 계약서 업로드 완료 시 `IN_PROGRESS` 전이 및 `contract_date` 기록 구현
-- 양측 완료 증빙 업로드 플로우 구현
-- 상호 리뷰 작성 구현
-- 첨부 파일 업로드 시 `member_id`가 해당 매칭 당사자인지 검증 구현
-- 리뷰 작성 화면 조회 시 `matching + principal` 기준으로 작성 가능 여부, 상대방 정보, 기존 리뷰 여부 계산 구현
-- 리뷰 생성 시 작성자/대상자/direction 서버 계산 구현
-- `UNIQUE (matching_id, member_id, attachment_type)` 강제 구현
-- 리뷰 수정 시 `reviewer_member_id` 소유권 검증 구현
-- `UNIQUE (matching_id, direction)`, `UNIQUE (matching_id, reviewer_member_id)` 강제 구현
+- 양측 계약 시작 확인 플로우 구현
+- 양측 계약 시작 확인 완료 시 `IN_PROGRESS` 전이 및 `contract_date` 기록 구현
+- 취소 요청/철회/확인 플로우 구현
+- `ACCEPTED` 취소 요청 24시간 자동 취소 처리 구현
+- 상호 후기 작성 구현
+- 후기 작성 화면 조회 시 `matching + principal` 기준으로 작성 가능 여부, 상대방 정보, 기존 후기 여부 계산 구현
 - 완료 조건 충족 시 `COMPLETED` 전이 및 `complete_date` 기록 구현
 - 연락처 공개 시점 제어 구현
 - 정원 도달 시 추가 요청 차단 구현
@@ -241,9 +230,9 @@
 - 참여자 판정은 `proposal_position -> proposal`, `resume -> member` 역추적 대신 `matching.client_member_id`, `matching.freelancer_member_id`를 기준으로 처리한다.
 - 정원은 `ACCEPTED`, `IN_PROGRESS`만 점유하고 `PROPOSED`는 점유하지 않는다.
 - 정원 여유가 다시 생기면 `proposal_position.status`는 `OPEN`으로 되돌릴 수 있어야 한다.
-- 명시적 시작 승인 / 종료 승인 버튼 없이 계약서, 완료 증빙, 리뷰 제출을 상태 게이트로 사용한다.
-- Phase 5 시작 전에 `matching_attachments`, `matching_reviews` 스키마를 먼저 반영해야 한다.
-- 현재 principal에는 `memberId`가 없으므로 리뷰 생성/수정 검증 전에 인증 컨텍스트 정리가 필요하다.
+- 계약 시작 확인, 취소 요청/확인, 후기 작성, 완료 확인을 상태 게이트로 사용한다.
+- 계약서/완료 증빙 업로드와 별도 리뷰 테이블은 현재 구현 범위에서 보류한다.
+- 현재 principal에는 `memberId`가 없으므로 후기 작성/완료 확인 검증 전에 인증 컨텍스트 정리가 필요하다.
 
 권장 API 범위는 아래와 같다.
 
@@ -251,12 +240,10 @@
 - 프리랜서 지원 생성
 - 요청 수락/거절
 - 요청 취소
-- 계약서 업로드
+- 계약 시작 확인
 - 진행 시작
-- 리뷰 작성 화면 조회
-- 완료 증빙 업로드
-- 리뷰 작성
-- 리뷰 수정
+- 취소 요청/철회/확인
+- 후기 작성
 - 완료 처리
 - 매칭 목록 조회
 
@@ -267,26 +254,25 @@
 - 수락 시 정원 재검증 테스트
 - `PROPOSED`가 정원을 점유하지 않는지 테스트
 - 수락 전 연락처 비노출 테스트
-- 같은 `matching/member/type` 첨부 중복이 막히는지 테스트
-- `ACCEPTED` 상태에서 양측 계약서가 모두 없으면 `IN_PROGRESS`로 갈 수 없는지 테스트
-- 양측 계약서 업로드 완료 시 `contract_date`가 기록되는지 테스트
+- `ACCEPTED` 상태에서 양측 계약 시작 확인이 모두 없으면 `IN_PROGRESS`로 갈 수 없는지 테스트
+- 양측 계약 시작 확인 완료 시 `contract_date`가 기록되는지 테스트
 - `FULL`, `CLOSED` 상태에서 신규 매칭 생성 불가 테스트
-- 양측 완료 증빙과 상호 리뷰가 모두 없으면 `COMPLETED`로 갈 수 없는지 테스트
-- 리뷰 생성 시 `matching.client_member_id`, `matching.freelancer_member_id`, 로그인 회원 기준으로 작성자/대상자/direction이 계산되는지 테스트
-- 같은 `matching`에서 같은 방향 또는 같은 작성자 중복 리뷰가 막히는지 테스트
-- 본인 리뷰만 수정 가능한지 테스트
-- `IN_PROGRESS`가 아니면 리뷰 작성이 불가능한지 테스트
+- 양측 후기 작성과 완료 확인이 모두 없으면 `COMPLETED`로 갈 수 없는지 테스트
+- 후기 작성 시 `matching.client_member_id`, `matching.freelancer_member_id`, 로그인 회원 기준으로 작성 가능 여부가 계산되는지 테스트
+- 같은 참여자가 같은 `matching`에 후기를 중복 작성할 수 없는지 테스트
+- `IN_PROGRESS`가 아니면 후기 작성이 불가능한지 테스트
 - 완료 조건 충족 시 `complete_date`가 기록되는지 테스트
 - 수락 취소/완료 후 `FULL -> OPEN` 재계산 테스트
 - `status` 단일 필드 전이 테스트
 
 종료 산출물은 아래와 같다.
 
-- 요청/지원/수락/계약 체결/진행/완료 API
-- 매칭 리뷰 작성/수정 API와 화면 DTO
+- 요청/지원/수락/계약 시작 확인/진행/완료 API
+- 취소 요청/철회/확인 API와 화면 DTO
+- 매칭 후기 작성 API와 화면 DTO
 - 연락처 공개 시점 제어
 - 정원 기반 매칭 차단 규칙
-- 계약서/완료 증빙/리뷰 기반 상태 게이트
+- 계약 시작 확인/취소 요청/후기/완료 확인 기반 상태 게이트
 
 ### Phase 6. 추천 엔진 MVP
 
@@ -366,7 +352,7 @@ MVP 운영 원칙은 아래와 같다.
 - `proposal_attachments` 또는 정식 제안서 파일 연관 모델
 - `matching.initiator_type`
 - `matching.participation_status`
-- 명시적 시작 승인 / 종료 승인 버튼 모델
+- 파일 기반 계약서/완료 증빙 모델
 - `DONE -> WRITING` 재오픈 규칙
 
 이 항목들은 ERD가 바뀌는 시점에 다시 백로그로 올린다.
@@ -395,8 +381,8 @@ PR 리뷰나 중간 점검 때는 아래 질문을 공통으로 본다.
 5. 추천 노출 조건이 `status`, `writing_status`, `publicly_visible`, `ai_matching_enabled`를 모두 반영하는가
 6. `FULL` 판정과 활성 매칭 판정을 같은 기준으로 재사용하는가
 7. 프로필/이력서/스킬 연결 테이블의 유니크 제약을 코드와 DB 양쪽에서 놓치지 않았는가
-8. `contract_date`, `complete_date`를 각각 계약 체결 시각, 완료 조건 충족 시각으로 일관되게 쓰고 있는가
-9. `IN_PROGRESS`, `COMPLETED` 전이 조건이 계약서/증빙/리뷰 규칙과 일치하는가
+8. `contract_date`, `complete_date`를 각각 계약 시작 확인 완료 시각, 완료 조건 충족 시각으로 일관되게 쓰고 있는가
+9. `IN_PROGRESS`, `COMPLETED` 전이 조건이 계약 시작 확인/후기/완료 확인 규칙과 일치하는가
 
 ## 7. 첫 구현 순서
 
@@ -434,7 +420,7 @@ PR 리뷰나 중간 점검 때는 아래 질문을 공통으로 본다.
 - `Resume.status`, `Resume.writingStatus`, `profile_image`, `resume_attachments`를 늦게 반영하면 이력서 화면 구조와 추천 필터 조건이 다시 흔들릴 수 있다.
 - `matching.status` 하나에 요청 처리와 진행 이력을 모두 넣으면 상태 전이 버그가 빠르게 늘어난다.
 - `proposal_position` 정원 수락 경쟁과 `FULL -> OPEN` 재계산은 동시성 문제를 만든다.
-- 계약서, 완료 증빙, 리뷰 제출이 한쪽에서만 멈추면 장기 체류 상태가 쉽게 생긴다.
+- 계약 시작 확인, 취소 확인, 후기 작성, 완료 확인이 한쪽에서만 멈추면 장기 체류 상태가 쉽게 생긴다.
 - `MATCHING` 상태 제안서의 수정 정책이 현재 ERD에 없어서 UX 규칙을 따로 정해야 한다.
 
 ## 10. 완료 기준
@@ -447,6 +433,6 @@ PR 리뷰나 중간 점검 때는 아래 질문을 공통으로 본다.
 - 제안서 제출 시 추천 가능한 입력 구조가 DB에 저장된다.
 - 클라이언트 요청과 프리랜서 지원이 `matching`으로 관리된다.
 - 수락 이후에만 연락처가 공개된다.
-- 양측 계약서 업로드 후에만 `IN_PROGRESS`로 전이된다.
-- 양측 완료 증빙 업로드와 상호 리뷰 작성 후에만 `COMPLETED`로 전이된다.
+- 양측 계약 시작 확인 후에만 `IN_PROGRESS`로 전이된다.
+- 양측 후기 작성과 완료 확인 후에만 `COMPLETED`로 전이된다.
 - 하드 필터 + 점수화 + Top 3 설명 흐름이 동작한다.

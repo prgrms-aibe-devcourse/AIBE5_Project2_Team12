@@ -12,6 +12,7 @@ public record MatchingDetailViewModel(
         MatchingDetailSummaryViewModel summary,
         MatchingDetailContactViewModel contacts,
         MatchingDetailProjectSummaryViewModel project,
-        List<MatchingTimelineItemViewModel> timeline
+        List<MatchingTimelineItemViewModel> timeline,
+        MatchingDetailLifecycleViewModel lifecycle
 ) {
 }
