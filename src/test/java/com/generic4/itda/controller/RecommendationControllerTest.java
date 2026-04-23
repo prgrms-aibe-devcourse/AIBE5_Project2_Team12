@@ -83,7 +83,8 @@ class RecommendationControllerTest {
                         null,
                         "대기 중",
                         false,
-                        null  // 매칭 없음
+                        null,  // matchingId — 매칭 없음
+                        null   // matchingStatus — 매칭 없음
                 ))
         );
 
@@ -164,7 +165,8 @@ class RecommendationControllerTest {
                         "사유",
                         "READY",
                         true,
-                        "PROPOSED"  // 매칭 요청 후 대기 중 시나리오
+                        9001L,       // matchingId
+                        "PROPOSED"   // matchingStatus
                 ),
                 "https://example.com",
                 List.of(new RecommendationResumeSkillItem("Java", "고급")),
