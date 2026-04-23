@@ -11,6 +11,7 @@ import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.domain.recommendation.constant.RecommendationAlgorithm;
 import com.generic4.itda.domain.skill.Skill;
 import com.generic4.itda.fixture.MemberFixture;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -209,6 +210,70 @@ class RecommendationFingerprintGeneratorTest {
 
         assertThat(fpNullId1).isEqualTo(fpNullId2);
         assertThat(fpNullId1).isNotEqualTo(fpWithId);
+    }
+
+    @Test
+    @DisplayName("추가 추천 fingerprint는 제외 이력서 id 순서가 달라도 동일하다")
+    void generateAdditional_isOrderInvariantForExcludedResumeIds() {
+        ProposalPosition position = createBasePosition(createBaseProposal());
+        addSkillWithId(position, 1L, "Java", ProposalPositionSkillImportance.ESSENTIAL);
+
+        String fp1 = generator.generateAdditional(
+                position,
+                RecommendationAlgorithm.HEURISTIC_V1,
+                10,
+                List.of(3L, 1L, 2L)
+        );
+        String fp2 = generator.generateAdditional(
+                position,
+                RecommendationAlgorithm.HEURISTIC_V1,
+                10,
+                List.of(2L, 3L, 1L)
+        );
+
+        assertThat(fp1).isEqualTo(fp2);
+    }
+
+    @Test
+    @DisplayName("추가 추천 fingerprint는 제외 이력서 id가 바뀌면 달라진다")
+    void generateAdditional_changesWhenExcludedResumeIdsChange() {
+        ProposalPosition position = createBasePosition(createBaseProposal());
+
+        String fp1 = generator.generateAdditional(
+                position,
+                RecommendationAlgorithm.HEURISTIC_V1,
+                10,
+                List.of(1L, 2L)
+        );
+        String fp2 = generator.generateAdditional(
+                position,
+                RecommendationAlgorithm.HEURISTIC_V1,
+                10,
+                List.of(1L, 3L)
+        );
+
+        assertThat(fp1).isNotEqualTo(fp2);
+    }
+
+    @Test
+    @DisplayName("추가 추천 fingerprint는 제외 이력서 id가 null 또는 empty여도 안정적으로 생성된다")
+    void generateAdditional_nullAndEmptyExcludedResumeIdsAreEquivalent() {
+        ProposalPosition position = createBasePosition(createBaseProposal());
+
+        String nullExcludedFingerprint = generator.generateAdditional(
+                position,
+                RecommendationAlgorithm.HEURISTIC_V1,
+                10,
+                null
+        );
+        String emptyExcludedFingerprint = generator.generateAdditional(
+                position,
+                RecommendationAlgorithm.HEURISTIC_V1,
+                10,
+                List.of()
+        );
+
+        assertThat(nullExcludedFingerprint).isEqualTo(emptyExcludedFingerprint);
     }
 
     private Proposal createBaseProposal() {
