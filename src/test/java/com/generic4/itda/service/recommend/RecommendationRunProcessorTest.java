@@ -11,6 +11,7 @@ import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.never;
 
 import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.position.Position;
@@ -140,10 +141,13 @@ class RecommendationRunProcessorTest {
             );
             List<ScoredCandidate> scoredCandidates = List.of();
             List<RecommendationResult> results = List.of(org.mockito.Mockito.mock(RecommendationResult.class));
+            List<Long> excludedResumeIds = List.of(303L, 404L);
 
             given(recommendationRunRepository.findById(1L))
                     .willReturn(Optional.of(run));
-            given(recommendationCandidateFinder.findCandidates(run.getProposalPosition(), run.getTopK()))
+            given(recommendationResultRepository.findRecommendedResumeIdsByProposalPositionIdExceptRunId(any(), any()))
+                    .willReturn(excludedResumeIds);
+            given(recommendationCandidateFinder.findCandidates(run.getProposalPosition(), run.getTopK(), excludedResumeIds))
                     .willReturn(candidates);
             given(recommendationScorer.score(
                     any(),
@@ -165,6 +169,8 @@ class RecommendationRunProcessorTest {
             assertThat(run.getStatus()).isEqualTo(RecommendationRunStatus.COMPUTED);
             assertThat(run.getCandidateCount()).isEqualTo(1);
             assertThat(run.getHardFilterStats()).isEqualTo(new HardFilterStat(2, 1));
+            then(recommendationCandidateFinder).should()
+                    .findCandidates(proposalPosition, run.getTopK(), excludedResumeIds);
             then(recommendationScorer).should().score(
                     proposalPosition.getProposal(),
                     proposalPosition,
@@ -193,7 +199,7 @@ class RecommendationRunProcessorTest {
 
         given(recommendationRunRepository.findById(1L))
                 .willReturn(Optional.of(run));
-        given(recommendationCandidateFinder.findCandidates(run.getProposalPosition(), run.getTopK()))
+        given(recommendationCandidateFinder.findCandidates(eq(run.getProposalPosition()), eq(run.getTopK()), anyList()))
                 .willThrow(new RuntimeException("하드 필터 계산 실패"));
 
         assertThatCode(() -> recommendationRunProcessor.process(1L))
@@ -203,7 +209,7 @@ class RecommendationRunProcessorTest {
         assertThat(run.getErrorMessage()).isEqualTo("하드 필터 계산 실패");
         then(recommendationScorer).shouldHaveNoInteractions();
         then(recommendationResultCreator).shouldHaveNoInteractions();
-        then(recommendationResultRepository).shouldHaveNoInteractions();
+        then(recommendationResultRepository).should(never()).saveAll(anyList());
     }
 
     @Test
@@ -224,7 +230,7 @@ class RecommendationRunProcessorTest {
 
         given(recommendationRunRepository.findById(1L))
                 .willReturn(Optional.of(run));
-        given(recommendationCandidateFinder.findCandidates(run.getProposalPosition(), run.getTopK()))
+        given(recommendationCandidateFinder.findCandidates(eq(run.getProposalPosition()), eq(run.getTopK()), anyList()))
                 .willReturn(candidates);
         given(recommendationQueryTextGenerator.generate(
                 proposalPosition.getProposal(),
@@ -281,7 +287,7 @@ class RecommendationRunProcessorTest {
 
         given(recommendationRunRepository.findById(1L))
                 .willReturn(Optional.of(run));
-        given(recommendationCandidateFinder.findCandidates(run.getProposalPosition(), run.getTopK()))
+        given(recommendationCandidateFinder.findCandidates(eq(run.getProposalPosition()), eq(run.getTopK()), anyList()))
                 .willReturn(candidates);
         given(recommendationQueryTextGenerator.generate(
                 proposalPosition.getProposal(),
@@ -299,7 +305,7 @@ class RecommendationRunProcessorTest {
         assertThat(run.getStatus()).isEqualTo(RecommendationRunStatus.FAILED);
         assertThat(run.getErrorMessage()).isEqualTo("임베딩 실패");
         then(recommendationResultCreator).shouldHaveNoInteractions();
-        then(recommendationResultRepository).shouldHaveNoInteractions();
+        then(recommendationResultRepository).should(never()).saveAll(anyList());
     }
 
     @Test
@@ -314,7 +320,7 @@ class RecommendationRunProcessorTest {
 
         given(recommendationRunRepository.findById(1L))
                 .willReturn(Optional.of(run));
-        given(recommendationCandidateFinder.findCandidates(run.getProposalPosition(), run.getTopK()))
+        given(recommendationCandidateFinder.findCandidates(eq(run.getProposalPosition()), eq(run.getTopK()), anyList()))
                 .willReturn(candidates);
         given(recommendationScorer.score(
                 any(),
@@ -330,7 +336,7 @@ class RecommendationRunProcessorTest {
         assertThat(run.getStatus()).isEqualTo(RecommendationRunStatus.FAILED);
         assertThat(run.getErrorMessage()).isEqualTo("scorer 계산 실패");
         then(recommendationResultCreator).shouldHaveNoInteractions();
-        then(recommendationResultRepository).shouldHaveNoInteractions();
+        then(recommendationResultRepository).should(never()).saveAll(anyList());
     }
 
     @Test
@@ -345,7 +351,7 @@ class RecommendationRunProcessorTest {
 
         given(recommendationRunRepository.findById(1L))
                 .willReturn(Optional.of(run));
-        given(recommendationCandidateFinder.findCandidates(run.getProposalPosition(), run.getTopK()))
+        given(recommendationCandidateFinder.findCandidates(eq(run.getProposalPosition()), eq(run.getTopK()), anyList()))
                 .willReturn(candidates);
         given(recommendationScorer.score(
                 any(),
@@ -361,7 +367,7 @@ class RecommendationRunProcessorTest {
         assertThat(run.getStatus()).isEqualTo(RecommendationRunStatus.FAILED);
         assertThat(run.getErrorMessage()).isEqualTo("추천 실행 중 오류가 발생했습니다.");
         then(recommendationResultCreator).shouldHaveNoInteractions();
-        then(recommendationResultRepository).shouldHaveNoInteractions();
+        then(recommendationResultRepository).should(never()).saveAll(anyList());
     }
 
     @Test
@@ -371,7 +377,7 @@ class RecommendationRunProcessorTest {
 
         given(recommendationRunRepository.findById(1L))
                 .willReturn(Optional.of(run));
-        given(recommendationCandidateFinder.findCandidates(run.getProposalPosition(), run.getTopK()))
+        given(recommendationCandidateFinder.findCandidates(eq(run.getProposalPosition()), eq(run.getTopK()), anyList()))
                 .willThrow(new RuntimeException());
 
         assertThatCode(() -> recommendationRunProcessor.process(1L))
@@ -388,7 +394,7 @@ class RecommendationRunProcessorTest {
 
         given(recommendationRunRepository.findById(1L))
                 .willReturn(Optional.of(run));
-        given(recommendationCandidateFinder.findCandidates(run.getProposalPosition(), run.getTopK()))
+        given(recommendationCandidateFinder.findCandidates(eq(run.getProposalPosition()), eq(run.getTopK()), anyList()))
                 .willThrow(new RuntimeException("   "));
 
         assertThatCode(() -> recommendationRunProcessor.process(1L))
@@ -409,7 +415,7 @@ class RecommendationRunProcessorTest {
 
         given(recommendationRunRepository.findById(1L))
                 .willReturn(Optional.of(run));
-        given(recommendationCandidateFinder.findCandidates(run.getProposalPosition(), run.getTopK()))
+        given(recommendationCandidateFinder.findCandidates(eq(run.getProposalPosition()), eq(run.getTopK()), anyList()))
                 .willReturn(candidates);
         given(recommendationScorer.score(
                 any(),
@@ -448,7 +454,7 @@ class RecommendationRunProcessorTest {
 
         given(recommendationRunRepository.findById(1L))
                 .willReturn(Optional.of(run));
-        given(recommendationCandidateFinder.findCandidates(run.getProposalPosition(), run.getTopK()))
+        given(recommendationCandidateFinder.findCandidates(eq(run.getProposalPosition()), eq(run.getTopK()), anyList()))
                 .willReturn(candidates);
         given(recommendationScorer.score(
                 any(),
@@ -547,7 +553,7 @@ class RecommendationRunProcessorTest {
 
         given(recommendationRunRepository.findById(1L))
                 .willReturn(Optional.of(run));
-        given(recommendationCandidateFinder.findCandidates(run.getProposalPosition(), run.getTopK()))
+        given(recommendationCandidateFinder.findCandidates(eq(run.getProposalPosition()), eq(run.getTopK()), anyList()))
                 .willReturn(candidates);
         given(recommendationScorer.score(
                 any(),

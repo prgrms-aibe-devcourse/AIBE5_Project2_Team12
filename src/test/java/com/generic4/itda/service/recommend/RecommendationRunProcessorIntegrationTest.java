@@ -95,7 +95,8 @@ class RecommendationRunProcessorIntegrationTest {
                 "resume-owner-happy@test.com"
         );
 
-        given(recommendationCandidateFinder.findCandidates(any(), anyInt())).willReturn(List.of(prepared.candidate()));
+        given(recommendationCandidateFinder.findCandidates(any(), anyInt(), anyList()))
+                .willReturn(List.of(prepared.candidate()));
         given(recommendationScorer.score(any(), any(), anySet(), anySet(), anyList())).willReturn(List.of(prepared.scoredCandidate()));
         given(recommendationResultCreator.create(any(), anyList(), anyInt(), anySet())).willReturn(List.of(prepared.result()));
         given(recommendationReasonGenerator.generate(any())).willReturn("  Java 경험이 적합합니다.  ");
@@ -139,7 +140,7 @@ class RecommendationRunProcessorIntegrationTest {
         // given
         RunFixture fixture = createRunningRunFixture("proc-fail@test.com", "fp-fail");
 
-        given(recommendationCandidateFinder.findCandidates(any(), anyInt()))
+        given(recommendationCandidateFinder.findCandidates(any(), anyInt(), anyList()))
                 .willThrow(new RuntimeException("후보 조회 중 오류 발생"));
 
         entityManager.flush();
@@ -171,7 +172,8 @@ class RecommendationRunProcessorIntegrationTest {
                 "resume-owner-reason-fail@test.com"
         );
 
-        given(recommendationCandidateFinder.findCandidates(any(), anyInt())).willReturn(List.of(prepared.candidate()));
+        given(recommendationCandidateFinder.findCandidates(any(), anyInt(), anyList()))
+                .willReturn(List.of(prepared.candidate()));
         given(recommendationScorer.score(any(), any(), anySet(), anySet(), anyList())).willReturn(List.of(prepared.scoredCandidate()));
         given(recommendationResultCreator.create(any(), anyList(), anyInt(), anySet())).willReturn(List.of(prepared.result()));
         given(recommendationReasonGenerator.generate(any())).willThrow(new RuntimeException("추천 이유 생성 실패"));
