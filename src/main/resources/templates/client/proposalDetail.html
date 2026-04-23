@@ -58,7 +58,13 @@
                                th:href="@{/proposals/{id}/recommendations(id=${proposal.id})}"
                                class="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-100 transition hover:bg-blue-700">
                                 <i data-lucide="sparkles" class="h-4 w-4"></i>
-                                추천 결과 보기
+                                추천 받아 보기
+                            </a>
+                            <a th:if="${proposal.status.name() == 'MATCHING'}"
+                               th:href="@{/proposals/{id}/matchings(id=${proposal.id})}"
+                               class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600">
+                                <i data-lucide="activity" class="h-4 w-4"></i>
+                                매칭 결과 보기
                             </a>
                             
                             <span th:if="${proposal.status.name() == 'COMPLETE'}"
@@ -66,6 +72,12 @@
                                 <i data-lucide="badge-check" class="h-4 w-4"></i>
                                 완료된 프로젝트
                             </span>
+                            <a th:if="${proposal.status.name() == 'COMPLETE'}"
+                               th:href="@{/proposals/{id}/matchings(id=${proposal.id})}"
+                               class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600">
+                                <i data-lucide="activity" class="h-4 w-4"></i>
+                                매칭 결과 보기
+                            </a>
                         </th:block>
 
                          
@@ -131,7 +143,18 @@
                                                  거절하기
                                              </button>
                                          </form>
+                                         <a th:href="@{/matchings/{id}(id=${myMatching.id})}"
+                                            class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600">
+                                             <i data-lucide="activity" class="h-4 w-4"></i>
+                                             매칭 결과 보기
+                                         </a>
                                      </th:block>
+                                     <a th:if="${myMatching != null and myMatching.status.name() != 'PROPOSED'}"
+                                        th:href="@{/matchings/{id}(id=${myMatching.id})}"
+                                        class="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-100 transition hover:bg-blue-700">
+                                         <i data-lucide="activity" class="h-4 w-4"></i>
+                                         매칭 결과 보기
+                                     </a>
                                  </th:block>
 
                                  <th:block th:if="${#lists.size(proposedPositions) > 1}">
@@ -162,6 +185,10 @@
                                                                  거절
                                                              </button>
                                                          </form>
+                                                         <a th:href="@{/matchings/{id}(id=${myMatching.id})}"
+                                                            class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600">
+                                                             결과 보기
+                                                         </a>
                                                      </div>
                                                  </div>
                                              </th:block>
