@@ -29,6 +29,7 @@ import com.generic4.itda.domain.resume.Resume;
 import com.generic4.itda.domain.resume.ResumeWritingStatus;
 import com.generic4.itda.domain.resume.WorkType;
 import com.generic4.itda.repository.MatchingRepository;
+import com.generic4.itda.repository.ProposalPositionRepository;
 import com.generic4.itda.repository.RecommendationResultRepository;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -59,6 +60,9 @@ class MatchingServiceTest {
 
     @Mock
     private MatchingRepository matchingRepository;
+
+    @Mock
+    private ProposalPositionRepository proposalPositionRepository;
 
     @Test
     @DisplayName("클라이언트는 추천 결과를 기준으로 PROPOSED 매칭 요청을 생성할 수 있다")
@@ -194,6 +198,8 @@ class MatchingServiceTest {
         );
 
         given(matchingRepository.findDetailById(401L)).willReturn(Optional.of(matching));
+        given(proposalPositionRepository.findByIdForUpdate(201L))
+                .willReturn(Optional.of(matching.getProposalPosition()));
         given(matchingRepository.countByProposalPosition_IdAndStatusIn(
                 eq(201L),
                 eq(EnumSet.of(MatchingStatus.ACCEPTED, MatchingStatus.IN_PROGRESS))
@@ -205,6 +211,7 @@ class MatchingServiceTest {
         assertThat(accepted.getAcceptedAt()).isNotNull();
         assertThat(accepted.getRejectedAt()).isNull();
         assertThat(accepted.getProposalPosition().getStatus()).isEqualTo(ProposalPositionStatus.FULL);
+        verify(proposalPositionRepository).findByIdForUpdate(201L);
     }
 
     @Test
@@ -217,6 +224,8 @@ class MatchingServiceTest {
         );
 
         given(matchingRepository.findDetailById(401L)).willReturn(Optional.of(matching));
+        given(proposalPositionRepository.findByIdForUpdate(201L))
+                .willReturn(Optional.of(matching.getProposalPosition()));
         given(matchingRepository.countByProposalPosition_IdAndStatusIn(
                 eq(201L),
                 eq(EnumSet.of(MatchingStatus.ACCEPTED, MatchingStatus.IN_PROGRESS))
@@ -240,6 +249,8 @@ class MatchingServiceTest {
         );
 
         given(matchingRepository.findDetailById(401L)).willReturn(Optional.of(matching));
+        given(proposalPositionRepository.findByIdForUpdate(201L))
+                .willReturn(Optional.of(matching.getProposalPosition()));
         given(matchingRepository.countByProposalPosition_IdAndStatusIn(
                 eq(201L),
                 eq(EnumSet.of(MatchingStatus.ACCEPTED, MatchingStatus.IN_PROGRESS))
@@ -264,6 +275,8 @@ class MatchingServiceTest {
         );
 
         given(matchingRepository.findDetailById(401L)).willReturn(Optional.of(matching));
+        given(proposalPositionRepository.findByIdForUpdate(201L))
+                .willReturn(Optional.of(matching.getProposalPosition()));
 
         assertThatThrownBy(() -> matchingService.accept(401L, "freelancer@example.com"))
                 .isInstanceOf(IllegalStateException.class)

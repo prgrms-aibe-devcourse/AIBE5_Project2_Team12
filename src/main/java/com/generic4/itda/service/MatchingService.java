@@ -11,6 +11,7 @@ import com.generic4.itda.domain.proposal.ProposalStatus;
 import com.generic4.itda.domain.recommendation.RecommendationResult;
 import com.generic4.itda.domain.resume.Resume;
 import com.generic4.itda.repository.MatchingRepository;
+import com.generic4.itda.repository.ProposalPositionRepository;
 import com.generic4.itda.repository.RecommendationResultRepository;
 import java.time.LocalDateTime;
 import java.util.EnumSet;
@@ -37,6 +38,7 @@ public class MatchingService {
 
     private final RecommendationResultRepository recommendationResultRepository;
     private final MatchingRepository matchingRepository;
+    private final ProposalPositionRepository proposalPositionRepository;
 
     public Matching request(Long recommendationResultId, String clientEmail) {
         RecommendationResult recommendationResult = recommendationResultRepository.findDetailById(recommendationResultId)
@@ -65,11 +67,12 @@ public class MatchingService {
                 .orElseThrow(() -> new IllegalArgumentException("매칭 요청을 찾을 수 없습니다. id=" + matchingId));
 
         validateFreelancerOwnership(matching, freelancerEmail);
-        validatePositionRespondable(matching.getProposalPosition());
-        validateCapacityAvailable(matching.getProposalPosition());
+        ProposalPosition proposalPosition = lockProposalPosition(matching.getProposalPosition());
+        validatePositionRespondable(proposalPosition);
+        validateCapacityAvailable(proposalPosition);
 
         matching.accept();
-        updatePositionStatusAfterAccept(matching.getProposalPosition());
+        updatePositionStatusAfterAccept(proposalPosition);
         return matching;
     }
 
@@ -191,6 +194,11 @@ public class MatchingService {
         if (!matching.getFreelancerMember().getEmail().getValue().equals(freelancerEmail)) {
             throw new AccessDeniedException("본인에게 온 매칭 요청에만 응답할 수 있습니다.");
         }
+    }
+
+    private ProposalPosition lockProposalPosition(ProposalPosition proposalPosition) {
+        return proposalPositionRepository.findByIdForUpdate(proposalPosition.getId())
+                .orElseThrow(() -> new IllegalStateException("모집 포지션을 찾을 수 없습니다."));
     }
 
     private MatchingParticipantRole resolveParticipantRole(Matching matching, String email) {
