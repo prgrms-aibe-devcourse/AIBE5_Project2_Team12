@@ -214,7 +214,8 @@ public class RecommendationRunQueryService {
         return skills.stream()
                 .map(skill -> new RecommendationResumeSkillItem(
                         skill.getSkill().getName(),
-                        skill.getProficiency().getDescription()
+                        skill.getProficiency().getDescription(),
+                        skill.getProficiency().name()
                 ))
                 .toList();
     }

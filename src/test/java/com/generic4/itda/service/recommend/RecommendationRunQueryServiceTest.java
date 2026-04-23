@@ -20,8 +20,12 @@ import com.generic4.itda.domain.recommendation.constant.RecommendationAlgorithm;
 import com.generic4.itda.domain.recommendation.constant.RecommendationRunStatus;
 import com.generic4.itda.domain.recommendation.vo.HardFilterStat;
 import com.generic4.itda.domain.recommendation.vo.ReasonFacts;
+import com.generic4.itda.domain.resume.Proficiency;
 import com.generic4.itda.domain.resume.Resume;
+import com.generic4.itda.domain.resume.ResumeSkill;
+import com.generic4.itda.domain.resume.ResumeSkillComparator;
 import com.generic4.itda.domain.resume.WorkType;
+import com.generic4.itda.domain.skill.Skill;
 import com.generic4.itda.dto.matching.LatestMatchingSummary;
 import com.generic4.itda.dto.profile.ProfileAccessLevel;
 import com.generic4.itda.dto.profile.ProfileContextType;
@@ -36,6 +40,8 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -160,7 +166,9 @@ class RecommendationRunQueryServiceTest {
         given(resume.getIntroduction()).willReturn("소개글");
         given(resume.getPreferredWorkType()).willReturn(WorkType.HYBRID);
         given(resume.getPortfolioUrl()).willReturn("https://example.com");
-        given(resume.getSkills()).willReturn(null);
+        given(resume.getSkills()).willReturn(skills(
+                ResumeSkill.create(resume, Skill.create("Java", null), Proficiency.ADVANCED)
+        ));
         given(resume.getCareer()).willReturn(null);
 
         ReasonFacts facts = new ReasonFacts(List.of(), List.of(), 3, List.of());
@@ -186,6 +194,9 @@ class RecommendationRunQueryServiceTest {
         assertThat(view.resultId()).isEqualTo(RESULT_ID);
         assertThat(view.candidate().matchingId()).isEqualTo(matchingId);
         assertThat(view.candidate().matchingStatus()).isEqualTo("IN_PROGRESS");
+        assertThat(view.resumeSkills()).hasSize(1);
+        assertThat(view.resumeSkills().get(0).proficiencyLabel()).isEqualTo("고급");
+        assertThat(view.resumeSkills().get(0).proficiencyCode()).isEqualTo("ADVANCED");
 
         var profile = view.profile();
         assertThat(profile.subjectType()).isEqualTo(ProfileSubjectType.FREELANCER);
@@ -195,6 +206,7 @@ class RecommendationRunQueryServiceTest {
         assertThat(profile.subtitle()).isEqualTo("Test Proposal · Backend Dev");
         assertThat(profile.freelancer().displayName()).isEqualTo("이*신");
         assertThat(profile.freelancer().introduction()).isEqualTo("소개글");
+        assertThat(profile.freelancer().skills().get(0).proficiencyCode()).isEqualTo("ADVANCED");
         assertThat(profile.recommendationContext().matchingId()).isEqualTo(matchingId);
         assertThat(profile.recommendationContext().matchingStatus()).isEqualTo("IN_PROGRESS");
         assertThat(profile.recommendationContext().active()).isTrue();
@@ -364,5 +376,11 @@ class RecommendationRunQueryServiceTest {
                 run.markFailed("추천 생성 실패");
             }
         }
+    }
+
+    private static SortedSet<ResumeSkill> skills(ResumeSkill... items) {
+        SortedSet<ResumeSkill> skills = new TreeSet<>(new ResumeSkillComparator());
+        skills.addAll(List.of(items));
+        return skills;
     }
 }

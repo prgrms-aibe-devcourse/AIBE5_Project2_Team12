@@ -1,11 +1,13 @@
 package com.generic4.itda.controller;
 
 import static com.generic4.itda.fixture.MemberFixture.createMember;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
@@ -169,7 +171,7 @@ class RecommendationControllerTest {
                         "PROPOSED"   // matchingStatus
                 ),
                 "https://example.com",
-                List.of(new RecommendationResumeSkillItem("Java", "고급")),
+                List.of(new RecommendationResumeSkillItem("Java", "고급", "ADVANCED")),
                 List.of(new RecommendationResumeCareerItem(
                         "ACME",
                         "Backend",
@@ -192,7 +194,8 @@ class RecommendationControllerTest {
                         ))))
                 .andExpect(status().isOk())
                 .andExpect(view().name("recommendation/resume"))
-                .andExpect(model().attributeExists("view"));
+                .andExpect(model().attributeExists("view"))
+                .andExpect(content().string(containsString("text-amber-600")));
 
         then(recommendationRunQueryService).should()
                 .getRecommendationCandidateResume(eq(PROPOSAL_ID), eq(RESULT_ID), eq("client@example.com"));
