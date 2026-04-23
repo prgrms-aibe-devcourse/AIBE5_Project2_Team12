@@ -2,6 +2,7 @@ package com.generic4.itda.repository;
 
 import com.generic4.itda.dto.freelancer.FreelancerDashboardItem;
 import com.generic4.itda.domain.matching.constant.MatchingStatus;
+import com.generic4.itda.dto.matching.LatestMatchingSummary;
 
 import java.util.Collection;
 import java.util.List;
@@ -21,4 +22,8 @@ public interface MatchingRepositoryCustom {
      * 단일 후보의 대표 매칭 상태를 조회한다(ACTIVE 우선, 없으면 최신).
      */
     Optional<MatchingStatus> getLatestMatchingStatus(Long proposalPositionId, Long resumeId);
+
+    Map<Long, LatestMatchingSummary> getLatestMatchingSummaryMap(Long proposalPositionId, Collection<Long> resumeIds);
+
+    Optional<LatestMatchingSummary> getLatestMatchingSummary(Long proposalPositionId, Long resumeId);
 }
