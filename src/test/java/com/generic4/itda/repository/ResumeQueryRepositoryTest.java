@@ -240,6 +240,57 @@ class ResumeQueryRepositoryTest {
                 .containsExactly(otherResume.getId());
     }
 
+    @DisplayName("findCandidatePool은 명시된 이력서를 후보 풀에서 제외한다")
+    @Test
+    void findCandidatePool_excludesExplicitResumeIds() {
+        // given
+        Skill java = skillRepository.saveAndFlush(Skill.create("Java-query-pool-exclude", null));
+        Skill spring = skillRepository.saveAndFlush(Skill.create("Spring-query-pool-exclude", null));
+
+        Resume excludedStrongest = saveResume(
+                "pool-exclude-strongest",
+                (byte) 20,
+                true,
+                true,
+                true,
+                skill(java, Proficiency.ADVANCED),
+                skill(spring, Proficiency.ADVANCED)
+        );
+        Resume includedHigherScore = saveResume(
+                "pool-exclude-included-high",
+                (byte) 10,
+                true,
+                true,
+                true,
+                skill(java, Proficiency.ADVANCED),
+                skill(spring, Proficiency.INTERMEDIATE)
+        );
+        Resume includedLowerScore = saveResume(
+                "pool-exclude-included-low",
+                (byte) 7,
+                true,
+                true,
+                true,
+                skill(java, Proficiency.INTERMEDIATE),
+                skill(spring, Proficiency.INTERMEDIATE)
+        );
+
+        // when
+        List<CandidatePoolRow> result = resumeQueryRepository.findCandidatePool(
+                createProposalPosition(null),
+                List.of(java.getId(), spring.getId()),
+                List.of(excludedStrongest.getId()),
+                10
+        );
+
+        // then
+        assertThat(result).extracting(CandidatePoolRow::resumeId)
+                .containsExactly(
+                        includedHigherScore.getId(),
+                        includedLowerScore.getId()
+                );
+    }
+
     @DisplayName("findCandidatePool은 근무 형태 정책 조합에 따라 후보를 필터링한다")
     @ParameterizedTest(name = "proposalWorkType={0}")
     @MethodSource("workTypePolicyCases")
@@ -353,6 +404,28 @@ class ResumeQueryRepositoryTest {
 
         // then
         assertThat(result).containsExactly(otherResume.getId());
+    }
+
+    @DisplayName("findRecommendableResumeIds는 명시된 이력서를 fallback 후보에서 제외한다")
+    @Test
+    void findRecommendableResumeIds_excludesExplicitResumeIds() {
+        // given
+        Resume excludedHighestCareer = saveResume("recommend-exclude-highest", (byte) 10, true, true, true);
+        Resume includedMediumCareerLowId = saveResume("recommend-exclude-medium-low-id", (byte) 5, true, true, true);
+        Resume includedMediumCareerHighId = saveResume("recommend-exclude-medium-high-id", (byte) 5, true, true, true);
+
+        // when
+        List<Long> result = resumeQueryRepository.findRecommendableResumeIds(
+                createProposalPosition(null),
+                List.of(excludedHighestCareer.getId()),
+                10
+        );
+
+        // then
+        assertThat(result).containsExactly(
+                includedMediumCareerLowId.getId(),
+                includedMediumCareerHighId.getId()
+        );
     }
 
     @DisplayName("findRecommendableResumeIds는 fallback 조회 경로에서도 근무 형태 정책 조합을 적용한다")

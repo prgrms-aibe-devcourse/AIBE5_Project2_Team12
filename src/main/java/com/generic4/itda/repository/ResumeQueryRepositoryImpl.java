@@ -33,6 +33,24 @@ public class ResumeQueryRepositoryImpl implements ResumeQueryRepository {
             List<Long> requiredSkillIds,
             int candidatePoolSize
     ) {
+        return findCandidatePool(proposalPosition, requiredSkillIds, List.of(), candidatePoolSize);
+    }
+
+    @Override
+    public List<Long> findRecommendableResumeIds(
+            ProposalPosition proposalPosition,
+            int candidatePoolSize
+    ) {
+        return findRecommendableResumeIds(proposalPosition, List.of(), candidatePoolSize);
+    }
+
+    @Override
+    public List<CandidatePoolRow> findCandidatePool(
+            ProposalPosition proposalPosition,
+            List<Long> requiredSkillIds,
+            List<Long> excludedResumeIds,
+            int candidatePoolSize
+    ) {
         NumberExpression<Integer> proficiencySquaredSum = new CaseBuilder()
                 .when(resumeSkill.proficiency.eq(Proficiency.BEGINNER)).then(1)
                 .when(resumeSkill.proficiency.eq(Proficiency.INTERMEDIATE)).then(4)
@@ -56,6 +74,7 @@ public class ResumeQueryRepositoryImpl implements ResumeQueryRepository {
                         recommendable(),
                         workTypeMatches(proposalPosition),
                         excludeProposalOwner(proposalPosition),
+                        excludeResumeIds(excludedResumeIds),
                         resumeSkill.skill.id.in(requiredSkillIds)
                 )
                 .groupBy(resume.id, resume.careerYears)
@@ -72,6 +91,7 @@ public class ResumeQueryRepositoryImpl implements ResumeQueryRepository {
     @Override
     public List<Long> findRecommendableResumeIds(
             ProposalPosition proposalPosition,
+            List<Long> excludedResumeIds,
             int candidatePoolSize
     ) {
         return queryFactory
@@ -80,7 +100,8 @@ public class ResumeQueryRepositoryImpl implements ResumeQueryRepository {
                 .where(
                         recommendable(),
                         workTypeMatches(proposalPosition),
-                        excludeProposalOwner(proposalPosition)
+                        excludeProposalOwner(proposalPosition),
+                        excludeResumeIds(excludedResumeIds)
                 )
                 .orderBy(
                         resume.careerYears.desc(),
@@ -114,5 +135,12 @@ public class ResumeQueryRepositoryImpl implements ResumeQueryRepository {
     private BooleanExpression excludeProposalOwner(ProposalPosition proposalPosition) {
         Long proposalOwnerId = proposalPosition.getProposal().getMember().getId();
         return resume.member.id.ne(proposalOwnerId);
+    }
+
+    private BooleanExpression excludeResumeIds(List<Long> excludedResumeIds) {
+        if (excludedResumeIds == null || excludedResumeIds.isEmpty()) {
+            return null;
+        }
+        return resume.id.notIn(excludedResumeIds);
     }
 }
