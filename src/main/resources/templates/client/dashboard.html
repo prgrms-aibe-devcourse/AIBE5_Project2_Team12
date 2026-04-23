@@ -182,7 +182,7 @@
     </main>
 
     <!-- 공유 액션 메뉴 (position: fixed로 overflow-hidden 부모 탈출) -->
-    <div id="actionMenu" class="hidden fixed z-40 w-52 rounded-2xl border border-slate-200 bg-white py-2 shadow-lg shadow-slate-200/80">
+    <div id="actionMenu" class="hidden fixed z-[9999] w-52 rounded-2xl border border-slate-200 bg-white py-2 shadow-lg shadow-slate-200/80">
         <a id="menuDetail" href="#"
            class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
             <i data-lucide="file-text" class="h-4 w-4 text-slate-400"></i>제안서 상세 보기
@@ -194,6 +194,10 @@
         <a id="menuRecommend" href="#"
            class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
             <i data-lucide="sparkles" class="h-4 w-4 text-slate-400"></i>추천 결과 보기
+        </a>
+        <a id="menuMatching" href="#"
+           class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            <i data-lucide="activity" class="h-4 w-4 text-slate-400"></i>매칭 결과 보기
         </a>
         <div id="menuDeleteDivider" class="my-1 border-t border-slate-100"></div>
         <button id="menuDelete" type="button"
@@ -316,9 +320,15 @@
         var menuDetail    = document.getElementById('menuDetail');
         var menuEdit      = document.getElementById('menuEdit');
         var menuRecommend = document.getElementById('menuRecommend');
+        var menuMatching  = document.getElementById('menuMatching');
         var menuDeleteDiv = document.getElementById('menuDeleteDivider');
         var menuDelete    = document.getElementById('menuDelete');
         var menuOpen      = false;
+
+        // 레이아웃 컨테이너(overflow/transform)의 영향을 피하기 위해 body 아래로 이동
+        if (actionMenu && actionMenu.parentElement !== document.body) {
+            document.body.appendChild(actionMenu);
+        }
 
         function closeActionMenu() {
             if (!menuOpen) return;
@@ -335,12 +345,14 @@
             menuDetail.href    = '/proposals/' + proposalId;
             menuEdit.href      = '/proposals/' + proposalId + '/edit';
             menuRecommend.href = '/proposals/' + proposalId + '/recommendations';
+            menuMatching.href  = '/proposals/' + proposalId + '/matchings';
             menuDelete.dataset.proposalId    = proposalId;
             menuDelete.dataset.proposalTitle = proposalTitle;
 
             // 상태별 항목 표시/숨김
             menuEdit.classList.toggle('hidden', statusKey === 'COMPLETE');
             menuRecommend.classList.toggle('hidden', statusKey === 'WRITING');
+            menuMatching.classList.toggle('hidden', !(statusKey === 'MATCHING' || statusKey === 'COMPLETE'));
             var showDelete = statusKey === 'WRITING';
             menuDeleteDiv.classList.toggle('hidden', !showDelete);
             menuDelete.classList.toggle('hidden', !showDelete);
