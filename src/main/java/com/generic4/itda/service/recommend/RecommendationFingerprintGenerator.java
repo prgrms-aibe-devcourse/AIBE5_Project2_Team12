@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Comparator;
+import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
@@ -38,6 +39,43 @@ public class RecommendationFingerprintGenerator {
 
                 "recommendation.algorithm=" + algorithm.name(),
                 "recommendation.topK=" + topK
+        );
+
+        return sha256(raw);
+    }
+
+    public String generateAdditional(
+            ProposalPosition proposalPosition,
+            RecommendationAlgorithm algorithm,
+            int topK,
+            List<Long> excludedResumeIds
+    ) {
+        String skillPart = proposalPosition.getSkills().stream()
+                .sorted(Comparator.comparing((ProposalPositionSkill skill) -> skill.getSkill().getName())
+                        .thenComparing(skill -> skill.getImportance().name()))
+                .map(this::toSkillToken)
+                .collect(Collectors.joining("|"));
+
+        String excludePart = excludedResumeIds == null ? "" : excludedResumeIds.stream()
+                .sorted()
+                .map(String::valueOf)
+                .collect(Collectors.joining(","));
+
+        String raw = String.join("::",
+                "proposalPosition.id=" + number(proposalPosition.getId()),
+                "proposalPosition.positionId=" + number(proposalPosition.getPosition().getId()),
+                "proposalPosition.workType=" + enumName(proposalPosition.getWorkType()),
+                "proposalPosition.careerMinYears=" + number(proposalPosition.getCareerMinYears()),
+                "proposalPosition.careerMaxYears=" + number(proposalPosition.getCareerMaxYears()),
+
+                "proposalPosition.unitBudgetMin=" + number(proposalPosition.getUnitBudgetMin()),
+                "proposalPosition.unitBudgetMax=" + number(proposalPosition.getUnitBudgetMax()),
+
+                "proposalPosition.skills=" + skillPart,
+
+                "recommendation.algorithm=" + algorithm.name(),
+                "recommendation.topK=" + topK,
+                "recommendation.excludedResumeIds=" + excludePart
         );
 
         return sha256(raw);

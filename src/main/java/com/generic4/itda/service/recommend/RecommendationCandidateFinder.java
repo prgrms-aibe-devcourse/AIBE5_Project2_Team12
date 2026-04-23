@@ -5,10 +5,13 @@ import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
 import com.generic4.itda.domain.resume.Resume;
 import com.generic4.itda.repository.ResumeQueryRepository;
 import com.generic4.itda.repository.ResumeRepository;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -24,17 +27,35 @@ public class RecommendationCandidateFinder {
     private final ResumeQueryRepository resumeQueryRepository;
     private final ResumeRepository resumeRepository;
 
-    public List<RecommendationCandidate> findCandidates(ProposalPosition proposalPosition, int topK) {
+    public List<RecommendationCandidate> findCandidates(
+            ProposalPosition proposalPosition,
+            int topK
+    ) {
+        return findCandidates(proposalPosition, topK, List.of());
+    }
+
+    public List<RecommendationCandidate> findCandidates(
+            ProposalPosition proposalPosition,
+            int topK,
+            List<Long> excludedResumeIds
+    ) {
         List<Long> requiredSkillIds = extractRequiredSkillIds(proposalPosition);
         int candidatePoolSize = resolveCandidatePoolSize(topK);
+        List<Long> normalizedExcludedResumeIds = excludedResumeIds == null ? List.of() : excludedResumeIds;
+        Set<Long> excludedSet = new HashSet<>(normalizedExcludedResumeIds);
 
         List<Long> candidateResumeIds;
         if (requiredSkillIds.isEmpty()) {
-            candidateResumeIds = resumeQueryRepository.findRecommendableResumeIds(proposalPosition, candidatePoolSize);
+            candidateResumeIds = resumeQueryRepository.findRecommendableResumeIds(
+                    proposalPosition,
+                    normalizedExcludedResumeIds,
+                    candidatePoolSize
+            );
         } else {
             candidateResumeIds = resumeQueryRepository.findCandidatePool(
                             proposalPosition,
                             requiredSkillIds,
+                            normalizedExcludedResumeIds,
                             candidatePoolSize
                     ).stream()
                     .map(CandidatePoolRow::resumeId)
@@ -50,6 +71,7 @@ public class RecommendationCandidateFinder {
                 .collect(Collectors.toMap(Resume::getId, Function.identity()));
 
         return candidateResumeIds.stream()
+                .filter(Predicate.not(excludedSet::contains))
                 .map(resumeMap::get)
                 .filter(Objects::nonNull)
                 .filter(resume -> passesCareerRange(resume, proposalPosition))

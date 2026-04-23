@@ -9,7 +9,9 @@ import com.generic4.itda.domain.recommendation.RecommendationRun;
 import com.generic4.itda.domain.recommendation.constant.RecommendationAlgorithm;
 import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.ProposalRepository;
+import com.generic4.itda.repository.RecommendationResultRepository;
 import com.generic4.itda.repository.RecommendationRunRepository;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,7 @@ public class RecommendationRunService {
     private final ProposalRepository proposalRepository;
     private final MemberRepository memberRepository;
     private final RecommendationRunRepository recommendationRunRepository;
+    private final RecommendationResultRepository recommendationResultRepository;
     private final RecommendationFingerprintGenerator fingerprintGenerator;
 
     public Long createOrReuse(Long proposalId, Long proposalPositionId, String email) {
@@ -48,6 +51,42 @@ public class RecommendationRunService {
                 proposalPosition,
                 DEFAULT_ALGORITHM,
                 DEFAULT_TOP_K
+        );
+
+        return recommendationRunRepository
+                .findByProposalPosition_IdAndRequestFingerprintAndAlgorithm(
+                        proposalPositionId,
+                        fingerprint,
+                        DEFAULT_ALGORITHM
+                )
+                .map(RecommendationRun::getId)
+                .orElseGet(() -> createNewRun(proposalPosition, fingerprint).getId());
+    }
+
+    public Long createAdditional(Long proposalId, Long proposalPositionId, String email) {
+        Proposal proposal = loadProposalDetail(proposalId);
+
+        Member member = Optional.ofNullable(memberRepository.findByEmail_Value(email))
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다."));
+
+        validateOwnership(proposal, member);
+        validateProposalStatus(proposal);
+
+        ProposalPosition proposalPosition = proposal.getPositions().stream()
+                .filter(position -> position.getId().equals(proposalPositionId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("해당 제안서에 속한 모집 포지션 아닙니다."));
+
+        validatePositionStatus(proposalPosition);
+
+        List<Long> excludedResumeIds = recommendationResultRepository
+                .findRecommendedResumeIdsByProposalPositionId(proposalPositionId);
+
+        String fingerprint = fingerprintGenerator.generateAdditional(
+                proposalPosition,
+                DEFAULT_ALGORITHM,
+                DEFAULT_TOP_K,
+                excludedResumeIds
         );
 
         return recommendationRunRepository

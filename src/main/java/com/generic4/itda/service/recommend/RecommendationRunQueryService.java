@@ -11,10 +11,10 @@ import com.generic4.itda.domain.recommendation.vo.ReasonFacts;
 import com.generic4.itda.domain.resume.Resume;
 import com.generic4.itda.domain.resume.ResumeSkill;
 import com.generic4.itda.dto.recommend.RecommendationCandidateItem;
+import com.generic4.itda.dto.recommend.RecommendationResultsViewModel;
 import com.generic4.itda.dto.recommend.RecommendationResumeCareerItem;
 import com.generic4.itda.dto.recommend.RecommendationResumeDetailViewModel;
 import com.generic4.itda.dto.recommend.RecommendationResumeSkillItem;
-import com.generic4.itda.dto.recommend.RecommendationResultsViewModel;
 import com.generic4.itda.dto.recommend.RecommendationRunStatusViewModel;
 import com.generic4.itda.repository.MatchingRepository;
 import com.generic4.itda.repository.RecommendationResultRepository;
@@ -79,6 +79,7 @@ public class RecommendationRunQueryService {
 
         return new RecommendationResultsViewModel(
                 proposal.getId(),
+                proposalPosition.getId(),
                 run.getId(),
                 proposal.getTitle(),
                 resolvePositionTitle(proposalPosition),

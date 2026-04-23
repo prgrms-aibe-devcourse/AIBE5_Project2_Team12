@@ -16,4 +16,17 @@ public interface ResumeQueryRepository {
             ProposalPosition proposalPosition,
             int candidatePoolSize
     );
+
+    List<CandidatePoolRow> findCandidatePool(
+            ProposalPosition proposalPosition,
+            List<Long> requiredSkillIds,
+            List<Long> excludedResumeIds,
+            int candidatePoolSize
+    );
+
+    List<Long> findRecommendableResumeIds(
+            ProposalPosition proposalPosition,
+            List<Long> excludedResumeIds,
+            int candidatePoolSize
+    );
 }

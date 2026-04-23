@@ -51,7 +51,8 @@ class RecommendationCandidateFinderTest {
         Resume first = createResume(11L, (byte) 7, skillData(101L, "Java", Proficiency.ADVANCED));
         Resume second = createResume(22L, (byte) 5, skillData(102L, "Spring", Proficiency.INTERMEDIATE));
 
-        given(resumeQueryRepository.findRecommendableResumeIds(proposalPosition, 100)).willReturn(List.of(11L, 22L));
+        given(resumeQueryRepository.findRecommendableResumeIds(proposalPosition, List.of(), 100))
+                .willReturn(List.of(11L, 22L));
         given(resumeRepository.findAllWithSkillsByIds(List.of(11L, 22L))).willReturn(List.of(second, first));
 
         // when
@@ -63,7 +64,7 @@ class RecommendationCandidateFinderTest {
         assertThat(result.get(0).skills()).extracting(RecommendationCandidate.CandidateSkill::skillName)
                 .containsExactly("Java");
 
-        verify(resumeQueryRepository).findRecommendableResumeIds(proposalPosition, 100);
+        verify(resumeQueryRepository).findRecommendableResumeIds(proposalPosition, List.of(), 100);
         verify(resumeRepository).findAllWithSkillsByIds(List.of(11L, 22L));
         verifyNoMoreInteractions(resumeQueryRepository, resumeRepository);
     }
@@ -79,10 +80,11 @@ class RecommendationCandidateFinderTest {
         Resume first = createResume(11L, (byte) 9, skillData(101L, "Java", Proficiency.ADVANCED));
         Resume second = createResume(22L, (byte) 4, skillData(101L, "Java", Proficiency.INTERMEDIATE));
 
-        given(resumeQueryRepository.findCandidatePool(proposalPosition, List.of(101L), 120)).willReturn(List.of(
-                new CandidatePoolRow(22L, 1L, 4, (byte) 4),
-                new CandidatePoolRow(11L, 1L, 9, (byte) 9)
-        ));
+        given(resumeQueryRepository.findCandidatePool(proposalPosition, List.of(101L), List.of(), 120))
+                .willReturn(List.of(
+                        new CandidatePoolRow(22L, 1L, 4, (byte) 4),
+                        new CandidatePoolRow(11L, 1L, 9, (byte) 9)
+                ));
         given(resumeRepository.findAllWithSkillsByIds(List.of(22L, 11L))).willReturn(List.of(first, second));
 
         // when
@@ -92,7 +94,62 @@ class RecommendationCandidateFinderTest {
         assertThat(result).extracting(RecommendationCandidate::resumeId)
                 .containsExactly(22L, 11L);
 
-        verify(resumeQueryRepository).findCandidatePool(proposalPosition, List.of(101L), 120);
+        verify(resumeQueryRepository).findCandidatePool(proposalPosition, List.of(101L), List.of(), 120);
+        verify(resumeRepository).findAllWithSkillsByIds(List.of(22L, 11L));
+        verifyNoMoreInteractions(resumeQueryRepository, resumeRepository);
+    }
+
+    @DisplayName("제외 이력서가 있으면 전체 추천 가능 풀 조회에 전달하고 최종 후보에서도 제외한다")
+    @Test
+    void findCandidates_excludesResumeIdsWhenNoEssentialSkills() {
+        // given
+        ProposalPosition proposalPosition = createProposalPosition(
+                skillRequirement(201L, "Communication", ProposalPositionSkillImportance.PREFERENCE)
+        );
+        Resume included = createResume(11L, (byte) 7, skillData(101L, "Java", Proficiency.ADVANCED));
+        Resume excluded = createResume(22L, (byte) 5, skillData(102L, "Spring", Proficiency.INTERMEDIATE));
+
+        given(resumeQueryRepository.findRecommendableResumeIds(proposalPosition, List.of(22L), 100))
+                .willReturn(List.of(22L, 11L));
+        given(resumeRepository.findAllWithSkillsByIds(List.of(22L, 11L))).willReturn(List.of(excluded, included));
+
+        // when
+        List<RecommendationCandidate> result = finder.findCandidates(proposalPosition, 3, List.of(22L));
+
+        // then
+        assertThat(result).extracting(RecommendationCandidate::resumeId)
+                .containsExactly(11L);
+
+        verify(resumeQueryRepository).findRecommendableResumeIds(proposalPosition, List.of(22L), 100);
+        verify(resumeRepository).findAllWithSkillsByIds(List.of(22L, 11L));
+        verifyNoMoreInteractions(resumeQueryRepository, resumeRepository);
+    }
+
+    @DisplayName("제외 이력서가 있으면 필수 스킬 후보 풀 조회에 전달하고 최종 후보에서도 제외한다")
+    @Test
+    void findCandidates_excludesResumeIdsWhenEssentialSkillsExist() {
+        // given
+        ProposalPosition proposalPosition = createProposalPosition(
+                skillRequirement(101L, "Java", ProposalPositionSkillImportance.ESSENTIAL)
+        );
+        Resume included = createResume(11L, (byte) 7, skillData(101L, "Java", Proficiency.ADVANCED));
+        Resume excluded = createResume(22L, (byte) 5, skillData(101L, "Java", Proficiency.INTERMEDIATE));
+
+        given(resumeQueryRepository.findCandidatePool(proposalPosition, List.of(101L), List.of(22L), 100))
+                .willReturn(List.of(
+                        new CandidatePoolRow(22L, 1L, 4, (byte) 5),
+                        new CandidatePoolRow(11L, 1L, 9, (byte) 7)
+                ));
+        given(resumeRepository.findAllWithSkillsByIds(List.of(22L, 11L))).willReturn(List.of(excluded, included));
+
+        // when
+        List<RecommendationCandidate> result = finder.findCandidates(proposalPosition, 3, List.of(22L));
+
+        // then
+        assertThat(result).extracting(RecommendationCandidate::resumeId)
+                .containsExactly(11L);
+
+        verify(resumeQueryRepository).findCandidatePool(proposalPosition, List.of(101L), List.of(22L), 100);
         verify(resumeRepository).findAllWithSkillsByIds(List.of(22L, 11L));
         verifyNoMoreInteractions(resumeQueryRepository, resumeRepository);
     }
@@ -104,14 +161,15 @@ class RecommendationCandidateFinderTest {
         ProposalPosition proposalPosition = createProposalPosition(
                 skillRequirement(101L, "Java", ProposalPositionSkillImportance.ESSENTIAL)
         );
-        given(resumeQueryRepository.findCandidatePool(proposalPosition, List.of(101L), 100)).willReturn(List.of());
+        given(resumeQueryRepository.findCandidatePool(proposalPosition, List.of(101L), List.of(), 100))
+                .willReturn(List.of());
 
         // when
         List<RecommendationCandidate> result = finder.findCandidates(proposalPosition, 5);
 
         // then
         assertThat(result).isEmpty();
-        verify(resumeQueryRepository).findCandidatePool(proposalPosition, List.of(101L), 100);
+        verify(resumeQueryRepository).findCandidatePool(proposalPosition, List.of(101L), List.of(), 100);
         verifyNoInteractions(resumeRepository);
         verifyNoMoreInteractions(resumeQueryRepository);
     }
@@ -131,7 +189,8 @@ class RecommendationCandidateFinderTest {
         Resume belowRange = createResume(22L, (byte) 2, skillData(101L, "Java", Proficiency.INTERMEDIATE));
         Resume aboveRange = createResume(33L, (byte) 9, skillData(101L, "Java", Proficiency.INTERMEDIATE));
 
-        given(resumeQueryRepository.findRecommendableResumeIds(proposalPosition, 100)).willReturn(List.of(11L, 22L, 33L));
+        given(resumeQueryRepository.findRecommendableResumeIds(proposalPosition, List.of(), 100))
+                .willReturn(List.of(11L, 22L, 33L));
         given(resumeRepository.findAllWithSkillsByIds(List.of(11L, 22L, 33L)))
                 .willReturn(List.of(aboveRange, inRange, belowRange));
 
@@ -141,7 +200,7 @@ class RecommendationCandidateFinderTest {
         // then
         assertThat(result).extracting(RecommendationCandidate::resumeId)
                 .containsExactly(11L);
-        verify(resumeQueryRepository).findRecommendableResumeIds(proposalPosition, 100);
+        verify(resumeQueryRepository).findRecommendableResumeIds(proposalPosition, List.of(), 100);
         verify(resumeRepository).findAllWithSkillsByIds(List.of(11L, 22L, 33L));
         verifyNoMoreInteractions(resumeQueryRepository, resumeRepository);
     }

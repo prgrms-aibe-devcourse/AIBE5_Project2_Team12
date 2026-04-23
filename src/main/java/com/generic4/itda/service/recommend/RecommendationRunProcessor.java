@@ -53,9 +53,16 @@ public class RecommendationRunProcessor {
     private void processRunningRun(RecommendationRun run) {
         ProposalPosition proposalPosition = run.getProposalPosition();
 
+        List<Long> excludedResumeIds = recommendationResultRepository
+                .findRecommendedResumeIdsByProposalPositionIdExceptRunId(
+                        proposalPosition.getId(),
+                        run.getId()
+                );
+
         List<RecommendationCandidate> candidates = recommendationCandidateFinder.findCandidates(
                 proposalPosition,
-                run.getTopK()
+                run.getTopK(),
+                excludedResumeIds
         );
 
         Set<String> requiredSkillNames = extractRequiredSkillNames(proposalPosition);
