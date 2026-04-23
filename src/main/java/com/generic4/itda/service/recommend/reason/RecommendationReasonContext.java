@@ -22,9 +22,16 @@ public record RecommendationReasonContext(
 
         return new RecommendationReasonContext(
                 proposalPosition.getProposal().getTitle(),
-                proposalPosition.getTitle(),
+                resolvePositionTitle(proposalPosition),
                 result.getReasonFacts(),
                 result.getFinalScore()
         );
+    }
+
+    private static String resolvePositionTitle(ProposalPosition proposalPosition) {
+        if (proposalPosition.getTitle() != null && !proposalPosition.getTitle().isBlank()) {
+            return proposalPosition.getTitle();
+        }
+        return proposalPosition.getPosition().getName();
     }
 }
