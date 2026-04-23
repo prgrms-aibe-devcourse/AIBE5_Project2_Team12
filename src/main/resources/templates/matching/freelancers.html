@@ -1,0 +1,101 @@
+﻿<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/base}">
+<head>
+    <title th:text="${view.proposalTitle + ' | 매칭 결과'}">매칭 결과 | IT-da</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <main class="min-h-screen bg-slate-50 px-4 py-6 lg:px-8 lg:py-8">
+        <div class="mx-auto max-w-5xl space-y-6">
+
+            <div class="sticky top-0 z-10 rounded-[28px] border border-slate-200 bg-white/95 px-6 py-5 shadow-sm shadow-slate-200/60 backdrop-blur">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center gap-4">
+                        <a th:href="@{/proposals/{proposalId}/matchings(proposalId=${view.proposalId})}"
+                           class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600">
+                            <i data-lucide="arrow-left" class="h-4 w-4"></i>
+                            포지션 선택
+                        </a>
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">MATCHING ENTRY</p>
+                            <h1 class="mt-1 text-2xl font-black tracking-tight text-slate-950"
+                                th:text="${view.proposalPositionTitle}">포지션명</h1>
+                            <p class="mt-1 text-sm text-slate-500">
+                                <span th:text="${view.positionStatusLabel}">모집 중</span> · 매칭 요청을 보낸 프리랜서를 선택하세요.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        <a th:href="@{/proposals/{proposalId}/matchings/positions/{positionId}(proposalId=${view.proposalId}, positionId=${view.proposalPositionId})}"
+                           th:classappend="${view.filterStatusKey == ''} ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'"
+                           class="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition">
+                            전체보기
+                        </a>
+                        <a th:href="@{/proposals/{proposalId}/matchings/positions/{positionId}(proposalId=${view.proposalId}, positionId=${view.proposalPositionId}, status='PROPOSED')}"
+                           th:classappend="${view.filterStatusKey == 'PROPOSED'} ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'"
+                           class="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition">
+                            제안됨
+                        </a>
+                        <a th:href="@{/proposals/{proposalId}/matchings/positions/{positionId}(proposalId=${view.proposalId}, positionId=${view.proposalPositionId}, status='ACCEPTED')}"
+                           th:classappend="${view.filterStatusKey == 'ACCEPTED'} ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'"
+                           class="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition">
+                            수락됨
+                        </a>
+                        <a th:href="@{/proposals/{proposalId}/matchings/positions/{positionId}(proposalId=${view.proposalId}, positionId=${view.proposalPositionId}, status='IN_PROGRESS')}"
+                           th:classappend="${view.filterStatusKey == 'IN_PROGRESS'} ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'"
+                           class="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition">
+                            협의 중
+                        </a>
+                        <a th:href="@{/proposals/{proposalId}/matchings/positions/{positionId}(proposalId=${view.proposalId}, positionId=${view.proposalPositionId}, status='COMPLETED')}"
+                           th:classappend="${view.filterStatusKey == 'COMPLETED'} ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'"
+                           class="inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold transition">
+                            완료됨
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <section th:if="${view.items.isEmpty()}"
+                     class="rounded-[28px] border border-slate-200 bg-white px-6 py-16 text-center shadow-sm shadow-slate-200/70">
+                <i data-lucide="user-x" class="mx-auto h-12 w-12 text-slate-300"></i>
+                <p class="mt-4 text-base font-bold text-slate-600">표시할 매칭 요청이 없습니다.</p>
+                <p class="mt-1 text-sm text-slate-400">필터를 변경하거나 다른 포지션을 선택해 보세요.</p>
+            </section>
+
+            <section th:if="${!view.items.isEmpty()}"
+                     class="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm shadow-slate-200/70">
+                <div class="hidden md:grid grid-cols-[minmax(0,2fr)_1fr_1fr_80px] gap-4 px-6 py-3 border-b border-slate-100 text-xs font-bold text-slate-400 uppercase tracking-wide">
+                    <span>프리랜서</span><span>상태</span><span>요청일</span><span></span>
+                </div>
+                <div class="divide-y divide-slate-100">
+                    <a th:each="item : ${view.items}"
+                       th:href="@{/matchings/{id}(id=${item.matchingId})}"
+                       class="grid grid-cols-1 md:grid-cols-[minmax(0,2fr)_1fr_1fr_80px] gap-4 items-center px-6 py-5 hover:bg-slate-50 transition-colors">
+                        <div class="space-y-1">
+                            <p class="text-sm font-bold text-slate-900" th:text="${item.freelancerName}">프리랜서</p>
+                            <p class="text-xs text-slate-500" th:text="${view.proposalTitle}">제안서</p>
+                        </div>
+                        <div>
+                            <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-700"
+                                  th:text="${item.statusLabel}">상태</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 text-sm text-slate-500">
+                            <i data-lucide="calendar" class="h-4 w-4 text-slate-400 hidden md:block"></i>
+                            <span th:text="${item.requestedAt != null ? #temporals.format(item.requestedAt, 'yyyy.MM.dd') : '-'}">날짜</span>
+                        </div>
+                        <div class="flex justify-end">
+                            <span class="flex items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-700 whitespace-nowrap">
+                                보기<i data-lucide="chevron-right" class="h-4 w-4"></i>
+                            </span>
+                        </div>
+                    </a>
+                </div>
+            </section>
+        </div>
+    </main>
+</div>
+</body>
+</html>
