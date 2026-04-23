@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.generic4.itda.annotation.RepositoryTest;
 import com.generic4.itda.domain.matching.Matching;
+import com.generic4.itda.domain.matching.constant.MatchingCancellationReason;
+import com.generic4.itda.domain.matching.constant.MatchingParticipantRole;
 import com.generic4.itda.domain.matching.constant.MatchingStatus;
 import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.position.Position;
@@ -17,6 +19,7 @@ import com.generic4.itda.domain.resume.WorkType;
 import com.generic4.itda.dto.freelancer.FreelancerDashboardItem;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceUnitUtil;
+import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -184,6 +187,70 @@ class MatchingRepositoryTest {
 
         assertThat(util.isLoaded(found.getResume(), "member")).isTrue();
         assertThat(found.getResume().getMember().getId()).isEqualTo(freelancerMember.getId());
+    }
+
+    @Test
+    @DisplayName("findAcceptedCancellationRequestsDue는 기한이 지난 ACCEPTED 취소 요청만 반환한다")
+    void findAcceptedCancellationRequestsDue_returnsOnlyDueAcceptedCancellationRequests() {
+        Matching dueAccepted = saveMatching(backendPosition, freelancerResume, MatchingStatus.ACCEPTED);
+        dueAccepted.requestCancellation(
+                MatchingParticipantRole.CLIENT,
+                MatchingCancellationReason.CLIENT_BEFORE_REQUIREMENT_CHANGED,
+                null
+        );
+        LocalDateTime now = LocalDateTime.of(2026, 4, 23, 12, 0);
+        ReflectionTestUtils.setField(dueAccepted, "cancellationAutoCancelAt", now.minusMinutes(1));
+
+        Member secondFreelancer = memberRepository.save(
+                createMember("freelancer2@test.com", "pw", "프리랜서2", "010-0000-0003"));
+        Resume secondResume = resumeRepository.saveAndFlush(
+                Resume.create(
+                        secondFreelancer,
+                        "두 번째 자기소개입니다.",
+                        (byte) 4,
+                        new CareerPayload(),
+                        WorkType.REMOTE,
+                        ResumeWritingStatus.DONE,
+                        null
+                )
+        );
+        Matching waitingAccepted = saveMatching(backendPosition, secondResume, MatchingStatus.ACCEPTED);
+        waitingAccepted.requestCancellation(
+                MatchingParticipantRole.CLIENT,
+                MatchingCancellationReason.CLIENT_BEFORE_REQUIREMENT_CHANGED,
+                null
+        );
+        ReflectionTestUtils.setField(waitingAccepted, "cancellationAutoCancelAt", now.plusMinutes(1));
+
+        Member thirdFreelancer = memberRepository.save(
+                createMember("freelancer3@test.com", "pw", "프리랜서3", "010-0000-0004"));
+        Resume thirdResume = resumeRepository.saveAndFlush(
+                Resume.create(
+                        thirdFreelancer,
+                        "세 번째 자기소개입니다.",
+                        (byte) 5,
+                        new CareerPayload(),
+                        WorkType.REMOTE,
+                        ResumeWritingStatus.DONE,
+                        null
+                )
+        );
+        Matching inProgress = saveMatching(backendPosition, thirdResume, MatchingStatus.IN_PROGRESS);
+        inProgress.requestCancellation(
+                MatchingParticipantRole.CLIENT,
+                MatchingCancellationReason.CLIENT_AFTER_PROJECT_SUSPENDED,
+                null
+        );
+
+        em.flush();
+        em.clear();
+
+        List<Matching> result = matchingRepository.findAcceptedCancellationRequestsDue(now);
+
+        assertThat(result).extracting(Matching::getId)
+                .contains(dueAccepted.getId())
+                .doesNotContain(waitingAccepted.getId())
+                .doesNotContain(inProgress.getId());
     }
 
     @Nested
