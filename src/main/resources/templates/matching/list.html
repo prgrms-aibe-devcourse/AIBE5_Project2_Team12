@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/base}">
+<head>
+    <title th:text="${view.proposalTitle} + ' | 매칭 목록'">매칭 목록 | IT-da</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <main class="min-h-screen bg-slate-50 px-4 py-6 lg:px-8 lg:py-8">
+        <div class="mx-auto max-w-5xl space-y-6">
+
+            <!-- 상단 헤더 -->
+            <div class="sticky top-0 z-10 rounded-[28px] border border-slate-200 bg-white/95 px-6 py-5 shadow-sm shadow-slate-200/60 backdrop-blur">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center gap-4">
+                        <a id="btnBack" href="#"
+                           class="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white p-3 text-slate-700 transition hover:border-blue-300 hover:text-blue-600">
+                            <i data-lucide="arrow-left" class="h-4 w-4"></i>
+                        </a>
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">Matching</p>
+                            <h1 class="mt-1 text-xl font-bold tracking-tight text-slate-900"
+                                th:text="${view.proposalTitle}">제안서명</h1>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 포지션 필터 탭 -->
+            <div class="flex flex-wrap gap-2" id="positionFilters">
+                <button type="button"
+                        th:classappend="${view.selectedPositionId == null} ? 'bg-slate-900 text-white' : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'"
+                        class="position-filter inline-flex items-center gap-1.5 rounded-2xl px-4 py-2 text-sm font-bold transition"
+                        data-position-id="">
+                    전체
+                </button>
+                <button th:each="pf : ${view.positionFilters}"
+                        type="button"
+                        th:classappend="${view.selectedPositionId != null and view.selectedPositionId == pf.proposalPositionId} ? 'bg-slate-900 text-white' : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'"
+                        class="position-filter inline-flex items-center gap-1.5 rounded-2xl px-4 py-2 text-sm font-bold transition"
+                        th:attr="data-position-id=${pf.proposalPositionId}">
+                    <span th:text="${pf.title}">포지션</span>
+                    <span th:if="${pf.count > 0}"
+                          th:text="${pf.count}"
+                          th:classappend="${view.selectedPositionId != null and view.selectedPositionId == pf.proposalPositionId} ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'"
+                          class="rounded-full px-2 py-0.5 text-xs font-bold">0</span>
+                </button>
+            </div>
+
+            <!-- 상태 필터 탭 -->
+            <div class="flex flex-wrap gap-2">
+                <button type="button"
+                        th:classappend="${view.selectedStatus == null} ? 'bg-blue-600 text-white shadow-md shadow-blue-100' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'"
+                        class="status-filter rounded-2xl px-4 py-2 text-sm font-bold transition"
+                        data-status="">
+                    전체
+                </button>
+                <button type="button"
+                        th:classappend="${view.selectedStatus == 'PROPOSED'} ? 'bg-blue-600 text-white shadow-md shadow-blue-100' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'"
+                        class="status-filter rounded-2xl px-4 py-2 text-sm font-bold transition"
+                        data-status="PROPOSED">
+                    제안됨
+                </button>
+                <button type="button"
+                        th:classappend="${view.selectedStatus == 'ACCEPTED'} ? 'bg-blue-600 text-white shadow-md shadow-blue-100' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'"
+                        class="status-filter rounded-2xl px-4 py-2 text-sm font-bold transition"
+                        data-status="ACCEPTED">
+                    수락됨
+                </button>
+                <button type="button"
+                        th:classappend="${view.selectedStatus == 'IN_PROGRESS'} ? 'bg-blue-600 text-white shadow-md shadow-blue-100' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'"
+                        class="status-filter rounded-2xl px-4 py-2 text-sm font-bold transition"
+                        data-status="IN_PROGRESS">
+                    협의 중
+                </button>
+                <button type="button"
+                        th:classappend="${view.selectedStatus == 'COMPLETED'} ? 'bg-blue-600 text-white shadow-md shadow-blue-100' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'"
+                        class="status-filter rounded-2xl px-4 py-2 text-sm font-bold transition"
+                        data-status="COMPLETED">
+                    완료됨
+                </button>
+                <button type="button"
+                        th:classappend="${view.selectedStatus == 'REJECTED'} ? 'bg-blue-600 text-white shadow-md shadow-blue-100' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'"
+                        class="status-filter rounded-2xl px-4 py-2 text-sm font-bold transition"
+                        data-status="REJECTED">
+                    거절됨
+                </button>
+                <button type="button"
+                        th:classappend="${view.selectedStatus == 'CANCELED'} ? 'bg-blue-600 text-white shadow-md shadow-blue-100' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'"
+                        class="status-filter rounded-2xl px-4 py-2 text-sm font-bold transition"
+                        data-status="CANCELED">
+                    취소됨
+                </button>
+            </div>
+
+            <!-- 목록 영역 (AJAX로 교체되는 영역) -->
+            <div id="itemListWrapper"
+                 th:attr="data-proposal-id=${view.proposalId}, data-position-id=${view.selectedPositionId}, data-status=${view.selectedStatus}">
+                <div th:replace="~{matching/fragments :: itemList}"></div>
+            </div>
+
+        </div>
+    </main>
+
+    <script th:inline="javascript">
+        (function () {
+            const backUrl = document.referrer || '/client/dashboard';
+            const btnBack = document.getElementById('btnBack');
+            if (btnBack) btnBack.href = backUrl;
+        })();
+
+        (function () {
+            const wrapper = document.getElementById('itemListWrapper');
+            if (!wrapper) return;
+
+            const proposalId = wrapper.dataset.proposalId;
+            let currentPositionId = wrapper.dataset.positionId || '';
+            let currentStatus = wrapper.dataset.status || '';
+
+            function fetchItems(positionId, status) {
+                const params = new URLSearchParams();
+                if (positionId) params.set('positionId', positionId);
+                if (status) params.set('status', status);
+
+                const url = `/proposals/${proposalId}/matchings/items?${params.toString()}`;
+
+                fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+                        .then(res => {
+                            if (!res.ok) throw new Error('서버 오류');
+                            return res.text();
+                        })
+                        .then(html => {
+                            wrapper.innerHTML = html;
+                            if (window.lucide) lucide.createIcons();
+                        })
+                        .catch(() => {
+                            wrapper.innerHTML = '<p class="py-10 text-center text-sm text-rose-500 font-semibold">목록을 불러오는 중 오류가 발생했습니다.</p>';
+                        });
+            }
+
+            document.querySelectorAll('.position-filter').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    currentPositionId = btn.dataset.positionId;
+
+                    document.querySelectorAll('.position-filter').forEach(b => {
+                        b.classList.remove('bg-slate-900', 'text-white');
+                        b.classList.add('border', 'border-slate-300', 'bg-white', 'text-slate-700');
+                        const badge = b.querySelector('span:last-child');
+                        if (badge) { badge.classList.remove('bg-white/20'); badge.classList.add('bg-slate-100', 'text-slate-500'); }
+                    });
+                    btn.classList.add('bg-slate-900', 'text-white');
+                    btn.classList.remove('border', 'border-slate-300', 'bg-white', 'text-slate-700');
+                    const activeBadge = btn.querySelector('span:last-child');
+                    if (activeBadge) { activeBadge.classList.add('bg-white/20'); activeBadge.classList.remove('bg-slate-100', 'text-slate-500'); }
+
+                    fetchItems(currentPositionId, currentStatus);
+                });
+            });
+
+            document.querySelectorAll('.status-filter').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    currentStatus = btn.dataset.status;
+
+                    document.querySelectorAll('.status-filter').forEach(b => {
+                        b.classList.remove('bg-blue-600', 'text-white', 'shadow-md', 'shadow-blue-100');
+                        b.classList.add('border', 'border-slate-200', 'bg-white', 'text-slate-600', 'hover:bg-slate-50');
+                    });
+                    btn.classList.add('bg-blue-600', 'text-white', 'shadow-md', 'shadow-blue-100');
+                    btn.classList.remove('border', 'border-slate-200', 'bg-white', 'text-slate-600', 'hover:bg-slate-50');
+
+                    fetchItems(currentPositionId, currentStatus);
+                });
+            });
+        })();
+    </script>
+</div>
+
+</body>
+</html>
