@@ -20,7 +20,9 @@ import com.generic4.itda.domain.recommendation.constant.RecommendationAlgorithm;
 import com.generic4.itda.domain.recommendation.constant.RecommendationRunStatus;
 import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.ProposalRepository;
+import com.generic4.itda.repository.RecommendationResultRepository;
 import com.generic4.itda.repository.RecommendationRunRepository;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -63,6 +65,9 @@ class RecommendationRunServiceTest {
 
     @Mock
     private RecommendationRunRepository recommendationRunRepository;
+
+    @Mock
+    private RecommendationResultRepository recommendationResultRepository;
 
     @Mock
     private RecommendationFingerprintGenerator fingerprintGenerator;
@@ -171,6 +176,186 @@ class RecommendationRunServiceTest {
         assertThat(savedRun.getStatus()).isEqualTo(RecommendationRunStatus.PENDING);
 
         verifyNoMoreInteractions(proposalRepository, memberRepository, fingerprintGenerator, recommendationRunRepository);
+    }
+
+    @Test
+    @DisplayName("추가 추천에서 동일한 제외 이력서 목록 기반 fingerprint의 기존 run이 있으면 기존 id를 재사용한다")
+    void createAdditional_returnsExistingRunIdWhenReusableAdditionalRunExists() {
+        // given
+        Member owner = createMemberWithId(OWNER_ID, OWNER_EMAIL);
+        Proposal proposal = createProposalWithStatus(owner, PROPOSAL_ID, ProposalStatus.MATCHING);
+        addPosition(proposal, 10L, "디자이너", ProposalPositionStatus.OPEN);
+        ProposalPosition selectedPosition = addPosition(proposal, SELECTED_POSITION_ID, "백엔드", ProposalPositionStatus.OPEN);
+        List<Long> excludedResumeIds = List.of(1L, 2L, 3L);
+
+        RecommendationRun existingRun = RecommendationRun.create(
+                selectedPosition,
+                FINGERPRINT,
+                DEFAULT_ALGORITHM,
+                DEFAULT_TOP_K
+        );
+        ReflectionTestUtils.setField(existingRun, "id", EXISTING_RUN_ID);
+
+        stubProposalDetailLoad(proposal);
+        given(memberRepository.findByEmail_Value(OWNER_EMAIL)).willReturn(owner);
+        given(recommendationResultRepository.findRecommendedResumeIdsByProposalPositionId(SELECTED_POSITION_ID))
+                .willReturn(excludedResumeIds);
+        given(fingerprintGenerator.generateAdditional(
+                selectedPosition,
+                DEFAULT_ALGORITHM,
+                DEFAULT_TOP_K,
+                excludedResumeIds
+        )).willReturn(FINGERPRINT);
+        given(recommendationRunRepository.findByProposalPosition_IdAndRequestFingerprintAndAlgorithm(
+                SELECTED_POSITION_ID,
+                FINGERPRINT,
+                DEFAULT_ALGORITHM
+        )).willReturn(Optional.of(existingRun));
+
+        // when
+        Long result = service.createAdditional(PROPOSAL_ID, SELECTED_POSITION_ID, OWNER_EMAIL);
+
+        // then
+        assertThat(result).isEqualTo(EXISTING_RUN_ID);
+
+        InOrder inOrder = inOrder(
+                proposalRepository,
+                memberRepository,
+                recommendationResultRepository,
+                fingerprintGenerator,
+                recommendationRunRepository
+        );
+        inOrder.verify(proposalRepository).findWithPositionsById(PROPOSAL_ID);
+        inOrder.verify(proposalRepository).findPositionsWithSkillsByProposalId(PROPOSAL_ID);
+        inOrder.verify(memberRepository).findByEmail_Value(OWNER_EMAIL);
+        inOrder.verify(recommendationResultRepository)
+                .findRecommendedResumeIdsByProposalPositionId(SELECTED_POSITION_ID);
+        inOrder.verify(fingerprintGenerator).generateAdditional(
+                selectedPosition,
+                DEFAULT_ALGORITHM,
+                DEFAULT_TOP_K,
+                excludedResumeIds
+        );
+        inOrder.verify(recommendationRunRepository)
+                .findByProposalPosition_IdAndRequestFingerprintAndAlgorithm(
+                        SELECTED_POSITION_ID,
+                        FINGERPRINT,
+                        DEFAULT_ALGORITHM
+                );
+
+        verifyNoMoreInteractions(
+                proposalRepository,
+                memberRepository,
+                recommendationResultRepository,
+                fingerprintGenerator,
+                recommendationRunRepository
+        );
+    }
+
+    @Test
+    @DisplayName("추가 추천에서 재사용 가능한 run이 없으면 기존 추천 이력서를 제외한 새 run을 생성해 저장한다")
+    void createAdditional_createsNewPendingRunWhenReusableAdditionalRunDoesNotExist() {
+        // given
+        Member owner = createMemberWithId(OWNER_ID, OWNER_EMAIL);
+        Proposal proposal = createProposalWithStatus(owner, PROPOSAL_ID, ProposalStatus.MATCHING);
+        addPosition(proposal, 10L, "디자이너", ProposalPositionStatus.OPEN);
+        ProposalPosition selectedPosition = addPosition(proposal, SELECTED_POSITION_ID, "백엔드", ProposalPositionStatus.OPEN);
+        List<Long> excludedResumeIds = List.of(1L, 2L, 3L);
+
+        stubProposalDetailLoad(proposal);
+        given(memberRepository.findByEmail_Value(OWNER_EMAIL)).willReturn(owner);
+        given(recommendationResultRepository.findRecommendedResumeIdsByProposalPositionId(SELECTED_POSITION_ID))
+                .willReturn(excludedResumeIds);
+        given(fingerprintGenerator.generateAdditional(
+                selectedPosition,
+                DEFAULT_ALGORITHM,
+                DEFAULT_TOP_K,
+                excludedResumeIds
+        )).willReturn(FINGERPRINT);
+        given(recommendationRunRepository.findByProposalPosition_IdAndRequestFingerprintAndAlgorithm(
+                SELECTED_POSITION_ID,
+                FINGERPRINT,
+                DEFAULT_ALGORITHM
+        )).willReturn(Optional.empty());
+        given(recommendationRunRepository.save(any(RecommendationRun.class))).willAnswer(invocation -> {
+            RecommendationRun run = invocation.getArgument(0);
+            ReflectionTestUtils.setField(run, "id", NEW_RUN_ID);
+            return run;
+        });
+
+        // when
+        Long result = service.createAdditional(PROPOSAL_ID, SELECTED_POSITION_ID, OWNER_EMAIL);
+
+        // then
+        assertThat(result).isEqualTo(NEW_RUN_ID);
+
+        ArgumentCaptor<RecommendationRun> runCaptor = ArgumentCaptor.forClass(RecommendationRun.class);
+
+        InOrder inOrder = inOrder(
+                proposalRepository,
+                memberRepository,
+                recommendationResultRepository,
+                fingerprintGenerator,
+                recommendationRunRepository
+        );
+        inOrder.verify(proposalRepository).findWithPositionsById(PROPOSAL_ID);
+        inOrder.verify(proposalRepository).findPositionsWithSkillsByProposalId(PROPOSAL_ID);
+        inOrder.verify(memberRepository).findByEmail_Value(OWNER_EMAIL);
+        inOrder.verify(recommendationResultRepository)
+                .findRecommendedResumeIdsByProposalPositionId(SELECTED_POSITION_ID);
+        inOrder.verify(fingerprintGenerator).generateAdditional(
+                selectedPosition,
+                DEFAULT_ALGORITHM,
+                DEFAULT_TOP_K,
+                excludedResumeIds
+        );
+        inOrder.verify(recommendationRunRepository)
+                .findByProposalPosition_IdAndRequestFingerprintAndAlgorithm(
+                        SELECTED_POSITION_ID,
+                        FINGERPRINT,
+                        DEFAULT_ALGORITHM
+                );
+        inOrder.verify(recommendationRunRepository).save(runCaptor.capture());
+
+        RecommendationRun savedRun = runCaptor.getValue();
+        assertThat(savedRun.getProposalPosition()).isSameAs(selectedPosition);
+        assertThat(savedRun.getRequestFingerprint()).isEqualTo(FINGERPRINT);
+        assertThat(savedRun.getAlgorithm()).isEqualTo(DEFAULT_ALGORITHM);
+        assertThat(savedRun.getTopK()).isEqualTo(DEFAULT_TOP_K);
+        assertThat(savedRun.getStatus()).isEqualTo(RecommendationRunStatus.PENDING);
+
+        verifyNoMoreInteractions(
+                proposalRepository,
+                memberRepository,
+                recommendationResultRepository,
+                fingerprintGenerator,
+                recommendationRunRepository
+        );
+    }
+
+    @Test
+    @DisplayName("추가 추천에서 OPEN 상태가 아닌 모집 포지션이면 기존 추천 결과를 조회하지 않고 거부한다")
+    void createAdditional_throwsBeforeLoadingExcludedResumesWhenProposalPositionStatusIsNotOpen() {
+        // given
+        Member owner = createMemberWithId(OWNER_ID, OWNER_EMAIL);
+        Proposal proposal = createProposalWithStatus(owner, PROPOSAL_ID, ProposalStatus.MATCHING);
+        addPosition(proposal, SELECTED_POSITION_ID, "백엔드", ProposalPositionStatus.FULL);
+
+        stubProposalDetailLoad(proposal);
+        given(memberRepository.findByEmail_Value(OWNER_EMAIL)).willReturn(owner);
+
+        // when / then
+        assertThatThrownBy(() -> service.createAdditional(PROPOSAL_ID, SELECTED_POSITION_ID, OWNER_EMAIL))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("OPEN 상태의 모집 포지션만 추천을 실행할 수 있습니다.");
+
+        InOrder inOrder = inOrder(proposalRepository, memberRepository);
+        inOrder.verify(proposalRepository).findWithPositionsById(PROPOSAL_ID);
+        inOrder.verify(proposalRepository).findPositionsWithSkillsByProposalId(PROPOSAL_ID);
+        inOrder.verify(memberRepository).findByEmail_Value(OWNER_EMAIL);
+
+        verifyNoMoreInteractions(proposalRepository, memberRepository);
+        verifyNoInteractions(recommendationResultRepository, fingerprintGenerator, recommendationRunRepository);
     }
 
     @Test
