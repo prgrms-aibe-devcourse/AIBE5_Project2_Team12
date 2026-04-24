@@ -665,8 +665,8 @@ class ProposalControllerTest {
     }
 
     @Test
-    @DisplayName("없는 제안서 상세 조회 시 대시보드로 리다이렉트한다")
-    void redirectDashboardWhenDetailNotFound() throws Exception {
+    @DisplayName("없는 제안서 상세 조회 시 홈으로 리다이렉트하고 오류 메시지를 남긴다")
+    void redirectHomeWhenDetailNotFound() throws Exception {
         given(proposalService.findOwnedProposal(999L, "client@example.com"))
                 .willThrow(new ProposalNotFoundException("제안서를 찾을 수 없습니다. id=999"));
 
@@ -680,11 +680,12 @@ class ProposalControllerTest {
                                 principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
                         ))))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/"));
+                .andExpect(redirectedUrl("/"))
+                .andExpect(flash().attributeExists("errorMessage"));
     }
 
     @Test
-    @DisplayName("존재하지 않는 제안서 조회 시 홈으로 리다이렉트된다")
+    @DisplayName("외부 referer에서 없는 제안서 조회 시 홈으로 리다이렉트하고 오류 메시지를 남긴다")
     void redirectHomeWhenDetailNotFoundWithExternalReferer() throws Exception {
         given(proposalService.findOwnedProposal(999L, "client@example.com"))
                 .willThrow(new ProposalNotFoundException("제안서를 찾을 수 없습니다. id=999"));
@@ -699,7 +700,8 @@ class ProposalControllerTest {
                                 principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
                         ))))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/"));
+                .andExpect(redirectedUrl("/"))
+                .andExpect(flash().attributeExists("errorMessage"));
     }
 
     @Test
