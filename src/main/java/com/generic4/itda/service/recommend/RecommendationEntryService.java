@@ -78,7 +78,9 @@ public class RecommendationEntryService {
                         .map(skill -> new RecommendationEntrySkillItem(
                                 skill.getSkill().getName(),
                                 skill.getImportance().getDescription()
-                        )).toList()
+                        )).toList(),
+                position.getStatus().name(),
+                position.getStatus().getDescription()
         );
     }
 
