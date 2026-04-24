@@ -284,6 +284,78 @@ class RecommendationControllerTest {
     }
 
     @Test
+    @DisplayName("COMPUTED 상태로 진행 페이지 접근 시 결과 페이지로 리다이렉트한다")
+    void redirectToResultsWhenRunAlreadyComputed() throws Exception {
+        // given
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        RecommendationRunStatusViewModel computedView = new RecommendationRunStatusViewModel(
+                PROPOSAL_ID, RUN_ID, "추천 테스트 제안서",
+                RecommendationRunStatus.COMPUTED,
+                "추천 결과가 준비되었습니다.",
+                "추천 결과 목록으로 이동할 수 있습니다.",
+                "결과 보기",
+                "/proposals/" + PROPOSAL_ID + "/recommendations/results?runId=" + RUN_ID,
+                false
+        );
+
+        given(recommendationRunQueryService.getRecommendationRunStatus(eq(PROPOSAL_ID), eq(RUN_ID), eq("client@example.com")))
+                .willReturn(computedView);
+
+        // when / then
+        mockMvc.perform(get("/proposals/{proposalId}/runs/{runId}", PROPOSAL_ID, RUN_ID)
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/proposals/" + PROPOSAL_ID + "/recommendations/results?runId=" + RUN_ID));
+
+        then(recommendationRunQueryService).should()
+                .getRecommendationRunStatus(eq(PROPOSAL_ID), eq(RUN_ID), eq("client@example.com"));
+    }
+
+    @Test
+    @DisplayName("COMPUTED 상태라도 from 파라미터가 있으면 status 화면을 렌더링한다")
+    void renderRunStatusWhenComputedAndFromParamPresent() throws Exception {
+        // given
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        RecommendationRunStatusViewModel computedView = new RecommendationRunStatusViewModel(
+                PROPOSAL_ID, RUN_ID, "추천 테스트 제안서",
+                RecommendationRunStatus.COMPUTED,
+                "추천 결과가 준비되었습니다.",
+                "추천 결과 목록으로 이동할 수 있습니다.",
+                "결과 보기",
+                "/proposals/" + PROPOSAL_ID + "/recommendations/results?runId=" + RUN_ID,
+                false
+        );
+
+        given(recommendationRunQueryService.getRecommendationRunStatus(eq(PROPOSAL_ID), eq(RUN_ID), eq("client@example.com")))
+                .willReturn(computedView);
+
+        // when / then
+        mockMvc.perform(get("/proposals/{proposalId}/runs/{runId}", PROPOSAL_ID, RUN_ID)
+                        .param("from", "recommendation")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("recommendation/status"))
+                .andExpect(model().attributeExists("view"))
+                .andExpect(model().attribute("from", "recommendation"));
+
+        then(recommendationRunQueryService).should()
+                .getRecommendationRunStatus(eq(PROPOSAL_ID), eq(RUN_ID), eq("client@example.com"));
+    }
+    @Test
     @DisplayName("추천 실행 정보를 찾을 수 없으면 error 화면을 렌더링한다")
     void renderErrorWhenRunNotFound() throws Exception {
         // given
@@ -355,7 +427,7 @@ class RecommendationControllerTest {
                                 List.of(new SimpleGrantedAuthority("ROLE_USER"))
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.redirect").value("/proposals/" + PROPOSAL_ID + "/runs/" + RUN_ID));
+                .andExpect(jsonPath("$.redirect").value("/proposals/" + PROPOSAL_ID + "/runs/" + RUN_ID + "?from=recommendation"));
 
         then(recommendationRunService).should()
                 .createOrReuse(eq(PROPOSAL_ID), eq(PROPOSAL_POSITION_ID), eq("client@example.com"));
@@ -431,7 +503,7 @@ class RecommendationControllerTest {
                                 List.of(new SimpleGrantedAuthority("ROLE_USER"))
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.redirect").value("/proposals/" + PROPOSAL_ID + "/runs/" + RUN_ID));
+                .andExpect(jsonPath("$.redirect").value("/proposals/" + PROPOSAL_ID + "/runs/" + RUN_ID + "?from=recommendation"));
 
         then(recommendationRunService).should()
                 .createAdditional(eq(PROPOSAL_ID), eq(PROPOSAL_POSITION_ID), eq("client@example.com"));

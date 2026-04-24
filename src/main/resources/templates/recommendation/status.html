@@ -68,7 +68,7 @@
 
                     <!-- 수동 새로고침 -->
                     <div class="mt-6">
-                        <a th:href="@{/proposals/{proposalId}/runs/{runId}(proposalId=${view.proposalId}, runId=${view.runId})}"
+                        <a th:href="@{/proposals/{proposalId}/runs/{runId}(proposalId=${view.proposalId}, runId=${view.runId}, from=${from})}"
                            class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100">
                             <i data-lucide="refresh-cw" class="h-4 w-4"></i>
                             지금 새로고침
@@ -134,5 +134,20 @@
         </div>
     </main>
 </div>
+
+<th:block layout:fragment="scripts">
+    <th:block th:if="${view.status.name() == 'COMPUTED' and view.nextActionUrl != null}">
+        <script th:inline="javascript">
+            (function () {
+                var nextUrl = /*[[${view.nextActionUrl}]]*/ null;
+                if (!nextUrl) return;
+
+                setTimeout(function () {
+                    window.location.replace(nextUrl);
+                }, 500);
+            })();
+        </script>
+    </th:block>
+</th:block>
 </body>
 </html>

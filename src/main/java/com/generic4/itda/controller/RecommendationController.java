@@ -1,5 +1,6 @@
 package com.generic4.itda.controller;
 
+import com.generic4.itda.domain.recommendation.constant.RecommendationRunStatus;
 import com.generic4.itda.dto.recommend.RecommendationRequestForm;
 import com.generic4.itda.dto.recommend.RecommendationResultsViewModel;
 import com.generic4.itda.dto.recommend.RecommendationResumeDetailViewModel;
@@ -30,8 +31,14 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @Slf4j
 public class RecommendationController {
 
+    private static final String RUN_STATUS_FROM_PARAM = "recommendation";
+
     private final RecommendationRunService recommendationRunService;
     private final RecommendationRunQueryService recommendationRunQueryService;
+
+    private static String buildRunStatusRedirectUrl(Long proposalId, Long runId) {
+        return "/proposals/" + proposalId + "/runs/" + runId + "?from=" + RUN_STATUS_FROM_PARAM;
+    }
 
     @GetMapping("/proposals/{proposalId}/recommendations")
     public String entry(
@@ -61,7 +68,7 @@ public class RecommendationController {
                     principal.getEmail()
             );
             return ResponseEntity.ok(Map.of(
-                    "redirect", "/proposals/" + proposalId + "/runs/" + runId
+                    "redirect", buildRunStatusRedirectUrl(proposalId, runId)
             ));
         } catch (IllegalArgumentException | IllegalStateException e) {
             log.warn("추천 실행 요청 실패(AJAX). proposalId={}, proposalPositionId={}, email={}",
@@ -92,6 +99,7 @@ public class RecommendationController {
 
             redirectAttributes.addAttribute("runId", runId);
             redirectAttributes.addAttribute("proposalId", proposalId);
+            redirectAttributes.addAttribute("from", RUN_STATUS_FROM_PARAM);
             return "redirect:/proposals/{proposalId}/runs/{runId}";
         } catch (IllegalArgumentException | IllegalStateException e) {
             log.warn("추천 실행 요청 실패. proposalId={}, proposalPositionId={}, email={}",
@@ -121,7 +129,7 @@ public class RecommendationController {
                     principal.getEmail()
             );
             return ResponseEntity.ok(Map.of(
-                    "redirect", "/proposals/" + proposalId + "/runs/" + runId
+                    "redirect", buildRunStatusRedirectUrl(proposalId, runId)
             ));
         } catch (IllegalArgumentException | IllegalStateException e) {
             log.warn("추가 추천 요청 실패(AJAX). proposalId={}, proposalPositionId={}, email={}",
@@ -146,6 +154,7 @@ public class RecommendationController {
 
             redirectAttributes.addAttribute("runId", runId);
             redirectAttributes.addAttribute("proposalId", proposalId);
+            redirectAttributes.addAttribute("from", RUN_STATUS_FROM_PARAM);
             return "redirect:/proposals/{proposalId}/runs/{runId}";
         } catch (IllegalArgumentException | IllegalStateException e) {
             log.warn("추가 추천 요청 실패. proposalId={}, proposalPositionId={}, email={}",
@@ -160,14 +169,22 @@ public class RecommendationController {
     public String runStatus(
             @PathVariable Long proposalId,
             @PathVariable Long runId,
+            @RequestParam(name = "from", required = false) String from,
             @AuthenticationPrincipal ItDaPrincipal principal,
             Model model
     ) {
+        String normalizedFrom = (from != null && !from.isBlank()) ? from : null;
+
         try {
             RecommendationRunStatusViewModel view = recommendationRunQueryService
                     .getRecommendationRunStatus(proposalId, runId, principal.getEmail());
 
+            if (view.status() == RecommendationRunStatus.COMPUTED && normalizedFrom == null) {
+                return "redirect:" + view.nextActionUrl();
+            }
+
             model.addAttribute("view", view);
+            model.addAttribute("from", normalizedFrom);
             return "recommendation/status";
         } catch (IllegalArgumentException e) {
             log.warn("추천 실행 상태 조회 실패. proposalId={}, runId={}, email={}",
