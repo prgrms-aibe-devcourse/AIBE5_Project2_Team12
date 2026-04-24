@@ -206,6 +206,7 @@ public class ResumeController {
         addCommonAttributes(model);
         model.addAttribute("resume", resume);
         model.addAttribute("isEditing", true);
+        model.addAttribute("isNew", false);
         return "freelancer/resumeForm :: #careerSection";
     }
 
