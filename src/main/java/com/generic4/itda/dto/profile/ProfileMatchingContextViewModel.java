@@ -10,7 +10,9 @@ public record ProfileMatchingContextViewModel(
         String matchingDetailUrl,
         String proposalDetailUrl,
         String acceptActionUrl,
-        String rejectActionUrl
+        String rejectActionUrl,
+        String contactEmail,
+        String contactPhone
 ) {
     public boolean proposed() {
         return "PROPOSED".equals(matchingStatus);
@@ -22,5 +24,13 @@ public record ProfileMatchingContextViewModel(
 
     public boolean canRespond() {
         return proposed() && freelancerViewer();
+    }
+
+    public boolean hasContactDetails() {
+        return contactVisible
+                && contactEmail != null
+                && !contactEmail.isBlank()
+                && contactPhone != null
+                && !contactPhone.isBlank();
     }
 }

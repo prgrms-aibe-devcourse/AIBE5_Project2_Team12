@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/base}">
+<head>
+  <title th:text="${view.title} + ' | IT-da'">상대 프로필 | IT-da</title>
+</head>
+<body>
+<div layout:fragment="content">
+  <main class="min-h-screen bg-slate-50">
+
+    <th:block th:replace="~{fragments/profileFragments :: profileHeader(profile=${view})}"></th:block>
+    <th:block th:replace="~{fragments/profileFragments :: profileAlerts}"></th:block>
+
+    <div class="mx-auto max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
+      <div class="grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.85fr)]">
+        <section class="space-y-6">
+          <th:block th:if="${view.freelancerSubject()}">
+            <th:block th:replace="~{fragments/profileFragments :: freelancerBody(profile=${view})}"></th:block>
+          </th:block>
+
+          <th:block th:if="${view.clientSubject()}">
+            <th:block th:replace="~{fragments/profileFragments :: clientBody(profile=${view})}"></th:block>
+          </th:block>
+
+          <th:block th:if="${view.hasProjectSummary()}">
+            <th:block th:replace="~{fragments/profileFragments :: projectSummarySection(project=${view.projectSummary})}"></th:block>
+          </th:block>
+        </section>
+
+        <div class="space-y-6">
+          <th:block th:if="${view.hasMatchingContext()}">
+            <th:block th:replace="~{fragments/profileFragments :: matchingContextPanel(profile=${view})}"></th:block>
+          </th:block>
+
+          <th:block th:if="${view.hasRecommendationContext()}">
+            <th:block th:replace="~{fragments/profileFragments :: recommendationContextPanel(profile=${view})}"></th:block>
+          </th:block>
+        </div>
+
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

@@ -61,6 +61,7 @@ public record RecommendationResumeDetailViewModel(
                 ),
                 null,
                 null,
+                null,
                 new ProfileRecommendationContextViewModel(
                         proposalId,
                         runId,
