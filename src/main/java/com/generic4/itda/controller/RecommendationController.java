@@ -1,17 +1,18 @@
 package com.generic4.itda.controller;
 
-import com.generic4.itda.dto.recommend.RecommendationEntryViewModel;
 import com.generic4.itda.dto.recommend.RecommendationRequestForm;
 import com.generic4.itda.dto.recommend.RecommendationResultsViewModel;
 import com.generic4.itda.dto.recommend.RecommendationResumeDetailViewModel;
 import com.generic4.itda.dto.recommend.RecommendationRunStatusViewModel;
 import com.generic4.itda.dto.security.ItDaPrincipal;
-import com.generic4.itda.service.recommend.RecommendationEntryService;
 import com.generic4.itda.service.recommend.RecommendationRunQueryService;
 import com.generic4.itda.service.recommend.RecommendationRunService;
 import jakarta.validation.Valid;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
@@ -28,22 +30,44 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @Slf4j
 public class RecommendationController {
 
-    private final RecommendationEntryService recommendationEntryService;
     private final RecommendationRunService recommendationRunService;
     private final RecommendationRunQueryService recommendationRunQueryService;
 
     @GetMapping("/proposals/{proposalId}/recommendations")
     public String entry(
             @PathVariable Long proposalId,
-            @AuthenticationPrincipal ItDaPrincipal principal,
-            Model model
+            @AuthenticationPrincipal ItDaPrincipal principal
     ) {
-        RecommendationEntryViewModel entry = recommendationEntryService.getEntry(proposalId, principal.getEmail());
+        return "redirect:/proposals/" + proposalId + "?openRecommendModal=true";
+    }
 
-        model.addAttribute("entry", entry);
-        model.addAttribute("requestForm", new RecommendationRequestForm(entry.selectedProposalPositionId()));
+    /** 모달에서 fetch로 호출 — 성공: redirect URL 반환, 실패: 에러 메시지 반환 */
+    @PostMapping(value = "/proposals/{proposalId}/recommendations", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<Map<String, String>> runAjax(
+            @PathVariable Long proposalId,
+            @Valid @ModelAttribute RecommendationRequestForm form,
+            BindingResult bindingResult,
+            @AuthenticationPrincipal ItDaPrincipal principal
+    ) {
+        if (bindingResult.hasErrors()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "포지션을 선택해주세요."));
+        }
 
-        return "recommendation/entry";
+        try {
+            Long runId = recommendationRunService.createOrReuse(
+                    proposalId,
+                    form.proposalPositionId(),
+                    principal.getEmail()
+            );
+            return ResponseEntity.ok(Map.of(
+                    "redirect", "/proposals/" + proposalId + "/runs/" + runId
+            ));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            log.warn("추천 실행 요청 실패(AJAX). proposalId={}, proposalPositionId={}, email={}",
+                    proposalId, form.proposalPositionId(), principal.getEmail(), e);
+            return ResponseEntity.badRequest().body(Map.of("error", toUserMessage(e)));
+        }
     }
 
     @PostMapping("/proposals/{proposalId}/recommendations")
@@ -52,13 +76,11 @@ public class RecommendationController {
             @Valid @ModelAttribute("requestForm") RecommendationRequestForm form,
             BindingResult bindingResult,
             @AuthenticationPrincipal ItDaPrincipal principal,
-            RedirectAttributes redirectAttributes,
-            Model model
+            RedirectAttributes redirectAttributes
     ) {
         if (bindingResult.hasErrors()) {
-            RecommendationEntryViewModel entry = recommendationEntryService.getEntry(proposalId, principal.getEmail());
-            model.addAttribute("entry", entry);
-            return "recommendation/entry";
+            redirectAttributes.addFlashAttribute("errorMessage", "포지션을 선택해주세요.");
+            return "redirect:/proposals/" + proposalId + "?openRecommendModal=true";
         }
 
         try {
@@ -76,7 +98,7 @@ public class RecommendationController {
                     proposalId, form.proposalPositionId(), principal.getEmail(), e);
 
             redirectAttributes.addFlashAttribute("errorMessage", toUserMessage(e));
-            return "redirect:/proposals/{proposalId}/recommendations";
+            return "redirect:/proposals/" + proposalId + "?openRecommendModal=true";
         }
     }
 
@@ -101,9 +123,8 @@ public class RecommendationController {
             log.warn("추가 추천 요청 실패. proposalId={}, proposalPositionId={}, email={}",
                     proposalId, proposalPositionId, principal.getEmail(), e);
 
-            redirectAttributes.addAttribute("proposalId", proposalId);
             redirectAttributes.addFlashAttribute("errorMessage", toUserMessage(e));
-            return "redirect:/proposals/{proposalId}/recommendations";
+            return "redirect:/proposals/" + proposalId + "?openRecommendModal=true";
         }
     }
 
@@ -126,7 +147,7 @@ public class RecommendationController {
 
             model.addAttribute("title", "추천 실행 정보를 확인할 수 없습니다.");
             model.addAttribute("message", toRunStatusUserMessage(e));
-            model.addAttribute("backUrl", "/proposals/" + proposalId + "/recommendations");
+            model.addAttribute("backUrl", "/proposals/" + proposalId + "?openRecommendModal=true");
 
             return "recommendation/error";
         }
@@ -175,7 +196,7 @@ public class RecommendationController {
 
             model.addAttribute("title", "추천 후보 이력서를 확인할 수 없습니다.");
             model.addAttribute("message", toResultsUserMessage(e));
-            model.addAttribute("backUrl", "/proposals/" + proposalId + "/recommendations");
+            model.addAttribute("backUrl", "/proposals/" + proposalId + "?openRecommendModal=true");
             return "recommendation/error";
         }
     }
@@ -185,7 +206,7 @@ public class RecommendationController {
             return "추천 요청을 처리할 수 없습니다. 선택한 포지션을 다시 확인해주세요.";
         }
         if (e instanceof IllegalStateException) {
-            return "현재 상태에는 추천을 실행할 수 없습니다.";
+            return "모집 중 상태의 포지션만 추천을 실행할 수 있습니다.";
         }
         return "추천 요청 처리 중 문제가 발생했습니다. 다시 시도해주세요.";
     }
