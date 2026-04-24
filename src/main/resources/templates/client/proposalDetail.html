@@ -54,12 +54,14 @@
                                 제안서 수정
                             </a>
                             
-                            <a th:if="${proposal.status.name() == 'MATCHING'}"
-                               th:href="@{/proposals/{id}/recommendations(id=${proposal.id})}"
-                               class="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-100 transition hover:bg-blue-700">
+                            <button th:if="${viewerRole == 'CLIENT' and proposal.status.name() == 'MATCHING'}"
+                                    type="button"
+                                    id="btnOpenRecommendModal"
+                                    onclick="openRecommendModal()"
+                                    class="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-100 transition hover:bg-blue-700">
                                 <i data-lucide="sparkles" class="h-4 w-4"></i>
                                 추천 받아 보기
-                            </a>
+                            </button>
                             
                             <span th:if="${proposal.status.name() == 'COMPLETE'}"
                                   class="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-bold text-emerald-600">
@@ -334,186 +336,363 @@
                     </th:block>
                 </div>
 
-                
-                <th:block th:if="${false}">
-
-                        <div class="flex flex-wrap items-start justify-between gap-4">
-                            <div class="space-y-1">
-                                <h4 class="text-2xl font-black tracking-tight text-slate-950"
-                                    th:text="${pos.title}">Node.js 백엔드 개발자/h4>
-                                <p class="text-base font-medium text-slate-400"
-                                   th:text="${pos.position.name}">백엔드 개발자</p>
-                            </div>
-
-                            <div class="flex flex-wrap items-center gap-2">
-                                
-                                <span th:classappend="${
-                                          pos.status.name() == 'OPEN'   ? 'border-blue-200 bg-blue-50 text-blue-600' :
-                                          (pos.status.name() == 'FULL'  ? 'border-amber-200 bg-amber-50 text-amber-600' :
-                                                                           'border-slate-200 bg-slate-100 text-slate-500')
-                                      }"
-                                      class="inline-flex rounded-full border px-4 py-1.5 text-xs font-bold"
-                                      th:text="${pos.status.name() == 'OPEN' ? '모집 중 :
-                                                 (pos.status.name() == 'FULL' ? '정원 충족' : '모집 종료')}">
-                                    모집 중                                </span>
-
-                                
-                                <th:block th:if="${viewerRole == 'FREELANCER' and matchingByPositionId != null and matchingByPositionId[pos.id] != null}">
-                                    <th:block th:with="myMatching=${matchingByPositionId[pos.id]}">
-                                        
-                                        <span th:classappend="${
-                                                  myMatching.status.name() == 'PROPOSED'    ? 'border-yellow-200 bg-yellow-50 text-yellow-700' :
-                                                  (myMatching.status.name() == 'ACCEPTED'   ? 'border-emerald-200 bg-emerald-50 text-emerald-700' :
-                                                  (myMatching.status.name() == 'REJECTED'   ? 'border-red-200 bg-red-50 text-red-600' :
-                                                  (myMatching.status.name() == 'IN_PROGRESS'? 'border-blue-200 bg-blue-50 text-blue-600' :
-                                                  (myMatching.status.name() == 'COMPLETED'  ? 'border-slate-200 bg-slate-100 text-slate-600' :
-                                                                                               'border-slate-200 bg-slate-100 text-slate-500'))))
-                                              }"
-                                              class="inline-flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-xs font-bold"
-                                              th:text="${myMatching.status.description}">
-                                            제안됨                                        </span>
-
-                                        
-                                        <th:block th:if="${myMatching.status.name() == 'PROPOSED'}">
-                                            <form th:action="@{/matchings/{id}/accept(id=${myMatching.id})}" method="post" class="inline">
-                                                <input type="hidden" name="_csrf" th:value="${_csrf.token}">
-                                                <input type="hidden" name="redirectTo" th:value="@{/matchings/{id}(id=${myMatching.id})}">
-                                                <input type="hidden" name="errorRedirectTo" th:value="@{/proposals/{id}(id=${proposal.id})}">
-                                                <button type="submit"
-                                                        class="inline-flex items-center gap-1.5 rounded-2xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700">
-                                                    <i data-lucide="check" class="h-3.5 w-3.5"></i>
-                                                    수락
-                                                </button>
-                                            </form>
-                                            <form th:action="@{/matchings/{id}/reject(id=${myMatching.id})}" method="post" class="inline">
-                                                <input type="hidden" name="_csrf" th:value="${_csrf.token}">
-                                                <input type="hidden" name="redirectTo" th:value="@{/matchings/{id}(id=${myMatching.id})}">
-                                                <input type="hidden" name="errorRedirectTo" th:value="@{/proposals/{id}(id=${proposal.id})}">
-                                                <button type="submit"
-                                                        class="inline-flex items-center gap-1.5 rounded-2xl border border-red-200 bg-white px-4 py-2 text-xs font-bold text-red-500 transition hover:bg-red-50">
-                                                    <i data-lucide="x" class="h-3.5 w-3.5"></i>
-                                                    거절
-                                                </button>
-                                            </form>
-                                        </th:block>
-                                    </th:block>
-                                </th:block>
-                            </div>
-                        </div>
-
-                        
-                        <div class="mt-6 grid gap-6 sm:grid-cols-3">
-                            <div>
-                                <p class="text-xs font-black uppercase tracking-widest text-slate-400">모집 인원</p>
-                                <p class="mt-2 text-2xl font-black tracking-tight text-slate-900"
-                                   th:text="${pos.headCount != null ? pos.headCount + '명 : '미정'}">2명</p>
-                            </div>
-                            <div>
-                                <p class="text-xs font-black uppercase tracking-widest text-slate-400">예산 (월)</p>
-                                <p class="mt-2 text-2xl font-black tracking-tight text-slate-900">
-                                    <span th:if="${pos.unitBudgetMin != null and pos.unitBudgetMax != null}"
-                                          th:text="${#numbers.formatInteger(pos.unitBudgetMin, 3, 'COMMA') + '년~ ' + #numbers.formatInteger(pos.unitBudgetMax, 3, 'COMMA') + '??}">
-                                        3,000,000원~ 4,000,000원                                    </span>
-                                    <span th:unless="${pos.unitBudgetMin != null and pos.unitBudgetMax != null}">미정</span>
-                                </p>
-                            </div>
-                            <div>
-                                <p class="text-xs font-black uppercase tracking-widest text-slate-400">湲곌컙</p>
-                                <p class="mt-2 text-2xl font-black tracking-tight text-slate-900"
-                                   th:text="${pos.expectedPeriod != null ? pos.expectedPeriod + '주 : '미정'}">4二?</p>
-                            </div>
-                        </div>
-
-                        
-                        <div class="mt-6 grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-
-                            
-                            <div class="space-y-4">
-                                
-                                <div>
-                                    <p class="text-xs font-black uppercase tracking-widest text-slate-400">필수 기술</p>
-                                    <div class="mt-3 flex flex-wrap gap-2">
-                                        <th:block th:each="skill : ${pos.skills}">
-                                            <span th:if="${skill.importance.name() == 'ESSENTIAL'}"
-                                                  class="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700"
-                                                  th:text="${skill.skill.name}">React</span>
-                                        </th:block>
-                                        
-                                        <span th:if="${!#lists.isEmpty(pos.skills) and
-                                                       #lists.isEmpty(pos.skills.?[importance.name() == 'ESSENTIAL'])}"
-                                              class="rounded-full border border-dashed border-slate-200 px-3 py-1.5 text-sm text-slate-400">
-                                            없음
-                                        </span>
-                                        <span th:if="${#lists.isEmpty(pos.skills)}"
-                                              class="rounded-full border border-dashed border-slate-200 px-3 py-1.5 text-sm text-slate-400">
-                                            없음
-                                        </span>
-                                    </div>
-                                </div>
-
-                                
-                                <div>
-                                    <p class="text-xs font-black uppercase tracking-widest text-slate-400">우대 기술</p>
-                                    <div class="mt-3 flex flex-wrap gap-2">
-                                        <th:block th:each="skill : ${pos.skills}">
-                                            <span th:if="${skill.importance.name() == 'PREFERENCE'}"
-                                                  class="rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-600"
-                                                  th:text="${skill.skill.name}">TypeScript</span>
-                                        </th:block>
-                                        
-                                        <span th:if="${!#lists.isEmpty(pos.skills) and
-                                                       #lists.isEmpty(pos.skills.?[importance.name() == 'PREFERENCE'])}"
-                                              class="rounded-full border border-dashed border-slate-200 px-3 py-1.5 text-sm text-slate-400">
-                                            없음
-                                        </span>
-                                        <span th:if="${#lists.isEmpty(pos.skills)}"
-                                              class="rounded-full border border-dashed border-slate-200 px-3 py-1.5 text-sm text-slate-400">
-                                            없음
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            
-                            <div class="rounded-[24px] border border-white bg-white px-5 py-5">
-                                <div class="grid gap-4 sm:grid-cols-2">
-                                    <div>
-                                        <p class="text-xs font-black uppercase tracking-widest text-slate-400">근무 형태</p>
-                                        <p class="mt-2 text-base font-bold text-slate-900"
-                                           th:text="${pos.workType != null ? pos.workType.description : '미정'}">?먭꺽</p>
-                                    </div>
-                                    <div>
-                                        <p class="text-xs font-black uppercase tracking-widest text-slate-400">근무지</p>
-                                        <p class="mt-2 text-base font-bold text-slate-900"
-                                           th:text="${!#strings.isEmpty(pos.workPlace) ? pos.workPlace : '미정'}">서울 강남구</p>
-                                    </div>
-                                    <div>
-                                        <p class="text-xs font-black uppercase tracking-widest text-slate-400">경력 범위</p>
-                                        <p class="mt-2 text-base font-bold text-slate-900">
-                                            <span th:if="${pos.careerMinYears != null and pos.careerMaxYears != null}"
-                                                  th:text="${pos.careerMinYears + '년~ ' + pos.careerMaxYears + '??}">3??~ 5??</span>
-                                            <span th:if="${pos.careerMinYears != null and pos.careerMaxYears == null}"
-                                                  th:text="${pos.careerMinYears + '년 이상'}">3???댁긽</span>
-                                            <span th:if="${pos.careerMinYears == null and pos.careerMaxYears != null}"
-                                                  th:text="${pos.careerMaxYears + '년 이하'}">5???댄븯</span>
-                                            <span th:if="${pos.careerMinYears == null and pos.careerMaxYears == null}">미정</span>
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p class="text-xs font-black uppercase tracking-widest text-slate-400">모집 상태</p>
-                                        <p class="mt-2 text-base font-bold text-slate-900"
-                                           th:text="${pos.status.name() == 'OPEN' ? '모집 중 :
-                                                      (pos.status.name() == 'FULL' ? '정원 충족' : '모집 종료')}">모집 중</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                </div>
-                </th:block>
             </section>
 
         </div>
     </main>
+
+    <!-- ── 추천 포지션 선택 모달 (MATCHING 상태 CLIENT에게만 렌더) ── -->
+
+        <!-- 백드롭 -->
+        <div id="recommendModalBackdrop"
+             th:if="${viewerRole == 'CLIENT' and proposal.status.name() == 'MATCHING'}"
+             class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm hidden"
+             onclick="closeRecommendModal()"
+        >
+        </div>
+
+        <!-- 모달 패널 -->
+        <div id="recommendModal"
+              th:if="${viewerRole == 'CLIENT' and proposal.status.name() == 'MATCHING'}"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="recommendModalTitle"
+              class="fixed inset-0 z-50 flex items-center justify-center px-4 hidden">
+            <div class="flex flex-col w-full max-w-xl max-h-[90vh] rounded-[32px] border border-slate-200 bg-white shadow-2xl shadow-slate-300/40">
+
+                <!-- 헤더 -->
+                <div class="flex-shrink-0 flex items-start justify-between px-7 pt-7 pb-5 border-b border-slate-100">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">Recommendation</p>
+                        <h2 id="recommendModalTitle"
+                            class="mt-1 text-lg font-bold tracking-tight text-slate-900"
+                            th:text="${recommendEntry != null ? recommendEntry.proposalTitle : proposal.title}">제안서명</h2>
+                    </div>
+                    <button type="button"
+                            id="btnCloseRecommendModal"
+                            onclick="closeRecommendModal()"
+                            class="ml-4 rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
+                        <i data-lucide="x" class="h-5 w-5"></i>
+                    </button>
+                </div>
+
+                <!-- 본문 -->
+                <div class="flex-1 overflow-y-auto px-7 py-6 space-y-5">
+
+                    <!-- 에러 배너 -->
+                    <div th:if="${errorMessage}"
+                         class="flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3">
+                        <i data-lucide="triangle-alert" class="h-4 w-4 shrink-0 text-rose-500"></i>
+                        <p class="text-sm font-semibold text-rose-700" th:text="${errorMessage}">오류 메시지</p>
+                    </div>
+
+                    <!-- 안내 문구 -->
+                    <div class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <i data-lucide="info" class="mt-0.5 h-4 w-4 shrink-0 text-slate-400"></i>
+                        <p class="text-sm leading-relaxed text-slate-600"
+                           th:text="${recommendEntry != null ? recommendEntry.helperMessage : '추천을 받을 포지션을 선택하고 추천을 시작해주세요.'}">안내 문구</p>
+                    </div>
+
+                    <!-- JS 에러 배너 (fetch 응답용 — 초기 hidden) -->
+                    <div id="recommendModalErrorBanner"
+                         class="hidden flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3">
+                        <i data-lucide="triangle-alert" class="h-4 w-4 shrink-0 text-rose-500"></i>
+                        <p id="recommendModalErrorMsg" class="text-sm font-semibold text-rose-700"></p>
+                    </div>
+
+                    <!-- 추천 요청 폼 — POST /proposal-positions/{posId}/recommendations/more?proposalId={id} -->
+                    <form id="recommendModalForm"
+                          th:action="@{/proposal-positions/{posId}/recommendations/more(
+                                    posId=${recommendEntry != null ? recommendEntry.selectedProposalPositionId : 0},
+                                    proposalId=${proposal.id})}"
+                          method="post"
+                          th:data-proposal-id="${proposal.id}">
+                        <th:block th:if="${_csrf != null}">
+                            <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+                        </th:block>
+
+                        <!-- 포지션 select -->
+                        <div>
+                            <div class="flex items-center gap-1.5 mb-3">
+                                <i data-lucide="layers" class="h-4 w-4 text-slate-400"></i>
+                                <label for="modalProposalPositionId"
+                                       class="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                                    추천 대상 포지션
+                                </label>
+                            </div>
+                            <div class="relative">
+                                <select id="modalProposalPositionId"
+                                        name="proposalPositionId"
+                                        class="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-4 pr-10 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100">
+                                    <option value="">포지션을 선택해주세요</option>
+                                    <th:block th:if="${recommendEntry != null}">
+                                        <option th:each="position : ${recommendEntry.positions}"
+                                                th:value="${position.proposalPositionId}"
+                                                th:disabled="${position.positionStatusName != 'OPEN'}"
+                                                th:selected="${position.proposalPositionId == recommendEntry.selectedProposalPositionId}"
+                                                th:text="${position.positionTitle
+                                                    + (position.positionCategoryName != null and position.positionCategoryName != position.positionTitle ? ' · ' + position.positionCategoryName : '')
+                                                    + (position.positionStatusName != 'OPEN' ? ' · ' + position.positionStatusDescription : '')}">
+                                            백엔드 개발자
+                                        </option>
+                                    </th:block>
+                                    <th:block th:if="${recommendEntry == null}">
+                                        <option th:each="pos : ${proposal.positions}"
+                                                th:value="${pos.id}"
+                                                th:disabled="${pos.status == null or pos.status.name() != 'OPEN'}"
+                                                th:text="${pos.title
+                                                    + (pos.status != null and pos.status.name() != 'OPEN' ? ' · ' + pos.status.description : '')
+                                                    + (pos.status == null ? ' · 상태 미정' : '')}">
+                                            백엔드 개발자
+                                        </option>
+                                    </th:block>
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-4 flex items-center">
+                                    <i data-lucide="chevron-down" class="h-4 w-4 text-slate-400"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 포지션 카드 목록 -->
+                        <div class="mt-5 space-y-3"
+                             th:if="${recommendEntry != null and !#lists.isEmpty(recommendEntry.positions)}">
+                            <article th:each="position : ${recommendEntry.positions}"
+                                     th:attr="data-position-id=${position.proposalPositionId}, data-position-status=${position.positionStatusName}"
+                                     class="rounded-[24px] border border-slate-200 bg-slate-50 p-5 transition"
+                                     th:classappend="${position.positionStatusName == 'OPEN'} ? ' cursor-pointer hover:border-blue-200' : ' opacity-50 cursor-not-allowed'"
+                                     th:onclick="${position.positionStatusName == 'OPEN'} ? 'selectPositionCard(this)' : null">
+
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                        <div class="flex items-center gap-2">
+                                            <h3 class="text-base font-bold tracking-tight text-slate-900"
+                                                th:text="${position.positionTitle}">백엔드 개발자</h3>
+                                            <span th:classappend="${position.positionStatusName == 'OPEN'}
+                                                      ? 'border-blue-200 bg-blue-50 text-blue-600'
+                                                      : (${position.positionStatusName == 'FULL'}
+                                                          ? 'border-amber-200 bg-amber-50 text-amber-600'
+                                                          : 'border-slate-200 bg-slate-100 text-slate-500')"
+                                                  class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-bold"
+                                                  th:text="${position.positionStatusDescription}">모집 중</span>
+                                        </div>
+                                        <p th:if="${position.positionCategoryName != null and position.positionCategoryName != position.positionTitle}"
+                                           class="mt-1 text-sm font-medium text-slate-500"
+                                           th:text="${position.positionCategoryName}">백엔드</p>
+                                    </div>
+                                    <!-- JS가 토글 -->
+                                    <span class="selected-badge hidden rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                                        선택됨
+                                    </span>
+                                </div>
+
+                                <!-- 수치 -->
+                                <div class="mt-3 flex flex-wrap gap-4">
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">인원</p>
+                                        <p class="mt-1 text-sm font-bold text-slate-900"
+                                           th:text="${position.headCount != null ? position.headCount + '명' : '미정'}">2명</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">예산</p>
+                                        <p class="mt-1 text-sm font-bold text-slate-900"
+                                           th:text="${position.budgetText != null ? position.budgetText : '미정'}">3,000,000 ~ 5,000,000</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">기간</p>
+                                        <p class="mt-1 text-sm font-bold text-slate-900"
+                                           th:text="${position.expectedPeriod != null ? position.expectedPeriod + '주' : '미정'}">8주</p>
+                                    </div>
+                                </div>
+
+                                <!-- 스킬 -->
+                                <div class="mt-4" th:if="${!#lists.isEmpty(position.skills)}">
+                                    <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">요구 스킬</p>
+                                    <div class="mt-2 flex flex-wrap gap-2">
+                                        <span th:each="skill : ${position.skills}"
+                                              th:classappend="${skill.importanceLabel == '필수'} ? 'border-slate-200 bg-white text-slate-700' : 'border-blue-100 bg-blue-50 text-blue-700'"
+                                              class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold">
+                                            <span th:text="${skill.skillName}">Java</span>
+                                            <span class="text-slate-300">·</span>
+                                            <span th:text="${skill.importanceLabel}">필수</span>
+                                        </span>
+                                    </div>
+                                </div>
+                            </article>
+                        </div>
+
+                        <!-- 액션 버튼 -->
+                        <div class="mt-6 flex items-center justify-end gap-3"
+                             th:with="openPositions=${recommendEntry != null ? recommendEntry.positions.?[positionStatusName == 'OPEN'] : proposal.positions.?[status != null and status.name() == 'OPEN']},
+                                      canRun=${recommendEntry != null ? recommendEntry.runnable : !#lists.isEmpty(openPositions)}">
+                            <button type="button"
+                                    id="btnCancelRecommendModal"
+                                    onclick="closeRecommendModal()"
+                                    class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50">
+                                취소
+                            </button>
+                            <button type="submit"
+                                    th:disabled="${!canRun}"
+                                    th:classappend="${canRun}
+                                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 hover:bg-blue-700'
+                                        : 'cursor-not-allowed bg-slate-100 text-slate-400'"
+                                    class="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold transition">
+                                <i data-lucide="sparkles" class="h-4 w-4"></i>
+                                추천 시작
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+
 </div>
+
+<th:block layout:fragment="scripts">
+    <script>
+        function openRecommendModal() {
+            var modal = document.getElementById('recommendModal');
+            var backdrop = document.getElementById('recommendModalBackdrop');
+            if (!modal || !backdrop) return;
+            modal.classList.remove('hidden');
+            backdrop.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeRecommendModal() {
+            var modal = document.getElementById('recommendModal');
+            var backdrop = document.getElementById('recommendModalBackdrop');
+            if (!modal || !backdrop) return;
+            modal.classList.add('hidden');
+            backdrop.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeRecommendModal();
+        });
+
+        (function () {
+            var params = new URLSearchParams(location.search);
+            if (params.get('openRecommendModal') === 'true') {
+                openRecommendModal();
+
+                params.delete('openRecommendModal');
+                var nextUrl = location.pathname + (params.toString() ? ('?' + params.toString()) : '');
+                history.replaceState(null, '', nextUrl);
+            }
+        })();
+
+        // ── 모달 폼 — fetch 제출 (에러 시 리다이렉트 없이 배너 표시) ──
+        (function () {
+            var form = document.getElementById('recommendModalForm');
+            if (!form) return;
+
+            var errorBanner = document.getElementById('recommendModalErrorBanner');
+            var errorMsg    = document.getElementById('recommendModalErrorMsg');
+
+            function showError(msg) {
+                if (!errorBanner || !errorMsg) return;
+                errorMsg.textContent = msg;
+                errorBanner.classList.remove('hidden');
+            }
+
+            function hideError() {
+                if (errorBanner) errorBanner.classList.add('hidden');
+            }
+
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                hideError();
+
+                var select = document.getElementById('modalProposalPositionId');
+                var proposalPositionId = select ? select.value : '';
+                if (!proposalPositionId) {
+                    showError('포지션을 선택해주세요.');
+                    return;
+                }
+
+                var selectedOption = select ? select.options[select.selectedIndex] : null;
+                if (selectedOption && selectedOption.disabled) {
+                    showError('모집 중(OPEN)인 포지션만 추천을 실행할 수 있습니다.');
+                    return;
+                }
+
+                // POST /proposal-positions/{posId}/recommendations/more?proposalId={id}
+                var proposalId = form.dataset.proposalId;
+                form.action = '/proposal-positions/' + encodeURIComponent(proposalPositionId)
+                            + '/recommendations/more'
+                            + '?proposalId=' + encodeURIComponent(proposalId);
+
+                var csrfInput = form.querySelector('input[name="_csrf"]');
+                var headers = {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Accept':       'application/json'
+                };
+
+                fetch(form.action, {
+                    method:  'POST',
+                    headers: headers,
+                    body:    new URLSearchParams(new FormData(form)).toString()
+                })
+                .then(function (res) { return res.json(); })
+                .then(function (data) {
+                    if (data.redirect) {
+                        location.href = data.redirect;
+                    } else if (data.error) {
+                        showError(data.error);
+                    }
+                })
+                .catch(function () {
+                    // 네트워크 오류 — 폼 직접 제출로 fallback
+                    form.submit();
+                });
+            });
+
+            // 모달 닫을 때 에러 배너 초기화
+            var origClose = window.closeRecommendModal;
+            window.closeRecommendModal = function () {
+                hideError();
+                if (origClose) origClose();
+            };
+        })();
+
+        // ── 포지션 카드 ↔ 드롭다운 연동 ──────────────────────────
+        (function () {
+            var select = document.getElementById('modalProposalPositionId');
+
+            function highlightCard(posId) {
+                document.querySelectorAll('[data-position-id]').forEach(function (card) {
+                    var badge = card.querySelector('.selected-badge');
+                    var isSelected = posId && card.dataset.positionId === String(posId);
+                    // 테두리 / 배경
+                    card.classList.toggle('border-blue-200', isSelected);
+                    card.classList.toggle('bg-blue-50', isSelected);
+                    card.classList.toggle('border-slate-200', !isSelected);
+                    card.classList.toggle('bg-slate-50', !isSelected);
+                    // 뱃지
+                    if (badge) badge.classList.toggle('hidden', !isSelected);
+                });
+            }
+
+            // 카드 클릭 → 드롭다운 갱신 + 하이라이트
+            window.selectPositionCard = function (cardEl) {
+                var posId = cardEl.dataset.positionId;
+                if (select) select.value = posId;
+                highlightCard(posId);
+            };
+
+            // 드롭다운 변경 → 카드 하이라이트
+            if (select) {
+                select.addEventListener('change', function () {
+                    highlightCard(this.value);
+                });
+                // 초기화 — 드롭다운 기본값에 맞춰 카드 선택 상태 적용
+                if (select.value) highlightCard(select.value);
+            }
+        })();
+    </script>
+</th:block>
+
 </body>
 </html>

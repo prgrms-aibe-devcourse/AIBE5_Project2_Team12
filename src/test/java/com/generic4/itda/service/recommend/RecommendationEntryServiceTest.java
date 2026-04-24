@@ -132,7 +132,7 @@ class RecommendationEntryServiceTest {
 
         assertThat(result.positions()).isEmpty();
         assertThat(result.selectedProposalPositionId()).isNull();
-        assertThat(result.runnable()).isTrue();
+        assertThat(result.runnable()).isFalse();
 
         verifyNoMoreInteractions(proposalRepository, memberRepository);
     }

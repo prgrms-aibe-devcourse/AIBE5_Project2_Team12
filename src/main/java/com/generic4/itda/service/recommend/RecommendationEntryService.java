@@ -3,6 +3,7 @@ package com.generic4.itda.service.recommend;
 import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
+import com.generic4.itda.domain.proposal.ProposalPositionStatus;
 import com.generic4.itda.domain.proposal.ProposalStatus;
 import com.generic4.itda.dto.recommend.RecommendationEntryPositionItem;
 import com.generic4.itda.dto.recommend.RecommendationEntrySkillItem;
@@ -32,21 +33,28 @@ public class RecommendationEntryService {
 
         validateOwnership(proposal, member);
 
-        boolean runnable = proposal.getStatus() == ProposalStatus.MATCHING;
+        boolean hasOpenPosition = proposal.getPositions().stream()
+                .anyMatch(position -> position.getStatus() == ProposalPositionStatus.OPEN);
+
+        boolean runnable = proposal.getStatus() == ProposalStatus.MATCHING && hasOpenPosition;
 
         List<RecommendationEntryPositionItem> positions = proposal.getPositions().stream()
                 .sorted(Comparator.comparing(ProposalPosition::getId))
                 .map(this::toPositionItem)
                 .toList();
 
-        Long selectedProposalPositionId = positions.isEmpty() ? null : positions.get(0).proposalPositionId();
+        Long selectedProposalPositionId = positions.stream()
+                .filter(position -> ProposalPositionStatus.OPEN.name().equals(position.positionStatusName()))
+                .map(RecommendationEntryPositionItem::proposalPositionId)
+                .findFirst()
+                .orElseGet(() -> positions.isEmpty() ? null : positions.get(0).proposalPositionId());
 
         return new RecommendationEntryViewModel(
                 proposal.getId(),
                 proposal.getTitle(),
                 proposal.getStatus().getDescription(),
                 runnable,
-                buildHelperMessage(runnable),
+                buildHelperMessage(proposal, hasOpenPosition),
                 selectedProposalPositionId,
                 positions
         );
@@ -78,7 +86,9 @@ public class RecommendationEntryService {
                         .map(skill -> new RecommendationEntrySkillItem(
                                 skill.getSkill().getName(),
                                 skill.getImportance().getDescription()
-                        )).toList()
+                        )).toList(),
+                position.getStatus().name(),
+                position.getStatus().getDescription()
         );
     }
 
@@ -102,9 +112,13 @@ public class RecommendationEntryService {
         return String.format("%,d 이하", max);
     }
 
-    private String buildHelperMessage(boolean runnable) {
-        return runnable
-                ? "선택한 포지션 기준으로 추천을 시작할 수 있습니다."
-                : "제안서가 MATCHING 상태일 때만 추천을 실행할 수 있습니다.";
+    private String buildHelperMessage(Proposal proposal, boolean hasOpenPosition) {
+        if (proposal.getStatus() != ProposalStatus.MATCHING) {
+            return "제안서가 MATCHING 상태일 때만 추천을 실행할 수 있습니다.";
+        }
+        if (!hasOpenPosition) {
+            return "OPEN 상태의 모집 포지션이 없어 추천을 실행할 수 없습니다.";
+        }
+        return "선택한 포지션 기준으로 추천을 시작할 수 있습니다.";
     }
 }

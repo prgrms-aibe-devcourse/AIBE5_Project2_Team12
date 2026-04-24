@@ -9,7 +9,9 @@ public record RecommendationEntryPositionItem(
         Long headCount,
         String budgetText,
         Long expectedPeriod,
-        List<RecommendationEntrySkillItem> skills
+        List<RecommendationEntrySkillItem> skills,
+        String positionStatusName,
+        String positionStatusDescription
 ) {
 
 }
