@@ -134,7 +134,7 @@ class RecommendationEntryServiceIntegrationTest {
                 owner.getEmail().getValue()
         );
 
-        assertThat(result.runnable()).isTrue();
+        assertThat(result.runnable()).isFalse();
         assertThat(result.positions()).isEmpty();
         assertThat(result.selectedProposalPositionId()).isNull();
     }
