@@ -9,6 +9,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -20,7 +21,6 @@ import com.generic4.itda.dto.recommend.RecommendationResumeSkillItem;
 import com.generic4.itda.dto.recommend.RecommendationResultsViewModel;
 import com.generic4.itda.dto.security.ItDaPrincipal;
 import com.generic4.itda.repository.MemberRepository;
-import com.generic4.itda.service.recommend.RecommendationEntryService;
 import com.generic4.itda.service.recommend.RecommendationRunQueryService;
 import com.generic4.itda.service.recommend.RecommendationRunService;
 import java.util.List;
@@ -44,9 +44,6 @@ class RecommendationControllerTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private RecommendationEntryService recommendationEntryService;
-
-    @MockitoBean
     private RecommendationRunService recommendationRunService;
 
     @MockitoBean
@@ -54,6 +51,25 @@ class RecommendationControllerTest {
 
     @MockitoBean
     private MemberRepository memberRepository;
+
+    @Test
+    @DisplayName("GET /recommendations — 제안서 상세 모달로 redirect한다")
+    void entryRedirectsToProposalDetail() throws Exception {
+        // given
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        // when / then
+        mockMvc.perform(get("/proposals/{proposalId}/recommendations", PROPOSAL_ID)
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/proposals/" + PROPOSAL_ID + "?openRecommendModal=true"));
+    }
 
     @Test
     @DisplayName("추천 결과 조회가 성공하면 results 화면을 렌더링한다")
