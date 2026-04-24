@@ -8,12 +8,14 @@ import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.dto.proposal.AiInterviewMessageResponse;
 import com.generic4.itda.dto.proposal.ProposalForm;
 import com.generic4.itda.dto.proposal.ProposalPositionForm;
+import com.generic4.itda.dto.recommend.RecommendationEntryViewModel;
 import com.generic4.itda.dto.security.ItDaPrincipal;
 import com.generic4.itda.exception.ProposalNotFoundException;
 import com.generic4.itda.repository.MatchingRepository;
 import com.generic4.itda.service.ProposalAiInterviewService;
 import com.generic4.itda.service.PositionResolver;
 import com.generic4.itda.service.ProposalService;
+import com.generic4.itda.service.recommend.RecommendationEntryService;
 import jakarta.validation.Valid;
 import java.util.HashSet;
 import java.util.List;
@@ -21,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -38,6 +41,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @Controller
 @RequestMapping("/proposals")
 @RequiredArgsConstructor
+@Slf4j
 public class ProposalController {
 
     private static final String SAVE_ACTION = "save";
@@ -47,6 +51,7 @@ public class ProposalController {
     private final ProposalAiInterviewService proposalAiInterviewService;
     private final PositionResolver positionResolver;
     private final MatchingRepository matchingRepository;
+    private final RecommendationEntryService recommendationEntryService;
 
     @GetMapping("/new")
     public String newForm(@AuthenticationPrincipal ItDaPrincipal principal, Model model) {
@@ -121,6 +126,16 @@ public class ProposalController {
                     .stream()
                     .map(m -> m.getProposalPosition().getId())
                     .collect(Collectors.toSet());
+
+            if (proposal.getStatus() == ProposalStatus.MATCHING) {
+                try {
+                    RecommendationEntryViewModel recommendEntry =
+                            recommendationEntryService.getEntry(proposalId, principal.getEmail());
+                    model.addAttribute("recommendEntry", recommendEntry);
+                } catch (Exception e) {
+                    log.warn("추천 진입 뷰 로딩 실패. proposalId={}, email={}", proposalId, principal.getEmail(), e);
+                }
+            }
 
             model.addAttribute("proposal", proposal);
             model.addAttribute("positionsWithMatchings", positionsWithMatchings);
@@ -352,7 +367,7 @@ public class ProposalController {
 
     private String redirectAfterSave(Proposal proposal, boolean registerAction, boolean aiBriefRequested) {
         if (registerAction) {
-            return "redirect:/proposals/" + proposal.getId() + "/recommendations";
+            return "redirect:/proposals/" + proposal.getId() + "?openRecommendModal=true";
         }
 
         if (aiBriefRequested) {
