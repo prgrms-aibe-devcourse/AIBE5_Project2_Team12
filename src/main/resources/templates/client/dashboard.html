@@ -202,10 +202,10 @@
         <div id="menuDeleteDivider" class="my-1 border-t border-slate-100"></div>
         <button id="menuDelete" type="button"
                 class="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium text-red-500 hover:bg-red-50">
-            <i data-lucide="trash-2" class="h-4 w-4"></i>프로젝트 삭제
+            <i data-lucide="trash-2" class="h-4 w-4"></i>제안서 삭제
         </button>
     </div>
-
+    
     <!-- 삭제 확인 모달 -->
     <div id="deleteModal" class="hidden fixed inset-0 z-50 flex items-center justify-center">
         <div id="deleteModalBackdrop" class="absolute inset-0 bg-black/40"></div>
@@ -350,7 +350,7 @@
             menuDelete.dataset.proposalTitle = proposalTitle;
 
             // 상태별 항목 표시/숨김
-            menuEdit.classList.toggle('hidden', statusKey === 'COMPLETE');
+            menuEdit.classList.toggle('hidden', statusKey === 'MATCHING' || statusKey === 'COMPLETE');
             menuRecommend.classList.toggle('hidden', statusKey === 'WRITING');
             menuMatching.classList.toggle('hidden', !(statusKey === 'MATCHING' || statusKey === 'COMPLETE'));
             var showDelete = statusKey === 'WRITING';
