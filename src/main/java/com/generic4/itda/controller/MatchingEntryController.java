@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
@@ -45,6 +46,7 @@ public class MatchingEntryController {
             @PathVariable Long proposalId,
             @RequestParam(name = "positionId", required = false) Long positionId,
             @RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "backUrl", required = false) String backUrl,
             @AuthenticationPrincipal ItDaPrincipal principal,
             Model model,
             RedirectAttributes redirectAttributes
@@ -55,6 +57,7 @@ public class MatchingEntryController {
                     .findWithPositionAndFreelancerByProposalIdAndClientEmail(proposalId, principal.getEmail());
 
             MatchingStatus filterStatus = parseStatus(status).orElse(null);
+            String resolvedBackUrl = resolveBackUrl(proposalId, backUrl);
 
             List<ClientMatchingListItemViewModel> items = applyFiltersAndSort(
                     matchings, positionId, filterStatus);
@@ -68,6 +71,9 @@ public class MatchingEntryController {
                     items
             ));
             model.addAttribute("items", items);
+            model.addAttribute("backUrl", resolvedBackUrl);
+            model.addAttribute("detailBackUrl",
+                    buildListUrl(proposalId, positionId, filterStatus, resolvedBackUrl));
             return "matching/list";
         } catch (ProposalNotFoundException e) {
             redirectAttributes.addFlashAttribute("errorMessage", "존재하지 않는 제안서입니다.");
@@ -86,6 +92,7 @@ public class MatchingEntryController {
             @PathVariable Long proposalId,
             @RequestParam(name = "positionId", required = false) Long positionId,
             @RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "backUrl", required = false) String backUrl,
             @AuthenticationPrincipal ItDaPrincipal principal,
             Model model
     ) {
@@ -97,6 +104,8 @@ public class MatchingEntryController {
         MatchingStatus filterStatus = parseStatus(status).orElse(null);
 
         model.addAttribute("items", applyFiltersAndSort(matchings, positionId, filterStatus));
+        model.addAttribute("detailBackUrl",
+                buildListUrl(proposalId, positionId, filterStatus, resolveBackUrl(proposalId, backUrl)));
         return "matching/fragments :: itemList";
     }
 
@@ -168,6 +177,35 @@ public class MatchingEntryController {
         } catch (IllegalArgumentException e) {
             return Optional.empty();
         }
+    }
+
+    private static String resolveBackUrl(Long proposalId, String backUrl) {
+        if (StringUtils.hasText(backUrl)) {
+            String trimmed = backUrl.trim();
+            if (trimmed.startsWith("/") && !trimmed.startsWith("//")) {
+                return trimmed;
+            }
+        }
+        return "/proposals/" + proposalId;
+    }
+
+    private static String buildListUrl(
+            Long proposalId,
+            Long positionId,
+            MatchingStatus filterStatus,
+            String backUrl
+    ) {
+        UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/proposals/{proposalId}/matchings");
+        if (positionId != null) {
+            builder.queryParam("positionId", positionId);
+        }
+        if (filterStatus != null) {
+            builder.queryParam("status", filterStatus.name());
+        }
+        if (StringUtils.hasText(backUrl)) {
+            builder.queryParam("backUrl", backUrl);
+        }
+        return builder.buildAndExpand(proposalId).toUriString();
     }
 
     private static Comparator<Matching> matchingSortComparator() {

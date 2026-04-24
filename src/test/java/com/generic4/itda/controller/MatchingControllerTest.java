@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -73,9 +74,53 @@ class MatchingControllerTest {
                         .with(authentication(authToken("client@example.com", "클라이언트"))))
                 .andExpect(status().isOk())
                 .andExpect(view().name("matching/detail"))
+                .andExpect(model().attribute("backUrl", "/proposals/200/matchings"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "counterpart-profile?returnTo=/matchings/401?backUrl%3D/proposals/200/matchings")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("매칭 프로세스 현황")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("연락처 정보")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("프로젝트 요약")));
+    }
+
+    @Test
+    @DisplayName("매칭 상세 페이지는 전달된 로컬 backUrl을 우선 사용한다")
+    void renderMatchingDetailPageWithExplicitBackUrl() throws Exception {
+        given(matchingQueryService.getDetail(401L, "client@example.com"))
+                .willReturn(createMatchingDetailView());
+
+        mockMvc.perform(get("/matchings/401")
+                        .param("backUrl", "/client/dashboard?tab=matchings")
+                        .with(authentication(authToken("client@example.com", "클라이언트"))))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("backUrl", "/client/dashboard?tab=matchings"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "counterpart-profile?returnTo=/matchings/401?backUrl%3D/client/dashboard?tab%253Dmatchings")));
+    }
+
+    @Test
+    @DisplayName("매칭 상세 페이지는 외부 backUrl을 무시하고 기본 복귀 경로를 사용한다")
+    void renderMatchingDetailPageWithUnsafeBackUrl() throws Exception {
+        given(matchingQueryService.getDetail(401L, "client@example.com"))
+                .willReturn(createMatchingDetailView());
+
+        mockMvc.perform(get("/matchings/401")
+                        .param("backUrl", "https://example.com/outside")
+                        .with(authentication(authToken("client@example.com", "클라이언트"))))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("backUrl", "/proposals/200/matchings"));
+    }
+
+    @Test
+    @DisplayName("프로젝트 정보가 비어 있어도 매칭 상세 페이지는 fallback 문구로 렌더링된다")
+    void renderMatchingDetailPageWhenProjectSummaryIsMissing() throws Exception {
+        given(matchingQueryService.getDetail(401L, "client@example.com"))
+                .willReturn(createMatchingDetailViewWithoutProject());
+
+        mockMvc.perform(get("/matchings/401")
+                        .with(authentication(authToken("client@example.com", "클라이언트"))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("matching/detail"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("연결된 제안서 요약을 불러오지 못했습니다.")));
     }
 
     @Test
@@ -92,12 +137,27 @@ class MatchingControllerTest {
     }
 
     @Test
-    @DisplayName("권한 없는 매칭 상세를 조회하면 홈으로 이동하며 오류 메시지를 남긴다")
+    @DisplayName("없는 매칭 상세를 조회하면 전달된 backUrl로 복귀하며 오류 메시지를 남긴다")
+    void redirectToBackUrlWhenMatchingDetailNotFound() throws Exception {
+        given(matchingQueryService.getDetail(999L, "client@example.com"))
+                .willThrow(new IllegalArgumentException("매칭 정보를 찾을 수 없습니다. id=999"));
+
+        mockMvc.perform(get("/matchings/999")
+                        .param("backUrl", "/proposals/200/matchings?status=PROPOSED")
+                        .with(authentication(authToken("client@example.com", "클라이언트"))))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/proposals/200/matchings?status=PROPOSED"))
+                .andExpect(flash().attribute("errorMessage", "존재하지 않는 매칭입니다."));
+    }
+
+    @Test
+    @DisplayName("권한 없는 매칭 상세를 조회하면 외부 backUrl을 무시하고 홈으로 이동한다")
     void redirectHomeWhenMatchingDetailAccessDenied() throws Exception {
         given(matchingQueryService.getDetail(401L, "client@example.com"))
                 .willThrow(new AccessDeniedException("해당 매칭 정보에 접근할 수 없습니다."));
 
         mockMvc.perform(get("/matchings/401")
+                        .param("backUrl", "https://example.com/outside")
                         .with(authentication(authToken("client@example.com", "클라이언트"))))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/"))
@@ -488,6 +548,22 @@ class MatchingControllerTest {
                         false,
                         false
                 )
+        );
+    }
+
+    private MatchingDetailViewModel createMatchingDetailViewWithoutProject() {
+        MatchingDetailViewModel view = createMatchingDetailView();
+        return new MatchingDetailViewModel(
+                view.matchingId(),
+                view.viewerRole(),
+                view.status(),
+                view.contactVisible(),
+                view.header(),
+                view.summary(),
+                view.contacts(),
+                null,
+                view.timeline(),
+                view.lifecycle()
         );
     }
 }

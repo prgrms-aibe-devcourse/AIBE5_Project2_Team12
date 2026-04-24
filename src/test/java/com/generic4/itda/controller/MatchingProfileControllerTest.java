@@ -46,13 +46,13 @@ class MatchingProfileControllerTest {
     private MemberRepository memberRepository;
 
     @Test
-    @DisplayName("프리랜서 상대 프로필에서도 공통 프로젝트 요약이 렌더링된다")
+    @DisplayName("프리랜서 상대 프로필에서도 returnTo 기반 back 링크와 공통 프로젝트 요약이 렌더링된다")
     void renderCounterpartProfileWithSharedProjectSummary() throws Exception {
         given(matchingProfileQueryService.getCounterpartProfile(401L, "client@example.com"))
                 .willReturn(createFreelancerShellView(false));
 
         mockMvc.perform(get("/matchings/401/counterpart-profile")
-                        .param("backUrl", "/client/dashboard")
+                        .param("returnTo", "/client/dashboard")
                         .with(authentication(authToken("client@example.com", "클라이언트"))))
                 .andExpect(status().isOk())
                 .andExpect(view().name("profile/shell"))
@@ -60,6 +60,21 @@ class MatchingProfileControllerTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("요청 프로젝트 요약")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("AI 매칭 플랫폼")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("매칭 상태")));
+    }
+
+    @Test
+    @DisplayName("returnTo가 있으면 기존 backUrl보다 우선 적용한다")
+    void renderCounterpartProfilePrefersReturnToOverBackUrl() throws Exception {
+        given(matchingProfileQueryService.getCounterpartProfile(401L, "client@example.com"))
+                .willReturn(createFreelancerShellView(false));
+
+        mockMvc.perform(get("/matchings/401/counterpart-profile")
+                        .param("returnTo", "/proposals/10/matchings")
+                        .param("backUrl", "/matchings/401")
+                        .with(authentication(authToken("client@example.com", "클라이언트"))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("profile/shell"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("href=\"/proposals/10/matchings\"")));
     }
 
     @Test
@@ -85,10 +100,10 @@ class MatchingProfileControllerTest {
                 .willThrow(new IllegalArgumentException("매칭 정보를 찾을 수 없습니다. id=401"));
 
         mockMvc.perform(get("/matchings/401/counterpart-profile")
-                        .param("backUrl", "/matchings/401")
+                        .param("returnTo", "/proposals/10/matchings?status=PROPOSED")
                         .with(authentication(authToken("client@example.com", "클라이언트"))))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/matchings/401"))
+                .andExpect(redirectedUrl("/proposals/10/matchings?status=PROPOSED"))
                 .andExpect(flash().attribute("errorMessage", "존재하지 않는 매칭입니다."));
     }
 
@@ -100,6 +115,21 @@ class MatchingProfileControllerTest {
 
         mockMvc.perform(get("/matchings/401/counterpart-profile")
                         .param("backUrl", "https://example.com/outside")
+                        .with(authentication(authToken("client@example.com", "클라이언트"))))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/matchings/401"))
+                .andExpect(flash().attribute("errorMessage", "해당 매칭 정보에 접근할 수 없습니다."));
+    }
+
+    @Test
+    @DisplayName("외부 returnTo는 무시하고 기존 내부 backUrl을 사용한다")
+    void redirectToLegacyBackUrlWhenReturnToIsUnsafe() throws Exception {
+        given(matchingProfileQueryService.getCounterpartProfile(401L, "client@example.com"))
+                .willThrow(new AccessDeniedException("해당 매칭 정보에 접근할 수 없습니다."));
+
+        mockMvc.perform(get("/matchings/401/counterpart-profile")
+                        .param("returnTo", "https://example.com/outside")
+                        .param("backUrl", "/matchings/401")
                         .with(authentication(authToken("client@example.com", "클라이언트"))))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/matchings/401"))

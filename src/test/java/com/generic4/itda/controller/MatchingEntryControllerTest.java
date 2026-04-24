@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -83,6 +84,57 @@ class MatchingEntryControllerTest {
         assertThat(view.items()).hasSize(3);
         assertThat(view.selectedPositionId()).isNull();
         assertThat(view.selectedStatus()).isNull();
+        assertThat(result.getModelAndView().getModel().get("backUrl")).isEqualTo("/proposals/10");
+        assertThat(result.getModelAndView().getModel().get("detailBackUrl"))
+                .isEqualTo("/proposals/10/matchings?backUrl=/proposals/10");
+        assertThat(result.getResponse().getContentAsString()).contains("href=\"/proposals/10\"");
+        assertThat(result.getResponse().getContentAsString())
+                .contains("counterpart-profile?returnTo=/proposals/10/matchings?backUrl%3D/proposals/10");
+    }
+
+    @Test
+    @DisplayName("매칭 목록 페이지는 전달된 backUrl을 사용하고 상세 복귀 경로에도 유지한다")
+    void list_preservesProvidedBackUrl() throws Exception {
+        Proposal proposal = createProposalWithTwoPositions();
+        List<Matching> matchings = createMatchingsForBothPositions(proposal);
+
+        given(proposalService.findOwnedProposal(PROPOSAL_ID, CLIENT_EMAIL)).willReturn(proposal);
+        given(matchingRepository.findWithPositionAndFreelancerByProposalIdAndClientEmail(PROPOSAL_ID, CLIENT_EMAIL))
+                .willReturn(matchings);
+
+        MvcResult result = mockMvc.perform(get("/proposals/{id}/matchings", PROPOSAL_ID)
+                        .param("backUrl", "/client/dashboard")
+                        .with(authentication(authToken(CLIENT_EMAIL, "클라이언트"))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("matching/list"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "counterpart-profile?returnTo=/proposals/10/matchings?backUrl%3D/client/dashboard")))
+                .andReturn();
+
+        assertThat(result.getModelAndView().getModel().get("backUrl")).isEqualTo("/client/dashboard");
+        assertThat(result.getModelAndView().getModel().get("detailBackUrl"))
+                .isEqualTo("/proposals/10/matchings?backUrl=/client/dashboard");
+    }
+
+    @Test
+    @DisplayName("외부 backUrl은 무시하고 제안서 상세로 복귀시킨다")
+    void list_ignoresExternalBackUrl() throws Exception {
+        Proposal proposal = createProposalWithTwoPositions();
+        List<Matching> matchings = createMatchingsForBothPositions(proposal);
+
+        given(proposalService.findOwnedProposal(PROPOSAL_ID, CLIENT_EMAIL)).willReturn(proposal);
+        given(matchingRepository.findWithPositionAndFreelancerByProposalIdAndClientEmail(PROPOSAL_ID, CLIENT_EMAIL))
+                .willReturn(matchings);
+
+        MvcResult result = mockMvc.perform(get("/proposals/{id}/matchings", PROPOSAL_ID)
+                        .param("backUrl", "https://example.com/outside")
+                        .with(authentication(authToken(CLIENT_EMAIL, "클라이언트"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertThat(result.getModelAndView().getModel().get("backUrl")).isEqualTo("/proposals/10");
+        assertThat(result.getModelAndView().getModel().get("detailBackUrl"))
+                .isEqualTo("/proposals/10/matchings?backUrl=/proposals/10");
     }
 
     @Test
@@ -328,6 +380,8 @@ class MatchingEntryControllerTest {
 
         assertThat(items).hasSize(1);
         assertThat(items.get(0).proposalPositionId()).isEqualTo(2L);
+        assertThat(result.getModelAndView().getModel().get("detailBackUrl"))
+                .isEqualTo("/proposals/10/matchings?positionId=2&backUrl=/proposals/10");
     }
 
     @Test
@@ -354,6 +408,30 @@ class MatchingEntryControllerTest {
         assertThat(items).hasSize(1);
         assertThat(items.get(0).proposalPositionId()).isEqualTo(1L);
         assertThat(items.get(0).status()).isEqualTo(MatchingStatus.REJECTED);
+        assertThat(result.getModelAndView().getModel().get("detailBackUrl"))
+                .isEqualTo("/proposals/10/matchings?positionId=1&status=REJECTED&backUrl=/proposals/10");
+    }
+
+    @Test
+    @DisplayName("AJAX 아이템 요청은 전달된 부모 backUrl까지 포함한 상세 복귀 경로를 만든다")
+    void listItems_preservesParentBackUrlInDetailLink() throws Exception {
+        Proposal proposal = createProposalWithTwoPositions();
+        List<Matching> matchings = createMatchingsForBothPositions(proposal);
+
+        given(proposalService.findOwnedProposal(PROPOSAL_ID, CLIENT_EMAIL)).willReturn(proposal);
+        given(matchingRepository.findWithPositionAndFreelancerByProposalIdAndClientEmail(PROPOSAL_ID, CLIENT_EMAIL))
+                .willReturn(matchings);
+
+        MvcResult result = mockMvc.perform(get("/proposals/{id}/matchings/items", PROPOSAL_ID)
+                        .param("positionId", "1")
+                        .param("status", "PROPOSED")
+                        .param("backUrl", "/client/dashboard")
+                        .with(authentication(authToken(CLIENT_EMAIL, "클라이언트"))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertThat(result.getModelAndView().getModel().get("detailBackUrl"))
+                .isEqualTo("/proposals/10/matchings?positionId=1&status=PROPOSED&backUrl=/client/dashboard");
     }
 
     @Test
