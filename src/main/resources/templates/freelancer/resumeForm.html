@@ -202,7 +202,10 @@
                     <!-- 신규 작성: 프론트에서 쌓은 스킬을 함께 제출하기 위한 hidden fields -->
                     <div id="draftSkillFields" class="hidden" th:if="${isNew eq true}">
                         <th:block th:each="item, iter : *{skillItems}">
-                            <input type="hidden" th:name="|skillItems[${iter.index}].skillId|" th:value="${item.skillId}">
+                            <input type="hidden"
+                                   class="draft-skill-id"
+                                   th:name="|skillItems[${iter.index}].skillId|"
+                                   th:value="${item.skillId}">
                             <input type="hidden" th:name="|skillItems[${iter.index}].proficiency|" th:value="${item.proficiency}">
                         </th:block>
                     </div>
@@ -438,8 +441,6 @@
                                     <div class="flex-1 min-w-[160px]">
                                         <div class="flex justify-between items-end mb-1.5">
                                             <label class="text-xs font-bold text-slate-400 block">스킬 검색</label>
-                                            <p id="draftSkillError"
-                                               class="text-[10px] text-red-500 font-bold hidden"></p>
                                         </div>
 
                                         <input type="hidden"
@@ -449,7 +450,7 @@
                                         <div class="relative">
                                             <input type="text"
                                                    id="skillSearchInput"
-                                                   placeholder="예) Java, React, ㅈㅂ"
+                                                   placeholder="예) Java, React, 자바"
                                                    autocomplete="off"
                                                    class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-blue-400 focus:outline-none">
 
@@ -458,25 +459,20 @@
                                                 <ul id="skillOptions"
                                                     role="listbox"
                                                     class="max-h-64 overflow-auto py-2 text-sm">
-                                                    <li id="skillNoResult"
-                                                        class="hidden px-4 py-2 text-slate-400">
-                                                        검색 결과가 없습니다.
-                                                    </li>
-                                                    <li th:each="skill : ${skills}"
-                                                        role="option"
-                                                        tabindex="-1"
-                                                        th:attr="data-skill-id=${skill.id},data-skill-name=${skill.name}"
-                                                        class="skill-option px-4 py-2 cursor-pointer text-slate-700 hover:bg-slate-50">
-                                                        <span th:text="${skill.name}">Skill</span>
-                                                    </li>
-                                                </ul>
-                                            </div>
-                                        </div>
-                                    </div>
+                                                     <li id="skillNoResult"
+                                                         class="hidden px-4 py-2 text-slate-400">
+                                                         검색 결과가 없습니다.
+                                                     </li>
+                                                 </ul>
+                                             </div>
+                                         </div>
+                                     </div>
 
                                     <div class="flex-1 min-w-[120px]">
                                         <div class="flex justify-between items-end mb-1.5">
                                             <label class="text-xs font-bold text-slate-400 block">숙련도</label>
+                                            <p id="draftSkillError"
+                                               class="text-[10px] text-red-500 font-bold hidden ml-auto whitespace-nowrap"></p>
                                         </div>
                                         <select id="draftSkillProficiency"
                                                 class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm appearance-none focus:border-blue-400 focus:outline-none transition-all">
@@ -508,6 +504,9 @@
                                     <!-- 편집 모드: 숙련도 선택 (변경 즉시 AJAX) -->
                                     <th:block th:if="${isEditing}">
                                         <form th:action="@{/resumes/skill/update}" method="post" class="inline skill-update-form">
+                                            <th:block th:if="${_csrf != null}">
+                                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                            </th:block>
                                             <input type="hidden" name="skillId" th:value="${rs.skill.id}">
                                             <select name="proficiency"
                                                     onchange="this.form.requestSubmit()"
@@ -555,17 +554,20 @@
                                   th:object="${resumeSkillForm}"
                                   method="post"
                                   class="flex flex-wrap gap-3 items-end">
+                                <th:block th:if="${_csrf != null}">
+                                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                                </th:block>
 
                                 <div class="flex-1 min-w-[160px]">
                                     <div class="flex justify-between items-end mb-1.5">
                                         <label class="text-xs font-bold text-slate-400 block">스킬 선택</label>
                                         <span th:if="${#fields.hasErrors('skillId')}"
-                                              class="text-[10px] text-red-500 font-bold animate-pulse"
+                                              class="text-[10px] text-red-500 font-bold animate-pulse ml-auto whitespace-nowrap"
                                               th:errors="*{skillId}">필수값입니다.</span>
                                     </div>
-                                    <input type="hidden"
-                                           th:field="*{skillId}"
-                                           id="skillIdInput">
+                                     <input type="hidden"
+                                            th:field="*{skillId}"
+                                            id="skillIdInput">
 
                                     <div class="relative">
                                         <input type="text"
@@ -580,27 +582,20 @@
                                             <ul id="skillOptions"
                                                 role="listbox"
                                                 class="max-h-64 overflow-auto py-2 text-sm">
-                                                <li id="skillNoResult"
-                                                    class="hidden px-4 py-2 text-slate-400">
-                                                    검색 결과가 없습니다.
-                                                </li>
-                                                <li th:each="skill : ${skills}"
-                                                    role="option"
-                                                    tabindex="-1"
-                                                    th:attr="data-skill-id=${skill.id},data-skill-name=${skill.name}"
-                                                    class="skill-option px-4 py-2 cursor-pointer text-slate-700 hover:bg-slate-50">
-                                                    <span th:text="${skill.name}">Skill</span>
-                                                </li>
-                                            </ul>
-                                        </div>
-                                    </div>
-                                </div>
+                                                 <li id="skillNoResult"
+                                                     class="hidden px-4 py-2 text-slate-400">
+                                                     검색 결과가 없습니다.
+                                                 </li>
+                                             </ul>
+                                         </div>
+                                     </div>
+                                 </div>
 
                                 <div class="flex-1 min-w-[120px]">
                                     <div class="flex justify-between items-end mb-1.5">
                                         <label class="text-xs font-bold text-slate-400 block">숙련도</label>
                                         <span th:if="${#fields.hasErrors('proficiency')}"
-                                              class="text-[10px] text-red-500 font-bold animate-pulse"
+                                              class="text-[10px] text-red-500 font-bold animate-pulse ml-auto whitespace-nowrap"
                                               th:errors="*{proficiency}">필수값입니다.</span>
                                     </div>
 
@@ -693,37 +688,38 @@
         if (input.dataset.autocompleteInit === 'true') return;
         input.dataset.autocompleteInit = 'true';
 
-        const optionEls = Array.from(optionsRoot.querySelectorAll('.skill-option'));
-        const CHOSEONGS = [
-            'ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ',
-            'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'
-        ];
-        const CHOSEONG_SET = new Set(CHOSEONGS);
+        let requestSequence = 0;
+        let debounceTimer = null;
+        let activeIndex = -1;
 
-        function getChoseong(text) {
-            if (!text) return '';
-            let result = '';
-            for (const ch of text) {
-                const code = ch.codePointAt(0);
-                if (code >= 0xac00 && code <= 0xd7a3) {
-                    const index = Math.floor((code - 0xac00) / 588);
-                    result += CHOSEONGS[index] || '';
-                }
+        const loadingEl = (function () {
+            let el = document.getElementById('skillLoading');
+            if (el) return el;
+            el = document.createElement('li');
+            el.id = 'skillLoading';
+            el.className = 'hidden px-4 py-2 text-slate-400';
+            el.textContent = '검색 중...';
+            if (noResult && noResult.parentNode) {
+                noResult.parentNode.insertBefore(el, noResult.nextSibling);
+            } else {
+                optionsRoot.insertBefore(el, optionsRoot.firstChild);
             }
-            return result;
-        }
+            return el;
+        })();
 
-        function normalizeQuery(value) {
-            return (value || '').trim();
-        }
+        function positionDropdown() {
+            const rect = input.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const spaceAbove = rect.top;
 
-        function isChoseongQuery(query) {
-            const stripped = query.replace(/\s+/g, '');
-            if (!stripped) return false;
-            for (const ch of stripped) {
-                if (!CHOSEONG_SET.has(ch)) return false;
+            const preferUp = spaceBelow < 260 && spaceAbove > spaceBelow;
+            if (preferUp) {
+                dropdown.classList.remove('top-full', 'mt-2');
+                dropdown.classList.add('bottom-full', 'mb-2');
+            } else {
+                dropdown.classList.remove('bottom-full', 'mb-2');
+                dropdown.classList.add('top-full', 'mt-2');
             }
-            return true;
         }
 
         function openDropdown() {
@@ -738,36 +734,97 @@
             clearActive();
         }
 
-        function positionDropdown() {
-            const rect = input.getBoundingClientRect();
-            const spaceBelow = window.innerHeight - rect.bottom;
-            const spaceAbove = rect.top;
-
-            // When near bottom of viewport, show options upward.
-            const preferUp = spaceBelow < 260 && spaceAbove > spaceBelow;
-            if (preferUp) {
-                dropdown.classList.remove('top-full', 'mt-2');
-                dropdown.classList.add('bottom-full', 'mb-2');
-            } else {
-                dropdown.classList.remove('bottom-full', 'mb-2');
-                dropdown.classList.add('top-full', 'mt-2');
-            }
-        }
-
         function isOpen() {
             return !dropdown.classList.contains('hidden');
         }
 
-        let activeIndex = -1;
-
         function clearActive() {
-            optionEls.forEach(el => el.classList.remove('bg-slate-100'));
+            optionsRoot.querySelectorAll('.skill-option').forEach(el => el.classList.remove('bg-slate-100'));
             input.removeAttribute('aria-activedescendant');
             activeIndex = -1;
         }
 
         function visibleOptions() {
-            return optionEls.filter(el => !el.classList.contains('hidden'));
+            return Array.from(optionsRoot.querySelectorAll('.skill-option'));
+        }
+
+        function setLoading(loading) {
+            if (!loadingEl) return;
+            if (loading) {
+                loadingEl.classList.remove('hidden');
+            } else {
+                loadingEl.classList.add('hidden');
+            }
+        }
+
+        function setNoResultVisible(visible) {
+            if (!noResult) return;
+            if (visible) {
+                noResult.classList.remove('hidden');
+            } else {
+                noResult.classList.add('hidden');
+            }
+        }
+
+        function clearRenderedOptions() {
+            optionsRoot.querySelectorAll('.skill-option').forEach(el => el.remove());
+        }
+
+        function getExcludedSkillIds() {
+            const excluded = new Set();
+
+            // 신규 작성(draft) — profileForm 안의 hidden fields
+            document.querySelectorAll('#draftSkillFields input[name$=\".skillId\"]').forEach(function (el) {
+                if (el && el.value) excluded.add(String(el.value));
+            });
+
+            // 기존 이력서 — 이미 추가된 스킬들(업데이트/삭제 form의 hidden skillId)
+            document.querySelectorAll('#skillSection input[name=\"skillId\"]').forEach(function (el) {
+                if (el && el.value) excluded.add(String(el.value));
+            });
+
+            return excluded;
+        }
+
+        function renderOptions(skills) {
+            clearRenderedOptions();
+            clearActive();
+
+            const list = (skills || [])
+                .filter(skill => skill && skill.id != null && skill.name)
+                .map(skill => ({ id: String(skill.id), name: String(skill.name) }));
+
+            if (list.length === 0) {
+                setNoResultVisible(true);
+                return;
+            }
+            setNoResultVisible(false);
+
+            list.forEach(function (skill) {
+                const li = document.createElement('li');
+                li.role = 'option';
+                li.tabIndex = -1;
+                li.className = 'skill-option px-4 py-2 cursor-pointer text-slate-700 hover:bg-slate-50';
+                li.dataset.skillId = skill.id;
+                li.dataset.skillName = skill.name;
+                li.textContent = skill.name;
+
+                li.addEventListener('mousedown', function (e) {
+                    e.preventDefault();
+                    chooseOption(li);
+                });
+
+                optionsRoot.appendChild(li);
+            });
+        }
+
+        function chooseOption(el) {
+            if (!el) return;
+            hiddenSkillId.value = el.dataset.skillId || '';
+            hiddenSkillId.dataset.skillName = el.dataset.skillName || '';
+            input.value = el.dataset.skillName || '';
+            closeDropdown();
+            input.focus();
         }
 
         function setActiveByIndex(nextIndex) {
@@ -776,67 +833,55 @@
                 clearActive();
                 return;
             }
+
             const bounded = Math.max(0, Math.min(nextIndex, visible.length - 1));
             visible.forEach(el => el.classList.remove('bg-slate-100'));
             const active = visible[bounded];
             active.classList.add('bg-slate-100');
+
             if (!active.id) {
-                active.id = 'skill-option-' + active.dataset.skillId;
+                active.id = 'skill-option-' + (active.dataset.skillId || bounded);
             }
             input.setAttribute('aria-activedescendant', active.id);
             active.scrollIntoView({ block: 'nearest' });
             activeIndex = bounded;
         }
 
-        function chooseOption(el) {
-            if (!el) return;
-            const id = el.dataset.skillId;
-            const name = el.dataset.skillName;
-            hiddenSkillId.value = id || '';
-            input.value = name || '';
-            closeDropdown();
-            input.focus();
+        async function searchSkills() {
+            const query = (input.value || '').trim();
+            const seq = ++requestSequence;
+
+            openDropdown();
+            setNoResultVisible(false);
+            setLoading(true);
+
+            try {
+                const response = await fetch(`/api/skills?query=${encodeURIComponent(query)}`, {
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!response.ok) {
+                    throw new Error('스킬 목록을 불러오지 못했습니다.');
+                }
+
+                const skills = await response.json();
+                if (seq !== requestSequence) return;
+
+                const excluded = getExcludedSkillIds();
+                const filtered = (skills || []).filter(skill => !excluded.has(String(skill.id)));
+                renderOptions(filtered);
+            } catch (error) {
+                if (seq !== requestSequence) return;
+                renderOptions([]);
+                setNoResultVisible(true);
+                console.error('스킬 검색 실패:', error);
+            } finally {
+                if (seq === requestSequence) setLoading(false);
+            }
         }
 
-        function applyFilter() {
-            const query = normalizeQuery(input.value);
-            const queryLower = query.toLowerCase();
-            const choseongMode = isChoseongQuery(query);
-            const choseongQuery = query.replace(/\s+/g, '');
-
-            let visibleCount = 0;
-            for (const el of optionEls) {
-                const name = el.dataset.skillName || '';
-                if (!el.dataset.lowerName) {
-                    el.dataset.lowerName = name.toLowerCase();
-                    el.dataset.choseong = getChoseong(name);
-                }
-
-                let matched = false;
-                if (!query) {
-                    matched = true;
-                } else if (el.dataset.lowerName.includes(queryLower)) {
-                    matched = true;
-                } else if (choseongMode && (el.dataset.choseong || '').includes(choseongQuery)) {
-                    matched = true;
-                }
-
-                if (matched) {
-                    el.classList.remove('hidden');
-                    visibleCount++;
-                } else {
-                    el.classList.add('hidden');
-                }
-            }
-
-            if (noResult) {
-                if (visibleCount === 0) {
-                    noResult.classList.remove('hidden');
-                } else {
-                    noResult.classList.add('hidden');
-                }
-            }
-            clearActive();
+        function scheduleSearch() {
+            if (debounceTimer) window.clearTimeout(debounceTimer);
+            debounceTimer = window.setTimeout(searchSkills, 250);
         }
 
         input.setAttribute('role', 'combobox');
@@ -846,18 +891,19 @@
         input.setAttribute('aria-haspopup', 'listbox');
 
         input.addEventListener('focus', function () {
-            applyFilter();
-            openDropdown();
+            searchSkills();
         });
+
         input.addEventListener('blur', function () {
-            setTimeout(function () {
+            window.setTimeout(function () {
                 closeDropdown();
-            }, 0);
+            }, 150);
         });
+
         input.addEventListener('input', function () {
             hiddenSkillId.value = '';
-            applyFilter();
-            openDropdown();
+            hiddenSkillId.dataset.skillName = '';
+            scheduleSearch();
         });
 
         input.addEventListener('keydown', function (e) {
@@ -869,11 +915,13 @@
             if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
                 e.preventDefault();
                 if (!isOpen()) {
-                    applyFilter();
-                    openDropdown();
+                    searchSkills();
+                    return;
                 }
+
                 const visible = visibleOptions();
                 if (visible.length === 0) return;
+
                 const delta = e.key === 'ArrowDown' ? 1 : -1;
                 const next = activeIndex < 0 ? (delta > 0 ? 0 : visible.length - 1) : activeIndex + delta;
                 setActiveByIndex(next);
@@ -889,22 +937,25 @@
             }
         });
 
-        optionEls.forEach(function (el) {
-            el.addEventListener('mousedown', function (e) {
-                e.preventDefault();
-                chooseOption(el);
+        if (hiddenSkillId.value && hiddenSkillId.dataset.skillName && !input.value) {
+            input.value = hiddenSkillId.dataset.skillName;
+        }
+
+        if (!window.__resumeSkillSearchGlobalCloseInstalled) {
+            window.__resumeSkillSearchGlobalCloseInstalled = true;
+            document.addEventListener('mousedown', function (e) {
+                const dropdownNow = document.getElementById('skillDropdown');
+                const inputNow = document.getElementById('skillSearchInput');
+                const optionsNow = document.getElementById('skillOptions');
+                if (!dropdownNow || !inputNow || !optionsNow) return;
+                if (dropdownNow.classList.contains('hidden')) return;
+                if (dropdownNow.contains(e.target) || inputNow.contains(e.target)) return;
+
+                dropdownNow.classList.add('hidden');
+                inputNow.setAttribute('aria-expanded', 'false');
+                inputNow.removeAttribute('aria-activedescendant');
+                optionsNow.querySelectorAll('.skill-option').forEach(el => el.classList.remove('bg-slate-100'));
             });
-        });
-
-        document.addEventListener('mousedown', function (e) {
-            if (!isOpen()) return;
-            if (dropdown.contains(e.target) || input.contains(e.target)) return;
-            closeDropdown();
-        });
-
-        if (hiddenSkillId.value) {
-            const selected = optionEls.find(el => el.dataset.skillId === hiddenSkillId.value);
-            if (selected) input.value = selected.dataset.skillName || '';
         }
     };
 
@@ -914,7 +965,7 @@
 
     // ─── 신규 작성: 스킬 임시 추가 → 저장 시 일괄 제출 ────────────────
     (function () {
-        function initDraftSkills() {
+        async function initDraftSkills() {
             const addButton = document.getElementById('draftSkillAddButton');
             const chipsRoot = document.getElementById('draftSkillsChips');
             const fieldsRoot = document.getElementById('draftSkillFields');
@@ -927,8 +978,6 @@
                 return;
             }
 
-            const optionEls = Array.from(document.querySelectorAll('#skillOptions .skill-option'));
-            const skillNameById = new Map(optionEls.map(el => [el.dataset.skillId, el.dataset.skillName]));
             const proficiencyLabelByValue = new Map(
                 Array.from(pickProficiency.querySelectorAll('option'))
                     .filter(o => o.value)
@@ -950,18 +999,21 @@
                 const inputs = Array.from(fieldsRoot.querySelectorAll('input[type="hidden"]'));
                 const byIndex = new Map();
                 for (const input of inputs) {
-                    const match = input.name.match(/^skillItems\[(\d+)\]\.(skillId|proficiency)$/);
+                    const match = input.name.match(/^skillItems\u005B(\d+)\u005D\.(skillId|proficiency)$/);
                     if (!match) continue;
                     const index = Number(match[1]);
                     const field = match[2];
                     if (!byIndex.has(index)) byIndex.set(index, {});
                     byIndex.get(index)[field] = input.value;
+                    if (field === 'skillId' && input.dataset && input.dataset.skillName) {
+                        byIndex.get(index).skillName = input.dataset.skillName;
+                    }
                 }
                 const items = Array.from(byIndex.entries())
                     .sort((a, b) => a[0] - b[0])
                     .map(([, v]) => ({
                         skillId: v.skillId,
-                        skillName: skillNameById.get(v.skillId) || '',
+                        skillName: v.skillName || '',
                         proficiency: v.proficiency
                     }))
                     .filter(v => v.skillId && v.proficiency);
@@ -969,6 +1021,41 @@
             }
 
             let draftSkills = readDraftSkillsFromHidden();
+
+            async function fillMissingSkillNames() {
+                const missing = draftSkills.filter(item => item && item.skillId && !item.skillName);
+                if (missing.length === 0) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/skills?query=', {
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    if (!response.ok) {
+                        return;
+                    }
+
+                    const skills = await response.json();
+                    const nameById = new Map(
+                        (skills || [])
+                            .filter(skill => skill && skill.id != null && skill.name)
+                            .map(skill => [String(skill.id), String(skill.name)])
+                    );
+
+                    draftSkills = draftSkills.map(item => {
+                        if (!item || !item.skillId || item.skillName) {
+                            return item;
+                        }
+                        return {
+                            ...item,
+                            skillName: nameById.get(String(item.skillId)) || ''
+                        };
+                    });
+                } catch (e) {
+                    // ignore
+                }
+            }
 
             function render() {
                 // Hidden fields
@@ -978,6 +1065,8 @@
                     idInput.type = 'hidden';
                     idInput.name = `skillItems[${index}].skillId`;
                     idInput.value = item.skillId;
+                    idInput.className = 'draft-skill-id';
+                    idInput.dataset.skillName = item.skillName || '';
                     fieldsRoot.appendChild(idInput);
 
                     const profInput = document.createElement('input');
@@ -1034,17 +1123,17 @@
                 if (!skillId) {
                     const q = (pickSkillName.value || '').trim().toLowerCase();
                     if (q) {
+                        const optionEls = Array.from(document.querySelectorAll('#skillOptions .skill-option'));
                         const exact = optionEls.find(el => (el.dataset.skillName || '').toLowerCase() === q);
                         if (exact) {
                             skillId = exact.dataset.skillId || '';
                             pickSkillId.value = skillId;
                             pickSkillName.value = exact.dataset.skillName || pickSkillName.value;
                         } else {
-                            const visible = optionEls.filter(el => !el.classList.contains('hidden'));
-                            if (visible.length === 1) {
-                                skillId = visible[0].dataset.skillId || '';
+                            if (optionEls.length === 1) {
+                                skillId = optionEls[0].dataset.skillId || '';
                                 pickSkillId.value = skillId;
-                                pickSkillName.value = visible[0].dataset.skillName || pickSkillName.value;
+                                pickSkillName.value = optionEls[0].dataset.skillName || pickSkillName.value;
                             }
                         }
                     }
@@ -1063,9 +1152,16 @@
                     return;
                 }
 
+                let skillName = (pickSkillName.value || '').trim();
+                const optionEls = Array.from(document.querySelectorAll('#skillOptions .skill-option'));
+                const selected = optionEls.find(el => (el.dataset.skillId || '') === skillId);
+                if (selected && selected.dataset.skillName) {
+                    skillName = selected.dataset.skillName;
+                }
+
                 draftSkills.push({
                     skillId,
-                    skillName: skillNameById.get(skillId) || (pickSkillName.value || '').trim(),
+                    skillName,
                     proficiency
                 });
 
@@ -1077,6 +1173,7 @@
             }
 
             // Initial render (restore from server-rendered hidden fields)
+            await fillMissingSkillNames();
             render();
             if (window.lucide) lucide.createIcons();
 
@@ -1089,7 +1186,9 @@
             });
         }
 
-        document.addEventListener('DOMContentLoaded', initDraftSkills);
+        document.addEventListener('DOMContentLoaded', function () {
+            initDraftSkills();
+        });
     })();
 
     // ─── 경력 모달 ────────────────────────────────────────
