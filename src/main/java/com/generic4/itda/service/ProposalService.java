@@ -50,6 +50,7 @@ public class ProposalService {
     private final ProposalRepository proposalRepository;
     private final MemberRepository memberRepository;
     private final PositionRepository positionRepository;
+    private final PositionResolver positionResolver;
     private final SkillResolver skillResolver;
     private final MatchingRepository matchingRepository;
     private final ProposalAiInterviewMessageRepository aiInterviewMessageRepository;
@@ -516,8 +517,14 @@ public class ProposalService {
     }
 
     private Position getPosition(Long positionId) {
-        return positionRepository.findById(positionId)
+        Position position = positionRepository.findById(positionId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 직무입니다. id=" + positionId));
+
+        if (!positionResolver.isAllowedPosition(position)) {
+            throw new IllegalArgumentException("존재하지 않는 직무입니다. id=" + positionId);
+        }
+
+        return position;
     }
 
     private Proposal getOwnedProposal(Long proposalId, String memberEmail) {
