@@ -14,7 +14,7 @@
             <div class="sticky top-0 z-10 rounded-[28px] border border-slate-200 bg-white/95 px-6 py-5 shadow-sm shadow-slate-200/60 backdrop-blur">
                 <div class="flex flex-wrap items-center justify-between gap-4">
                     <div class="flex items-center gap-4">
-                        <a id="btnBack" href="#"
+                        <a id="btnBack" th:href="${backUrl}"
                            class="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white p-3 text-slate-700 transition hover:border-blue-300 hover:text-blue-600">
                             <i data-lucide="arrow-left" class="h-4 w-4"></i>
                         </a>
@@ -95,7 +95,7 @@
 
             <!-- 목록 영역 (AJAX로 교체되는 영역) -->
             <div id="itemListWrapper"
-                 th:attr="data-proposal-id=${view.proposalId}, data-position-id=${view.selectedPositionId}, data-status=${view.selectedStatus}">
+                 th:attr="data-proposal-id=${view.proposalId}, data-position-id=${view.selectedPositionId}, data-status=${view.selectedStatus}, data-back-url=${backUrl}">
                 <div th:replace="~{matching/fragments :: itemList}"></div>
             </div>
 
@@ -104,16 +104,11 @@
 
     <script th:inline="javascript">
         (function () {
-            const backUrl = document.referrer || '/client/dashboard';
-            const btnBack = document.getElementById('btnBack');
-            if (btnBack) btnBack.href = backUrl;
-        })();
-
-        (function () {
             const wrapper = document.getElementById('itemListWrapper');
             if (!wrapper) return;
 
             const proposalId = wrapper.dataset.proposalId;
+            const backUrl = wrapper.dataset.backUrl || '';
             let currentPositionId = wrapper.dataset.positionId || '';
             let currentStatus = wrapper.dataset.status || '';
 
@@ -121,6 +116,7 @@
                 const params = new URLSearchParams();
                 if (positionId) params.set('positionId', positionId);
                 if (status) params.set('status', status);
+                if (backUrl) params.set('backUrl', backUrl);
 
                 const url = `/proposals/${proposalId}/matchings/items?${params.toString()}`;
 

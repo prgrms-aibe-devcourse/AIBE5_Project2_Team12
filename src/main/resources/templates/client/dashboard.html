@@ -345,7 +345,7 @@
             menuDetail.href    = '/proposals/' + proposalId;
             menuEdit.href      = '/proposals/' + proposalId + '/edit';
             menuRecommend.href = '/proposals/' + proposalId + '/recommendations';
-            menuMatching.href  = '/proposals/' + proposalId + '/matchings';
+            menuMatching.href  = '/proposals/' + proposalId + '/matchings?backUrl=' + encodeURIComponent('/client/dashboard');
             menuDelete.dataset.proposalId    = proposalId;
             menuDelete.dataset.proposalTitle = proposalTitle;
 

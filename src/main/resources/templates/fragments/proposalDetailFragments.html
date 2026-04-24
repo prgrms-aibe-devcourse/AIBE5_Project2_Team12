@@ -28,7 +28,7 @@
 
                 <!-- 클라이언트: 해당 포지션 매칭 결과 바로가기 (매칭이 존재하는 포지션에만 표시) -->
                 <a th:if="${viewerRole != 'FREELANCER' and positionsWithMatchings != null and positionsWithMatchings.contains(pos.id)}"
-                   th:href="@{/proposals/{id}/matchings(id=${pos.proposal.id}, positionId=${pos.id})}"
+                   th:href="@{/proposals/{id}/matchings(id=${pos.proposal.id}, positionId=${pos.id}, backUrl=${'/proposals/' + pos.proposal.id})}"
                    class="inline-flex items-center gap-2 rounded-2xl border border-blue-600 bg-white px-5 py-3 text-sm font-bold text-blue-600 transition hover:bg-blue-600 hover:text-white">
                     <i data-lucide="users" class="h-4 w-4"></i>
                     매칭 결과 보기
