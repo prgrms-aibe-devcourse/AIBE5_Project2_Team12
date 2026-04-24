@@ -402,8 +402,10 @@
 
                     <!-- 추천 요청 폼 -->
                     <form id="recommendModalForm"
-                          th:action="@{/proposals/{id}/recommendations(id=${proposal.id})}"
+                          th:action="@{/proposal-positions/{proposalPositionId}/recommendations/more(
+                                    proposalPositionId=${recommendEntry != null ? recommendEntry.selectedProposalPositionId : 0})}"
                           method="post">
+                        <input type="hidden" name="proposalId" th:value="${proposal.id}">
                         <th:block th:if="${_csrf != null}">
                             <input type="hidden" name="_csrf" th:value="${_csrf.token}">
                         </th:block>
@@ -425,15 +427,21 @@
                                     <th:block th:if="${recommendEntry != null}">
                                         <option th:each="position : ${recommendEntry.positions}"
                                                 th:value="${position.proposalPositionId}"
+                                                th:disabled="${position.positionStatusName != 'OPEN'}"
                                                 th:selected="${position.proposalPositionId == recommendEntry.selectedProposalPositionId}"
-                                                th:text="${position.positionTitle + (position.positionCategoryName != null and position.positionCategoryName != position.positionTitle ? ' · ' + position.positionCategoryName : '')}">
+                                                th:text="${position.positionTitle
+                                                    + (position.positionCategoryName != null and position.positionCategoryName != position.positionTitle ? ' · ' + position.positionCategoryName : '')
+                                                    + (position.positionStatusName != 'OPEN' ? ' · ' + position.positionStatusDescription : '')}">
                                             백엔드 개발자
                                         </option>
                                     </th:block>
                                     <th:block th:if="${recommendEntry == null}">
                                         <option th:each="pos : ${proposal.positions}"
                                                 th:value="${pos.id}"
-                                                th:text="${pos.title}">
+                                                th:disabled="${pos.status == null or pos.status.name() != 'OPEN'}"
+                                                th:text="${pos.title
+                                                    + (pos.status != null and pos.status.name() != 'OPEN' ? ' · ' + pos.status.description : '')
+                                                    + (pos.status == null ? ' · 상태 미정' : '')}">
                                             백엔드 개발자
                                         </option>
                                     </th:block>
@@ -448,9 +456,10 @@
                         <div class="mt-5 space-y-3"
                              th:if="${recommendEntry != null and !#lists.isEmpty(recommendEntry.positions)}">
                             <article th:each="position : ${recommendEntry.positions}"
-                                     th:attr="data-position-id=${position.proposalPositionId}"
-                                     class="rounded-[24px] border border-slate-200 bg-slate-50 p-5 transition cursor-pointer hover:border-blue-200"
-                                     onclick="selectPositionCard(this)">
+                                     th:attr="data-position-id=${position.proposalPositionId}, data-position-status=${position.positionStatusName}"
+                                     class="rounded-[24px] border border-slate-200 bg-slate-50 p-5 transition"
+                                     th:classappend="${position.positionStatusName == 'OPEN'} ? ' cursor-pointer hover:border-blue-200' : ' opacity-50 cursor-not-allowed'"
+                                     th:onclick="${position.positionStatusName == 'OPEN'} ? 'selectPositionCard(this)' : null">
 
                                 <div class="flex flex-wrap items-start justify-between gap-3">
                                     <div>
@@ -512,7 +521,8 @@
 
                         <!-- 액션 버튼 -->
                         <div class="mt-6 flex items-center justify-end gap-3"
-                             th:with="canRun=${recommendEntry != null ? recommendEntry.runnable : !#lists.isEmpty(proposal.positions)}">
+                             th:with="openPositions=${recommendEntry != null ? recommendEntry.positions.?[positionStatusName == 'OPEN'] : proposal.positions.?[status != null and status.name() == 'OPEN']},
+                                      canRun=${recommendEntry != null ? recommendEntry.runnable : !#lists.isEmpty(openPositions)}">
                             <button type="button"
                                     id="btnCancelRecommendModal"
                                     onclick="closeRecommendModal()"
@@ -593,6 +603,21 @@
             form.addEventListener('submit', function (e) {
                 e.preventDefault();
                 hideError();
+
+                var select = document.getElementById('modalProposalPositionId');
+                var proposalPositionId = select ? select.value : '';
+                if (!proposalPositionId) {
+                    showError('포지션을 선택해주세요.');
+                    return;
+                }
+
+                var selectedOption = select ? select.options[select.selectedIndex] : null;
+                if (selectedOption && selectedOption.disabled) {
+                    showError('모집 중(OPEN)인 포지션만 추천을 실행할 수 있습니다.');
+                    return;
+                }
+
+                form.action = '/proposal-positions/' + encodeURIComponent(proposalPositionId) + '/recommendations/more';
 
                 var csrfInput  = form.querySelector('input[name="_csrf"]');
                 var csrfHeader = document.querySelector('meta[name="_csrf_header"]');

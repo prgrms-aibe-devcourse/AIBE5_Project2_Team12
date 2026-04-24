@@ -102,6 +102,34 @@ public class RecommendationController {
         }
     }
 
+    /** 모달에서 fetch로 호출 — 성공: redirect URL 반환, 실패: 에러 메시지 반환 */
+    @PostMapping(
+            value = "/proposal-positions/{proposalPositionId}/recommendations/more",
+            produces = MediaType.APPLICATION_JSON_VALUE,
+            headers = "Accept=application/json"
+    )
+    @ResponseBody
+    public ResponseEntity<Map<String, String>> moreAjax(
+            @PathVariable Long proposalPositionId,
+            @RequestParam Long proposalId,
+            @AuthenticationPrincipal ItDaPrincipal principal
+    ) {
+        try {
+            Long runId = recommendationRunService.createAdditional(
+                    proposalId,
+                    proposalPositionId,
+                    principal.getEmail()
+            );
+            return ResponseEntity.ok(Map.of(
+                    "redirect", "/proposals/" + proposalId + "/runs/" + runId
+            ));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            log.warn("추가 추천 요청 실패(AJAX). proposalId={}, proposalPositionId={}, email={}",
+                    proposalId, proposalPositionId, principal.getEmail(), e);
+            return ResponseEntity.badRequest().body(Map.of("error", toUserMessage(e)));
+        }
+    }
+
     @PostMapping("/proposal-positions/{proposalPositionId}/recommendations/more")
     public String more(
             @PathVariable Long proposalPositionId,
