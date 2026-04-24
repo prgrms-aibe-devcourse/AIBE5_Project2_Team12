@@ -10,9 +10,27 @@ public record ProfileShellViewModel(
         String backUrl,
         ProfileFreelancerBodyViewModel freelancer,
         ProfileClientBodyViewModel client,
+        ProfileProjectSummaryViewModel projectSummary,
         ProfileMatchingContextViewModel matchingContext,
         ProfileRecommendationContextViewModel recommendationContext
 ) {
+    public ProfileShellViewModel withBackUrl(String backUrl) {
+        return new ProfileShellViewModel(
+                subjectType,
+                contextType,
+                accessLevel,
+                title,
+                subtitle,
+                statusLabel,
+                backUrl,
+                freelancer,
+                client,
+                projectSummary,
+                matchingContext,
+                recommendationContext
+        );
+    }
+
     public boolean freelancerSubject() {
         return subjectType == ProfileSubjectType.FREELANCER;
     }
@@ -27,5 +45,9 @@ public record ProfileShellViewModel(
 
     public boolean hasMatchingContext() {
         return contextType == ProfileContextType.MATCHING && matchingContext != null;
+    }
+
+    public boolean hasProjectSummary() {
+        return projectSummary != null;
     }
 }
