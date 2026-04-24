@@ -19,11 +19,14 @@
 - `proposal`은 프로젝트 전체 수준의 문서다.
 - `proposal_position`은 실제 모집 단위다.
 - `position`은 공용 직무 마스터다.
+- `position`은 현재 `백엔드 개발자`, `프론트엔드 개발자`, `풀스택 개발자`, `모바일 앱 개발자`, `AI 엔지니어`, `데이터 엔지니어`, `DevOps 엔지니어`, `UI/UX 디자이너`, `서비스 기획자`, `QA 엔지니어` 10종의 canonical 직무 마스터를 사용한다.
 - `proposal_position_skill`은 실제 모집 단위별 요구 스킬 집합이다.
 - 요구 스킬 테이블의 FK 기준은 `proposal_position.id`다.
 - 같은 제안서 안에서도 같은 직무 마스터를 여러 번 사용할 수 있고, 구체 구분은 `proposal_position.title`로 한다.
 - `proposal_position`은 `title`, `work_type`, `expected_period`, `career_min_years`, `career_max_years`, `work_place`를 포함하는 상세 모집 단위로 확장한다.
 - `proposal_position_skill.importance`는 null 저장을 허용하지 않고, 입력이 비어 있으면 `PREFERENCE`를 기본값으로 사용한다.
+- 제안서 수동 입력과 AI 브리프/AI 인터뷰는 모두 같은 `position` 마스터를 사용한다.
+- AI 직무 카테고리는 alias 정규화 후 canonical `position`으로 매핑하고, 매핑에 실패하면 신규 `position`을 만들지 않고 해당 모집 단위를 저장하지 않는다.
 
 ### AI 브리프 저장 모델
 

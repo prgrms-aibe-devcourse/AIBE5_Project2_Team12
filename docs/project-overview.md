@@ -29,6 +29,8 @@
 - `proposal`의 `work_type`, `work_place`는 두지 않고, 근무 형태와 근무지는 `proposal_position`에 둔다.
 - `proposal_position`은 `title`, `work_type`, `expected_period`, `career_min/max_years`, `work_place`를 포함하는 상세 모집 단위다.
 - 같은 제안서 안에서도 같은 직무 마스터를 여러 번 사용할 수 있고, 세부 구분은 `proposal_position.title`로 처리한다.
+- `position` 공용 마스터는 현재 `백엔드 개발자`, `프론트엔드 개발자`, `풀스택 개발자`, `모바일 앱 개발자`, `AI 엔지니어`, `데이터 엔지니어`, `DevOps 엔지니어`, `UI/UX 디자이너`, `서비스 기획자`, `QA 엔지니어` 10종 canonical 직무로 제한한다.
+- AI 브리프/AI 인터뷰는 이 canonical 목록으로만 직무를 반영하고, 목록 밖 카테고리는 신규 생성하지 않는다.
 - MVP에서는 별도 `project` 테이블 없이 `matching.status` 단일 모델로 진행 흐름을 관리한다.
 - `matching`은 `proposal_position_id`, `resume_id`와 함께 `client_member_id`, `freelancer_member_id`를 유지한다.
 - `ACCEPTED -> IN_PROGRESS`는 양측 계약 시작 확인, `IN_PROGRESS -> COMPLETED`는 양측 후기 작성과 완료 확인을 조건으로 둔다.

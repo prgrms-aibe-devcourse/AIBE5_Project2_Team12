@@ -63,13 +63,13 @@ class RecommendationEntryServiceTest {
         Member owner = createMemberWithId(OWNER_ID);
         Proposal proposal = createProposalWithStatus(owner, PROPOSAL_ID, ProposalStatus.MATCHING);
 
-        ProposalPosition designer = addPosition(proposal, 30L, "디자인", "프로덕트 디자이너", 1L, null, null, null);
+        ProposalPosition designer = addPosition(proposal, 30L, "UI/UX 디자이너", "프로덕트 디자이너", 1L, null, null, null);
         addSkill(designer, 201L, "Figma", ProposalPositionSkillImportance.PREFERENCE);
 
-        ProposalPosition backend = addPosition(proposal, 10L, "백엔드", "Node.js 백엔드 개발자", 3L, 1_000_000L, 2_000_000L, 3L);
+        ProposalPosition backend = addPosition(proposal, 10L, "백엔드 개발자", "Node.js 백엔드 개발자", 3L, 1_000_000L, 2_000_000L, 3L);
         addSkill(backend, 202L, "Java", ProposalPositionSkillImportance.ESSENTIAL);
 
-        ProposalPosition frontend = addPosition(proposal, 20L, "프론트엔드", "프론트엔드 개발자", 2L, 700_000L, 900_000L, 2L);
+        ProposalPosition frontend = addPosition(proposal, 20L, "프론트엔드 개발자", "프론트엔드 개발자", 2L, 700_000L, 900_000L, 2L);
         addSkill(frontend, 203L, "React", ProposalPositionSkillImportance.PREFERENCE);
 
         stubProposalDetailLoad(proposal);
@@ -97,7 +97,7 @@ class RecommendationEntryServiceTest {
 
         RecommendationEntryPositionItem firstPosition = result.positions().get(0);
         assertThat(firstPosition.positionTitle()).isEqualTo("Node.js 백엔드 개발자");
-        assertThat(firstPosition.positionCategoryName()).isEqualTo("백엔드");
+        assertThat(firstPosition.positionCategoryName()).isEqualTo("백엔드 개발자");
         assertThat(firstPosition.headCount()).isEqualTo(3L);
         assertThat(firstPosition.budgetText()).isEqualTo("1,000,000 ~ 2,000,000");
         assertThat(firstPosition.expectedPeriod()).isEqualTo(3L);
@@ -173,7 +173,7 @@ class RecommendationEntryServiceTest {
         // given
         Member owner = createMemberWithId(OWNER_ID);
         Proposal proposal = createProposalWithStatus(owner, PROPOSAL_ID, ProposalStatus.MATCHING);
-        ProposalPosition position = addPosition(proposal, 100L, "백엔드", "백엔드 개발자", 1L, null, null, null);
+        ProposalPosition position = addPosition(proposal, 100L, "백엔드 개발자", "백엔드 개발자", 1L, null, null, null);
         ReflectionTestUtils.setField(position, "title", "   ");
 
         stubProposalDetailLoad(proposal);
@@ -183,8 +183,8 @@ class RecommendationEntryServiceTest {
         RecommendationEntryPositionItem result = service.getEntry(PROPOSAL_ID, OWNER_EMAIL).positions().get(0);
 
         // then
-        assertThat(result.positionTitle()).isEqualTo("백엔드");
-        assertThat(result.positionCategoryName()).isEqualTo("백엔드");
+        assertThat(result.positionTitle()).isEqualTo("백엔드 개발자");
+        assertThat(result.positionCategoryName()).isEqualTo("백엔드 개발자");
         verifyExpectedInteractions();
     }
 

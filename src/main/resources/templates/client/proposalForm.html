@@ -488,13 +488,39 @@
                         <div class="grid gap-6 md:grid-cols-2">
                             <div>
                                 <label class="ml-1 text-[11px] font-black uppercase tracking-widest text-slate-400">직무</label>
-                                <select x-model="currentPosition.positionId"
-                                        class="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100">
-                                    <option value="">직무를 선택해주세요</option>
-                                    <template x-for="option in positionOptions" :key="option.id">
-                                        <option :value="String(option.id)" x-text="option.name"></option>
-                                    </template>
-                                </select>
+                                <div class="relative mt-3">
+                                    <input type="text"
+                                           x-model="currentPosition.positionSearchDraft"
+                                           @focus="openPositionSearch()"
+                                           @input.debounce.200ms="handlePositionSearchInput()"
+                                           @keydown.enter.prevent="selectFirstPosition()"
+                                           @keydown.escape.prevent="closePositionSearch()"
+                                           @blur="closePositionSearchWithDelay()"
+                                           placeholder="직무 이름 검색"
+                                           autocomplete="off"
+                                           class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100">
+                                    <div x-show="positionSearchOpen"
+                                         x-cloak
+                                         class="absolute left-0 right-0 top-full z-20 mt-2 max-h-56 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/10">
+                                        <div x-show="positionSearchLoading"
+                                             class="px-4 py-3 text-sm font-semibold text-slate-400">
+                                            검색 중입니다.
+                                        </div>
+                                        <template x-if="!positionSearchLoading && positionSearchResults.length === 0">
+                                            <div class="px-4 py-3 text-sm font-semibold text-slate-400">
+                                                선택할 수 있는 직무가 없습니다.
+                                            </div>
+                                        </template>
+                                        <template x-for="option in positionSearchResults" :key="`position-option-${option.id}`">
+                                            <button type="button"
+                                                    @mousedown.prevent="selectPosition(option)"
+                                                    class="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                                                <span x-text="option.name"></span>
+                                                <i data-lucide="chevron-right" class="h-4 w-4 text-slate-300"></i>
+                                            </button>
+                                        </template>
+                                    </div>
+                                </div>
                             </div>
 
                             <div>
@@ -790,6 +816,10 @@
                 editingIndex: null,
                 currentPosition: null,
                 positionErrors: [],
+                positionSearchResults: [],
+                positionSearchOpen: false,
+                positionSearchLoading: false,
+                positionSearchRequestSequence: 0,
                 skillSearchResults: {
                     essential: [],
                     preferred: []
@@ -1196,6 +1226,7 @@
                     this.editingIndex = null;
                     this.currentPosition = this.blankPosition();
                     this.positionErrors = [];
+                    this.resetPositionSearchState();
                     this.resetSkillSearchState();
                     this.positionModalOpen = true;
                     this.refreshIcons();
@@ -1205,6 +1236,7 @@
                     this.editingIndex = index;
                     this.currentPosition = this.normalizePosition(JSON.parse(JSON.stringify(this.positions[index])));
                     this.positionErrors = [];
+                    this.resetPositionSearchState();
                     this.resetSkillSearchState();
                     this.positionModalOpen = true;
                     this.refreshIcons();
@@ -1214,6 +1246,7 @@
                     this.positionModalOpen = false;
                     this.currentPosition = this.blankPosition();
                     this.positionErrors = [];
+                    this.resetPositionSearchState();
                     this.resetSkillSearchState();
                     this.refreshIcons();
                 },
@@ -1237,6 +1270,97 @@
 
                 removePosition(index) {
                     this.positions.splice(index, 1);
+                    this.refreshIcons();
+                },
+
+                openPositionSearch() {
+                    this.positionSearchOpen = true;
+                    this.searchPositions();
+                },
+
+                closePositionSearch() {
+                    this.positionSearchOpen = false;
+                },
+
+                closePositionSearchWithDelay() {
+                    window.setTimeout(() => {
+                        this.closePositionSearch();
+                    }, 150);
+                },
+
+                handlePositionSearchInput() {
+                    if (!this.currentPosition) {
+                        return;
+                    }
+
+                    this.currentPosition.positionId = '';
+                    this.searchPositions();
+                },
+
+                async searchPositions() {
+                    if (!this.currentPosition) {
+                        return;
+                    }
+
+                    const query = (this.currentPosition.positionSearchDraft || '').trim();
+                    const requestSequence = ++this.positionSearchRequestSequence;
+
+                    this.positionSearchOpen = true;
+                    this.positionSearchLoading = true;
+
+                    try {
+                        const response = await fetch(`/api/positions?query=${encodeURIComponent(query)}`, {
+                            headers: {
+                                'Accept': 'application/json'
+                            }
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('직무 목록을 불러오지 못했습니다.');
+                        }
+
+                        const positions = await response.json();
+                        if (requestSequence !== this.positionSearchRequestSequence) {
+                            return;
+                        }
+
+                        this.positionSearchResults = (positions || [])
+                            .filter(position => position && position.id && position.name);
+                    } catch (error) {
+                        if (requestSequence === this.positionSearchRequestSequence) {
+                            this.positionSearchResults = [];
+                            this.positionErrors = [error.message || '직무 목록을 불러오지 못했습니다.'];
+                        }
+                    } finally {
+                        if (requestSequence === this.positionSearchRequestSequence) {
+                            this.positionSearchLoading = false;
+                            this.refreshIcons();
+                        }
+                    }
+                },
+
+                selectFirstPosition() {
+                    if (this.positionSearchResults.length > 0) {
+                        this.selectPosition(this.positionSearchResults[0]);
+                        return;
+                    }
+
+                    const draft = (this.currentPosition.positionSearchDraft || '').trim();
+                    if (draft) {
+                        this.positionErrors = ['검색 결과에서 직무를 선택해주세요.'];
+                    }
+                },
+
+                selectPosition(position) {
+                    if (!position || !position.id || !position.name) {
+                        return;
+                    }
+
+                    this.currentPosition.positionId = String(position.id);
+                    this.currentPosition.positionSearchDraft = position.name.trim();
+                    this.positionSearchResults = [];
+                    this.positionSearchOpen = false;
+                    this.positionErrors = [];
                     this.refreshIcons();
                 },
 
@@ -1368,6 +1492,13 @@
                     };
                 },
 
+                resetPositionSearchState() {
+                    this.positionSearchResults = [];
+                    this.positionSearchOpen = false;
+                    this.positionSearchLoading = false;
+                    this.positionSearchRequestSequence = 0;
+                },
+
                 removeSkill(type, index) {
                     const listKey = type === 'essential' ? 'essentialSkillNames' : 'preferredSkillNames';
                     this.currentPosition[listKey].splice(index, 1);
@@ -1395,6 +1526,7 @@
                         id: null,
                         clientKey: this.generateKey(),
                         positionId: '',
+                        positionSearchDraft: '',
                         title: '',
                         workType: '',
                         headCount: '',
@@ -1418,6 +1550,7 @@
                         id: position.id ?? null,
                         clientKey: position.clientKey || this.generateKey(),
                         positionId: position.positionId != null ? String(position.positionId) : '',
+                        positionSearchDraft: this.positionNameById(position.positionId) || '',
                         title: (position.title || '').trim(),
                         workType,
                         headCount: this.normalizeNumberField(position.headCount),

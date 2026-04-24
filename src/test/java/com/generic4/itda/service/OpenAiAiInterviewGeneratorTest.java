@@ -32,11 +32,24 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import org.mockito.Mockito;
 
 class OpenAiAiInterviewGeneratorTest {
 
     private static final String API_URL = "https://api.openai.com/v1/responses";
     private static final String API_KEY = "test-api-key";
+    private static final List<String> ALLOWED_POSITIONS = List.of(
+            "백엔드 개발자",
+            "프론트엔드 개발자",
+            "풀스택 개발자",
+            "모바일 앱 개발자",
+            "AI 엔지니어",
+            "데이터 엔지니어",
+            "DevOps 엔지니어",
+            "UI/UX 디자이너",
+            "서비스 기획자",
+            "QA 엔지니어"
+    );
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -55,7 +68,10 @@ class OpenAiAiInterviewGeneratorTest {
 
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
-        generator = new OpenAiAiInterviewGenerator(builder, objectMapper, properties);
+        PositionResolver positionResolver = Mockito.mock(PositionResolver.class);
+        Mockito.when(positionResolver.findAllowedCategoryNames())
+                .thenReturn(ALLOWED_POSITIONS);
+        generator = new OpenAiAiInterviewGenerator(builder, objectMapper, properties, positionResolver);
     }
 
     @AfterEach
@@ -110,6 +126,13 @@ class OpenAiAiInterviewGeneratorTest {
                 .andExpect(jsonPath("$.instructions").value(containsString("skills.skillName은 반드시 아래 정규 Skill 목록 중 하나만 사용한다.")))
                 .andExpect(jsonPath("$.instructions").value(containsString("정규 Skill 목록에 없는 스킬은 절대 생성, 제안, 추가, 반환하지 않는다.")))
                 .andExpect(jsonPath("$.instructions").value(containsString("assistantMessage에서도 정규 Skill 목록에 없는 스킬을 먼저 제안하거나 추가해드릴지 묻지 않는다.")))
+                .andExpect(jsonPath("$.instructions").value(containsString("허용 가능한 Position 카테고리 목록:")))
+                .andExpect(jsonPath("$.instructions").value(containsString("- 백엔드 개발자")))
+                .andExpect(jsonPath("$.instructions").value(containsString("- 프론트엔드 개발자")))
+                .andExpect(jsonPath("$.instructions").value(containsString("- 모바일 앱 개발자")))
+                .andExpect(jsonPath("$.instructions").value(containsString("- AI 엔지니어")))
+                .andExpect(jsonPath("$.instructions").value(containsString("- QA 엔지니어")))
+                .andExpect(jsonPath("$.instructions").value(containsString("목록에 없는 직무 카테고리는 절대 새로 만들거나 비슷하게 지어내지 않는다.")))
                 .andExpect(jsonPath("$.instructions").value(containsString("- React")))
                 .andExpect(jsonPath("$.instructions").value(containsString("- Spring Boot")))
                 .andExpect(jsonPath("$.text.format.type").value("json_schema"))
@@ -139,6 +162,8 @@ class OpenAiAiInterviewGeneratorTest {
                                 "workPlace",
                                 "skills"
                         )))
+                .andExpect(jsonPath("$.text.format.schema.properties.aiBriefResult.properties.positions.items.properties.positionCategoryName.enum[*]")
+                        .value(containsInAnyOrder(ALLOWED_POSITIONS.toArray())))
                 .andExpect(jsonPath("$.text.format.schema.properties.aiBriefResult.properties.positions.items.properties.skills.items.required[*]")
                         .value(containsInAnyOrder("skillName", "importance")))
                 .andRespond(withSuccess(

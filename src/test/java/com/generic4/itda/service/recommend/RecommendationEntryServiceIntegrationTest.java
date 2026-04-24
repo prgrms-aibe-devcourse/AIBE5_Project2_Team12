@@ -41,9 +41,9 @@ class RecommendationEntryServiceIntegrationTest {
     @DisplayName("저장된 recommendation aggregate를 조회해 entry ViewModel을 조립한다")
     void getEntry_assemblesViewModelFromPersistedAggregate() {
         Member owner = memberRepository.save(createMember("entry-owner@test.com", "pw", "제안자", "010-0000-1111"));
-        Position designer = persist(Position.create("디자인"));
-        Position backend = persist(Position.create("백엔드"));
-        Position frontend = persist(Position.create("프론트엔드"));
+        Position designer = persist(Position.create("UI/UX 디자이너"));
+        Position backend = persist(Position.create("백엔드 개발자"));
+        Position frontend = persist(Position.create("프론트엔드 개발자"));
         Skill figma = persist(Skill.create("Figma", null));
         Skill java = persist(Skill.create("Java", null));
         Skill react = persist(Skill.create("React", null));
@@ -90,7 +90,7 @@ class RecommendationEntryServiceIntegrationTest {
 
         RecommendationEntryPositionItem first = result.positions().get(0);
         assertThat(first.positionTitle()).isEqualTo("프로덕트 디자이너");
-        assertThat(first.positionCategoryName()).isEqualTo("디자인");
+        assertThat(first.positionCategoryName()).isEqualTo("UI/UX 디자이너");
         assertThat(first.budgetText()).isEqualTo("예산 미정");
         assertThat(first.skills())
                 .singleElement()
@@ -101,7 +101,7 @@ class RecommendationEntryServiceIntegrationTest {
 
         RecommendationEntryPositionItem second = result.positions().get(1);
         assertThat(second.positionTitle()).isEqualTo("Node.js 백엔드 개발자");
-        assertThat(second.positionCategoryName()).isEqualTo("백엔드");
+        assertThat(second.positionCategoryName()).isEqualTo("백엔드 개발자");
         assertThat(second.budgetText()).isEqualTo("1,000,000 ~ 2,000,000");
         assertThat(second.expectedPeriod()).isEqualTo(5L);
         assertThat(second.skills())
@@ -144,7 +144,7 @@ class RecommendationEntryServiceIntegrationTest {
     void getEntry_rejectsNonOwner() {
         Member owner = memberRepository.save(createMember("entry-real-owner@test.com", "pw", "소유자", "010-0000-3333"));
         Member other = memberRepository.save(createMember("entry-other@test.com", "pw", "다른회원", "010-0000-4444"));
-        Position backend = persist(Position.create("통합 백엔드"));
+        Position backend = persist(Position.create("백엔드 개발자"));
 
         Proposal proposal = Proposal.create(
                 owner,

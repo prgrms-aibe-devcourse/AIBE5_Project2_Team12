@@ -63,6 +63,9 @@ class ProposalServiceTest {
     private PositionRepository positionRepository;
 
     @Mock
+    private PositionResolver positionResolver;
+
+    @Mock
     private SkillResolver skillResolver;
 
     @Mock
@@ -86,6 +89,7 @@ class ProposalServiceTest {
                 .thenReturn(false);
         lenient().when(proposalRepository.findFirstBySourceProposal_IdAndStatusOrderByModifiedAtDescIdDesc(any(Long.class), any()))
                 .thenReturn(Optional.empty());
+        lenient().when(positionResolver.isAllowedPosition(any(Position.class))).thenReturn(true);
         lenient().when(aiInterviewMessageRepository.findAllByProposalIdOrderBySequenceAsc(any(Long.class)))
                 .thenReturn(List.of());
         lenient().when(aiInterviewMessageRepository.saveAll(any()))
@@ -283,6 +287,33 @@ class ProposalServiceTest {
     }
 
     @Test
+    @DisplayName("제안서 저장은 허용 목록 밖 Position id가 와도 저장하지 않는다")
+    void saveDraft_throwsWhenPositionIsNotAllowed() {
+        Position legacyBackend = Position.create("백엔드");
+        ReflectionTestUtils.setField(legacyBackend, "id", 99L);
+
+        ProposalPositionForm positionForm = new ProposalPositionForm();
+        positionForm.setPositionId(99L);
+        positionForm.setTitle("백엔드 개발자");
+        positionForm.setWorkType(ProposalWorkType.REMOTE);
+        positionForm.setHeadCount(1L);
+
+        ProposalForm form = new ProposalForm();
+        form.setTitle("백엔드 프로젝트");
+        form.setRawInputText("");
+        form.getPositions().add(positionForm);
+
+        when(positionRepository.findById(99L)).thenReturn(Optional.of(legacyBackend));
+        when(positionResolver.isAllowedPosition(legacyBackend)).thenReturn(false);
+
+        assertThatThrownBy(() -> proposalService.saveDraft(EMAIL, form))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("존재하지 않는 직무입니다. id=99");
+
+        then(proposalRepository).should(never()).save(any(Proposal.class));
+    }
+
+    @Test
     @DisplayName("AI 인터뷰 draft 저장은 WRITING 상태가 아니면 실패한다")
     void saveInterviewDraft_blocksNonWritingProposal() {
         Proposal proposal = Proposal.create(
@@ -346,6 +377,44 @@ class ProposalServiceTest {
 
         assertThatThrownBy(() -> proposalService.saveInterviewDraft(99L, EMAIL, request))
                 .isInstanceOf(ProposalNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("AI 인터뷰 draft 저장도 허용 목록 밖 Position id를 거부한다")
+    void saveInterviewDraft_throwsWhenPositionIsNotAllowed() {
+        Proposal proposal = Proposal.create(
+                member,
+                "기존 프로젝트",
+                "기존 원본 입력",
+                "기존 설명",
+                null,
+                null,
+                6L
+        );
+        ReflectionTestUtils.setField(proposal, "id", 1L);
+
+        Position legacyBackend = Position.create("백엔드");
+        ReflectionTestUtils.setField(legacyBackend, "id", 99L);
+
+        ProposalPositionForm positionForm = new ProposalPositionForm();
+        positionForm.setPositionId(99L);
+        positionForm.setTitle("백엔드 개발자");
+        positionForm.setWorkType(ProposalWorkType.REMOTE);
+        positionForm.setHeadCount(1L);
+
+        AiInterviewDraftSaveRequest request = new AiInterviewDraftSaveRequest();
+        request.setTitle("수정된 프로젝트");
+        request.setDescription("수정된 설명");
+        request.setExpectedPeriod(6L);
+        request.setPositions(List.of(positionForm));
+
+        when(proposalRepository.findById(1L)).thenReturn(Optional.of(proposal));
+        when(positionRepository.findById(99L)).thenReturn(Optional.of(legacyBackend));
+        when(positionResolver.isAllowedPosition(legacyBackend)).thenReturn(false);
+
+        assertThatThrownBy(() -> proposalService.saveInterviewDraft(1L, EMAIL, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("존재하지 않는 직무입니다. id=99");
     }
 
     @Test

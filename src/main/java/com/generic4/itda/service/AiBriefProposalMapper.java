@@ -10,7 +10,6 @@ import com.generic4.itda.domain.skill.Skill;
 import com.generic4.itda.dto.proposal.AiBriefPositionResult;
 import com.generic4.itda.dto.proposal.AiBriefResult;
 import com.generic4.itda.dto.proposal.AiBriefSkillResult;
-import com.generic4.itda.repository.PositionRepository;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -31,7 +30,7 @@ public class AiBriefProposalMapper {
     private static final ProposalWorkType DEFAULT_WORK_TYPE = ProposalWorkType.REMOTE;
     private static final String DEFAULT_WORK_PLACE = "협의";
 
-    private final PositionRepository positionRepository;
+    private final PositionResolver positionResolver;
     private final SkillResolver skillResolver;
 
     public void apply(Proposal proposal, AiBriefResult aiBriefResult) {
@@ -74,6 +73,9 @@ public class AiBriefProposalMapper {
 
         Map<String, ProposalPosition> existingByPositionName = existingPositionsByPositionName(proposal);
         List<PositionApplication> applications = mergePositionApplicationsByPositionName(positionResults);
+        if (applications.isEmpty()) {
+            return;
+        }
         Set<ProposalPosition> appliedPositions = new HashSet<>();
 
         for (PositionApplication application : applications) {
@@ -229,7 +231,12 @@ public class AiBriefProposalMapper {
         Map<String, PositionApplication> merged = new LinkedHashMap<>();
 
         for (AiBriefPositionResult positionResult : positionResults) {
-            Position position = findOrCreatePosition(positionResult.getPositionCategoryName());
+            Optional<Position> resolvedPosition = positionResolver.resolve(positionResult.getPositionCategoryName());
+            if (resolvedPosition.isEmpty()) {
+                continue;
+            }
+
+            Position position = resolvedPosition.get();
             merged.put(normalizeKey(position.getName()), new PositionApplication(position, positionResult));
         }
 
@@ -308,11 +315,6 @@ public class AiBriefProposalMapper {
         }
 
         return desiredSkills;
-    }
-
-    private Position findOrCreatePosition(String positionCategoryName) {
-        return positionRepository.findByName(positionCategoryName)
-                .orElseGet(() -> positionRepository.save(Position.create(positionCategoryName)));
     }
 
     private String resolveTitle(Proposal proposal, AiBriefResult aiBriefResult) {

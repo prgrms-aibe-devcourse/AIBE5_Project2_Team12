@@ -27,18 +27,22 @@ import com.generic4.itda.domain.skill.Skill;
 import com.generic4.itda.repository.MatchingRepository;
 import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.PositionRepository;
+import com.generic4.itda.repository.ProposalPositionRepository;
 import com.generic4.itda.repository.ProposalRepository;
 import com.generic4.itda.repository.RecommendationResultRepository;
 import com.generic4.itda.repository.RecommendationRunRepository;
 import com.generic4.itda.repository.ResumeRepository;
 import com.generic4.itda.repository.SkillRepository;
+import com.generic4.itda.service.PositionResolver;
 import com.generic4.itda.service.ResumeEmbeddingService;
 import com.generic4.itda.service.recommend.RecommendationFingerprintGenerator;
 import java.math.BigDecimal;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -80,11 +84,13 @@ public class SeedDataInitializer implements ApplicationRunner {
     private final PositionRepository positionRepository;
     private final SkillRepository skillRepository;
     private final ResumeRepository resumeRepository;
+    private final ProposalPositionRepository proposalPositionRepository;
     private final ProposalRepository proposalRepository;
     private final MatchingRepository matchingRepository;
     private final RecommendationRunRepository recommendationRunRepository;
     private final RecommendationResultRepository recommendationResultRepository;
     private final RecommendationFingerprintGenerator recommendationFingerprintGenerator;
+    private final PositionResolver positionResolver;
     private final ResumeEmbeddingService resumeEmbeddingService;
     private final PasswordEncoder passwordEncoder;
 
@@ -94,6 +100,9 @@ public class SeedDataInitializer implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         Map<String, Position> positions = ensurePositions();
+        normalizeProposalPositionCategories(positions);
+        cleanupUnusedLegacyPositions(positions);
+        positions = ensurePositions();
         Map<String, Skill> skills = ensureSkills();
 
         Member client = ensureMember(SEED_CLIENT_EMAIL, "시드 클라이언트", "추천 테스트용 발주자", "010-9000-1000");
@@ -867,10 +876,65 @@ public class SeedDataInitializer implements ApplicationRunner {
 
     private Map<String, Position> ensurePositions() {
         Map<String, Position> positions = new LinkedHashMap<>();
-        positions.put("백엔드 개발자", ensurePosition("백엔드 개발자"));
-        positions.put("프론트엔드 개발자", ensurePosition("프론트엔드 개발자"));
-        positions.put("AI 엔지니어", ensurePosition("AI 엔지니어"));
+        for (String positionName : positionResolver.findAllowedCategoryNames()) {
+            positions.put(positionName, ensurePosition(positionName));
+        }
         return positions;
+    }
+
+    private void normalizeProposalPositionCategories(Map<String, Position> canonicalPositions) {
+        List<ProposalPosition> proposalPositions = proposalPositionRepository.findAll();
+
+        for (ProposalPosition proposalPosition : proposalPositions) {
+            Position currentPosition = proposalPosition.getPosition();
+            if (currentPosition == null || currentPosition.getName() == null) {
+                continue;
+            }
+
+            Optional<String> canonicalName = positionResolver.resolveCanonicalName(currentPosition.getName());
+            if (canonicalName.isEmpty()) {
+                continue;
+            }
+
+            Position canonicalPosition = canonicalPositions.get(canonicalName.get());
+            if (canonicalPosition == null || hasSamePosition(currentPosition, canonicalPosition)) {
+                continue;
+            }
+
+            proposalPosition.update(
+                    canonicalPosition,
+                    proposalPosition.getTitle(),
+                    proposalPosition.getWorkType(),
+                    proposalPosition.getHeadCount(),
+                    proposalPosition.getUnitBudgetMin(),
+                    proposalPosition.getUnitBudgetMax(),
+                    proposalPosition.getExpectedPeriod(),
+                    proposalPosition.getCareerMinYears(),
+                    proposalPosition.getCareerMaxYears(),
+                    proposalPosition.getWorkPlace()
+            );
+        }
+    }
+
+    private void cleanupUnusedLegacyPositions(Map<String, Position> canonicalPositions) {
+        Set<Long> usedPositionIds = new HashSet<>();
+        for (ProposalPosition proposalPosition : proposalPositionRepository.findAll()) {
+            if (proposalPosition.getPosition() != null && proposalPosition.getPosition().getId() != null) {
+                usedPositionIds.add(proposalPosition.getPosition().getId());
+            }
+        }
+
+        for (Position position : positionRepository.findAll()) {
+            if (canonicalPositions.containsKey(position.getName())) {
+                continue;
+            }
+
+            if (position.getId() != null && usedPositionIds.contains(position.getId())) {
+                continue;
+            }
+
+            positionRepository.delete(position);
+        }
     }
 
     private Map<String, Skill> ensureSkills() {
@@ -1422,6 +1486,16 @@ public class SeedDataInitializer implements ApplicationRunner {
     private Position ensurePosition(String name) {
         return positionRepository.findByName(name)
                 .orElseGet(() -> positionRepository.save(Position.create(name)));
+    }
+
+    private boolean hasSamePosition(Position source, Position target) {
+        if (source == target) {
+            return true;
+        }
+        if (source.getId() != null && target.getId() != null) {
+            return source.getId().equals(target.getId());
+        }
+        return source.getName().equals(target.getName());
     }
 
     private Skill ensureSkill(String name, String description) {

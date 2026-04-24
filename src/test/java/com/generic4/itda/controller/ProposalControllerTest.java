@@ -35,14 +35,13 @@ import java.time.LocalDateTime;
 import org.springframework.security.access.AccessDeniedException;
 import com.generic4.itda.repository.MatchingRepository;
 import com.generic4.itda.repository.MemberRepository;
-import com.generic4.itda.repository.PositionRepository;
+import com.generic4.itda.service.PositionResolver;
 import com.generic4.itda.service.ProposalAiInterviewService;
 import com.generic4.itda.service.ProposalService;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Sort;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -61,7 +60,7 @@ class ProposalControllerTest {
     private ProposalAiInterviewService proposalAiInterviewService;
 
     @MockitoBean
-    private PositionRepository positionRepository;
+    private PositionResolver positionResolver;
 
     @MockitoBean
     private MemberRepository memberRepository;
@@ -75,7 +74,7 @@ class ProposalControllerTest {
         ItDaPrincipal principal = ItDaPrincipal.from(
                 createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
         );
-        given(positionRepository.findAll(any(Sort.class)))
+        given(positionResolver.findAllowedPositions())
                 .willReturn(List.of(Position.create("백엔드 개발자")));
 
         mockMvc.perform(get("/proposals/new")
@@ -96,7 +95,7 @@ class ProposalControllerTest {
     void saveDraftAndRedirectToEdit() throws Exception {
         Proposal proposal = org.mockito.Mockito.mock(Proposal.class);
         given(proposal.getId()).willReturn(1L);
-        given(positionRepository.findAll(any(Sort.class))).willReturn(List.of());
+        given(positionResolver.findAllowedPositions()).willReturn(List.of());
         given(proposalService.saveDraft(anyString(), any(ProposalForm.class))).willReturn(proposal);
 
         ItDaPrincipal principal = ItDaPrincipal.from(
@@ -124,7 +123,7 @@ class ProposalControllerTest {
     void saveDraftAndRedirectToEditWithAiBriefRequested() throws Exception {
         Proposal proposal = org.mockito.Mockito.mock(Proposal.class);
         given(proposal.getId()).willReturn(1L);
-        given(positionRepository.findAll(any(Sort.class))).willReturn(List.of());
+        given(positionResolver.findAllowedPositions()).willReturn(List.of());
         given(proposalService.saveDraft(anyString(), any(ProposalForm.class))).willReturn(proposal);
 
         ItDaPrincipal principal = ItDaPrincipal.from(
@@ -153,7 +152,7 @@ class ProposalControllerTest {
     void registerAndRedirectToRecommendationEntry() throws Exception {
         Proposal proposal = org.mockito.Mockito.mock(Proposal.class);
         given(proposal.getId()).willReturn(3L);
-        given(positionRepository.findAll(any(Sort.class)))
+        given(positionResolver.findAllowedPositions())
                 .willReturn(List.of(Position.create("백엔드 개발자")));
         // register 검증 로직에서 총 예산 계산이 null 이면 실패로 처리되므로, 성공 흐름을 위해 stub 한다.
         given(proposalService.calculateTotalBudgetMin(any(ProposalForm.class))).willReturn(3_000_000L);
@@ -195,7 +194,7 @@ class ProposalControllerTest {
         ItDaPrincipal principal = ItDaPrincipal.from(
                 createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
         );
-        given(positionRepository.findAll(any(Sort.class)))
+        given(positionResolver.findAllowedPositions())
                 .willReturn(List.of(Position.create("백엔드 개발자")));
 
         mockMvc.perform(post("/proposals/new")
@@ -238,7 +237,7 @@ class ProposalControllerTest {
                 null,
                 6L
         );
-        given(positionRepository.findAll(any(Sort.class)))
+        given(positionResolver.findAllowedPositions())
                 .willReturn(List.of(Position.create("백엔드 개발자")));
         given(proposalService.findOwnedProposal(1L, "client@example.com")).willReturn(proposal);
         given(proposalService.findOwnedProposalForm(1L, "client@example.com"))
@@ -275,7 +274,7 @@ class ProposalControllerTest {
                 null,
                 null
         );
-        given(positionRepository.findAll(any(Sort.class)))
+        given(positionResolver.findAllowedPositions())
                 .willReturn(List.of(Position.create("백엔드 개발자")));
         given(proposalService.findOwnedProposal(1L, "client@example.com")).willReturn(proposal);
         given(proposalService.findOwnedProposalForm(1L, "client@example.com"))
@@ -307,7 +306,7 @@ class ProposalControllerTest {
     void updateDraftAndRedirectToEditWithAiBriefRequested() throws Exception {
         Proposal proposal = org.mockito.Mockito.mock(Proposal.class);
         given(proposal.getId()).willReturn(1L);
-        given(positionRepository.findAll(any(Sort.class))).willReturn(List.of());
+        given(positionResolver.findAllowedPositions()).willReturn(List.of());
         given(proposalService.saveDraft(any(Long.class), anyString(), any(ProposalForm.class))).willReturn(proposal);
 
         ItDaPrincipal principal = ItDaPrincipal.from(
@@ -336,7 +335,7 @@ class ProposalControllerTest {
     void updateDraftAndRedirectToEdit() throws Exception {
         Proposal proposal = org.mockito.Mockito.mock(Proposal.class);
         given(proposal.getId()).willReturn(1L);
-        given(positionRepository.findAll(any(Sort.class))).willReturn(List.of());
+        given(positionResolver.findAllowedPositions()).willReturn(List.of());
         given(proposalService.saveDraft(any(Long.class), anyString(), any(ProposalForm.class))).willReturn(proposal);
 
         ItDaPrincipal principal = ItDaPrincipal.from(
@@ -364,7 +363,7 @@ class ProposalControllerTest {
     void registerAfterUpdateAndRedirectToRecommendationEntry() throws Exception {
         Proposal proposal = org.mockito.Mockito.mock(Proposal.class);
         given(proposal.getId()).willReturn(1L);
-        given(positionRepository.findAll(any(Sort.class)))
+        given(positionResolver.findAllowedPositions())
                 .willReturn(List.of(Position.create("백엔드 개발자")));
         given(proposalService.calculateTotalBudgetMin(any(ProposalForm.class))).willReturn(3_000_000L);
         given(proposalService.calculateTotalBudgetMax(any(ProposalForm.class))).willReturn(4_000_000L);
@@ -402,7 +401,7 @@ class ProposalControllerTest {
     @Test
     @DisplayName("수정 요청에서 register 조건을 만족하지 못하면 편집기에 머무르며 이유를 보여준다")
     void stayOnFormWhenUpdateRegisterValidationFails() throws Exception {
-        given(positionRepository.findAll(any(Sort.class)))
+        given(positionResolver.findAllowedPositions())
                 .willReturn(List.of(Position.create("백엔드 개발자")));
 
         ItDaPrincipal principal = ItDaPrincipal.from(
@@ -479,7 +478,7 @@ class ProposalControllerTest {
     @Test
     @DisplayName("수정 요청 처리 중 예외가 발생하면 편집기에 머무르며 이유를 보여준다")
     void stayOnFormWhenUpdateFailsWithIllegalState() throws Exception {
-        given(positionRepository.findAll(any(Sort.class)))
+        given(positionResolver.findAllowedPositions())
                 .willReturn(List.of(Position.create("백엔드 개발자")));
         willThrow(new IllegalStateException("저장 중 오류가 발생했습니다."))
                 .given(proposalService).saveDraft(eq(1L), eq("client@example.com"), any(ProposalForm.class));
