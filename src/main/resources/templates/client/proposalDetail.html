@@ -400,12 +400,13 @@
                         <p id="recommendModalErrorMsg" class="text-sm font-semibold text-rose-700"></p>
                     </div>
 
-                    <!-- 추천 요청 폼 -->
+                    <!-- 추천 요청 폼 — POST /proposal-positions/{posId}/recommendations/more?proposalId={id} -->
                     <form id="recommendModalForm"
-                          th:action="@{/proposal-positions/{proposalPositionId}/recommendations/more(
-                                    proposalPositionId=${recommendEntry != null ? recommendEntry.selectedProposalPositionId : 0})}"
-                          method="post">
-                        <input type="hidden" name="proposalId" th:value="${proposal.id}">
+                          th:action="@{/proposal-positions/{posId}/recommendations/more(
+                                    posId=${recommendEntry != null ? recommendEntry.selectedProposalPositionId : 0},
+                                    proposalId=${proposal.id})}"
+                          method="post"
+                          th:data-proposal-id="${proposal.id}">
                         <th:block th:if="${_csrf != null}">
                             <input type="hidden" name="_csrf" th:value="${_csrf.token}">
                         </th:block>
@@ -617,17 +618,17 @@
                     return;
                 }
 
-                form.action = '/proposal-positions/' + encodeURIComponent(proposalPositionId) + '/recommendations/more';
+                // POST /proposal-positions/{posId}/recommendations/more?proposalId={id}
+                var proposalId = form.dataset.proposalId;
+                form.action = '/proposal-positions/' + encodeURIComponent(proposalPositionId)
+                            + '/recommendations/more'
+                            + '?proposalId=' + encodeURIComponent(proposalId);
 
-                var csrfInput  = form.querySelector('input[name="_csrf"]');
-                var csrfHeader = document.querySelector('meta[name="_csrf_header"]');
+                var csrfInput = form.querySelector('input[name="_csrf"]');
                 var headers = {
                     'Content-Type': 'application/x-www-form-urlencoded',
                     'Accept':       'application/json'
                 };
-                if (csrfInput && csrfHeader) {
-                    headers[csrfHeader.content] = csrfInput.value;
-                }
 
                 fetch(form.action, {
                     method:  'POST',
