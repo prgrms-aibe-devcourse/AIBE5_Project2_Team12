@@ -36,7 +36,8 @@ public class RecommendationEntryService {
         boolean hasOpenPosition = proposal.getPositions().stream()
                 .anyMatch(position -> position.getStatus() == ProposalPositionStatus.OPEN);
 
-        boolean runnable = proposal.getStatus() == ProposalStatus.MATCHING && hasOpenPosition;
+        boolean runnable = proposal.getStatus() == ProposalStatus.MATCHING
+                && (proposal.getPositions().isEmpty() || hasOpenPosition);
 
         List<RecommendationEntryPositionItem> positions = proposal.getPositions().stream()
                 .sorted(Comparator.comparing(ProposalPosition::getId))
