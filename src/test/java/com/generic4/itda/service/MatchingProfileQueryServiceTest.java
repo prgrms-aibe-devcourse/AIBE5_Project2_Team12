@@ -101,6 +101,8 @@ class MatchingProfileQueryServiceTest {
         assertThat(result.matchingContext().viewerRole()).isEqualTo("CLIENT");
         assertThat(result.matchingContext().matchingStatus()).isEqualTo("PROPOSED");
         assertThat(result.matchingContext().contactVisible()).isFalse();
+        assertThat(result.matchingContext().contactEmail()).isNull();
+        assertThat(result.matchingContext().contactPhone()).isNull();
         assertThat(result.matchingContext().statusLabel()).isEqualTo("제안됨");
         assertThat(result.matchingContext().helperMessage())
                 .isEqualTo("프리랜서가 요청을 확인하고 응답하면 다음 단계로 넘어갈 수 있습니다.");
@@ -142,6 +144,8 @@ class MatchingProfileQueryServiceTest {
         assertThat(result.client().project().preferredSkills()).containsExactly("Docker");
         assertThat(result.matchingContext().viewerRole()).isEqualTo("FREELANCER");
         assertThat(result.matchingContext().contactVisible()).isFalse();
+        assertThat(result.matchingContext().contactEmail()).isNull();
+        assertThat(result.matchingContext().contactPhone()).isNull();
         assertThat(result.matchingContext().helperMessage()).isEqualTo("요청 내용을 확인한 뒤 수락 또는 거절할 수 있습니다.");
         assertThat(result.matchingContext().canRespond()).isTrue();
 
@@ -164,6 +168,9 @@ class MatchingProfileQueryServiceTest {
         assertThat(result.client().userTypeLabel()).isEqualTo("기업");
         assertThat(result.matchingContext().matchingStatus()).isEqualTo("ACCEPTED");
         assertThat(result.matchingContext().contactVisible()).isTrue();
+        assertThat(result.matchingContext().contactEmail()).isEqualTo(CLIENT_EMAIL);
+        assertThat(result.matchingContext().contactPhone()).isEqualTo("010-0000-0001");
+        assertThat(result.matchingContext().hasContactDetails()).isTrue();
         assertThat(result.matchingContext().helperMessage())
                 .isEqualTo("연락처가 공개되었습니다. 제안서를 다시 확인하고 협의를 이어가세요.");
         assertThat(result.matchingContext().canRespond()).isFalse();
@@ -186,6 +193,9 @@ class MatchingProfileQueryServiceTest {
         assertThat(result.statusLabel()).isEqualTo("취소됨");
         assertThat(result.matchingContext().matchingStatus()).isEqualTo("CANCELED");
         assertThat(result.matchingContext().contactVisible()).isTrue();
+        assertThat(result.matchingContext().contactEmail()).isEqualTo(FREELANCER_EMAIL);
+        assertThat(result.matchingContext().contactPhone()).isEqualTo("010-0000-0002");
+        assertThat(result.matchingContext().hasContactDetails()).isTrue();
         assertThat(result.matchingContext().helperMessage())
                 .isEqualTo("취소된 계약입니다. 필요한 경우 진행 이력과 연락처 정보를 확인해보세요.");
 

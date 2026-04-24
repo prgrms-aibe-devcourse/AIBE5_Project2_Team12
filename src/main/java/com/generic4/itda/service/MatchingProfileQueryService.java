@@ -72,7 +72,7 @@ public class MatchingProfileQueryService {
                 toFreelancerBody(resume, displayName),
                 null,
                 projectSummary,
-                toMatchingContext(matching, viewerRole, contactVisible),
+                toMatchingContext(matching, viewerRole, contactVisible, freelancer),
                 null
         );
     }
@@ -95,7 +95,7 @@ public class MatchingProfileQueryService {
                 null,
                 toClientBody(client, displayName, projectSummary),
                 projectSummary,
-                toMatchingContext(matching, viewerRole, contactVisible),
+                toMatchingContext(matching, viewerRole, contactVisible, client),
                 null
         );
     }
@@ -135,7 +135,8 @@ public class MatchingProfileQueryService {
     private ProfileMatchingContextViewModel toMatchingContext(
             Matching matching,
             String viewerRole,
-            boolean contactVisible
+            boolean contactVisible,
+            Member counterpart
     ) {
         return new ProfileMatchingContextViewModel(
                 matching.getId(),
@@ -147,7 +148,9 @@ public class MatchingProfileQueryService {
                 "/matchings/" + matching.getId(),
                 "/proposals/" + matching.getProposalPosition().getProposal().getId(),
                 "/matchings/" + matching.getId() + "/accept",
-                "/matchings/" + matching.getId() + "/reject"
+                "/matchings/" + matching.getId() + "/reject",
+                resolveContactEmail(counterpart, contactVisible),
+                resolveContactPhone(counterpart, contactVisible)
         );
     }
 
@@ -251,6 +254,20 @@ public class MatchingProfileQueryService {
         return member.getName().trim();
     }
 
+    private String resolveContactEmail(Member member, boolean contactVisible) {
+        if (!contactVisible) {
+            return null;
+        }
+        return member.getEmail().getValue();
+    }
+
+    private String resolveContactPhone(Member member, boolean contactVisible) {
+        if (!contactVisible) {
+            return null;
+        }
+        return formatPhone(member.getPhone().getValue());
+    }
+
     private String resolveHelperMessage(Matching matching, String viewerRole) {
         MatchingStatus status = matching.getStatus();
 
@@ -298,6 +315,28 @@ public class MatchingProfileQueryService {
 
     private String formatExpectedPeriod(Long expectedPeriod) {
         return expectedPeriod != null ? expectedPeriod + "주" : "미정";
+    }
+
+    private String formatPhone(String phone) {
+        if (!StringUtils.hasText(phone)) {
+            return "-";
+        }
+        String digits = phone.replaceAll("[^0-9]", "");
+        if (digits.startsWith("02")) {
+            if (digits.length() == 9) {
+                return digits.substring(0, 2) + "-" + digits.substring(2, 5) + "-" + digits.substring(5);
+            }
+            if (digits.length() == 10) {
+                return digits.substring(0, 2) + "-" + digits.substring(2, 6) + "-" + digits.substring(6);
+            }
+        }
+        if (digits.length() == 10) {
+            return digits.substring(0, 3) + "-" + digits.substring(3, 6) + "-" + digits.substring(6);
+        }
+        if (digits.length() == 11) {
+            return digits.substring(0, 3) + "-" + digits.substring(3, 7) + "-" + digits.substring(7);
+        }
+        return digits;
     }
 
     private String formatBudgetText(Long budgetMin, Long budgetMax) {

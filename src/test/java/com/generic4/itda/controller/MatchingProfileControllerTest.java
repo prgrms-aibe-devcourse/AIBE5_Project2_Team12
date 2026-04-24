@@ -49,7 +49,7 @@ class MatchingProfileControllerTest {
     @DisplayName("프리랜서 상대 프로필에서도 공통 프로젝트 요약이 렌더링된다")
     void renderCounterpartProfileWithSharedProjectSummary() throws Exception {
         given(matchingProfileQueryService.getCounterpartProfile(401L, "client@example.com"))
-                .willReturn(createFreelancerShellView());
+                .willReturn(createFreelancerShellView(false));
 
         mockMvc.perform(get("/matchings/401/counterpart-profile")
                         .param("backUrl", "/client/dashboard")
@@ -60,6 +60,22 @@ class MatchingProfileControllerTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("요청 프로젝트 요약")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("AI 매칭 플랫폼")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("매칭 상태")));
+    }
+
+    @Test
+    @DisplayName("연락처가 공개된 매칭 프로필에서는 상대 연락처를 함께 렌더링한다")
+    void renderCounterpartProfileWithContactDetailsWhenVisible() throws Exception {
+        given(matchingProfileQueryService.getCounterpartProfile(401L, "client@example.com"))
+                .willReturn(createFreelancerShellView(true));
+
+        mockMvc.perform(get("/matchings/401/counterpart-profile")
+                        .param("backUrl", "/matchings/401")
+                        .with(authentication(authToken("client@example.com", "클라이언트"))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("profile/shell"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("공개된 연락처")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("freelancer@example.com")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("010-0000-0002")));
     }
 
     @Test
@@ -101,17 +117,17 @@ class MatchingProfileControllerTest {
         );
     }
 
-    private ProfileShellViewModel createFreelancerShellView() {
+    private ProfileShellViewModel createFreelancerShellView(boolean contactVisible) {
         return new ProfileShellViewModel(
                 ProfileSubjectType.FREELANCER,
                 ProfileContextType.MATCHING,
-                ProfileAccessLevel.PREVIEW,
-                "길*",
+                contactVisible ? ProfileAccessLevel.FULL : ProfileAccessLevel.PREVIEW,
+                contactVisible ? "길동" : "길*",
                 "AI 매칭 플랫폼 · 플랫폼 백엔드 개발자",
-                "제안됨",
+                contactVisible ? "수락됨" : "제안됨",
                 "/matchings/401",
                 new ProfileFreelancerBodyViewModel(
-                        "길*",
+                        contactVisible ? "길동" : "길*",
                         "프리랜서 프로필",
                         "커머스와 금융 도메인 백엔드 개발 경험이 있습니다.",
                         5,
@@ -147,14 +163,18 @@ class MatchingProfileControllerTest {
                 new ProfileMatchingContextViewModel(
                         401L,
                         "CLIENT",
-                        "PROPOSED",
-                        false,
-                        "제안됨",
-                        "프리랜서가 요청을 확인하고 응답하면 다음 단계로 넘어갈 수 있습니다.",
+                        contactVisible ? "ACCEPTED" : "PROPOSED",
+                        contactVisible,
+                        contactVisible ? "수락됨" : "제안됨",
+                        contactVisible
+                                ? "연락처가 공개되었습니다. 제안서를 다시 확인하고 협의를 이어가세요."
+                                : "프리랜서가 요청을 확인하고 응답하면 다음 단계로 넘어갈 수 있습니다.",
                         "/matchings/401",
                         "/proposals/200",
                         "/matchings/401/accept",
-                        "/matchings/401/reject"
+                        "/matchings/401/reject",
+                        contactVisible ? "freelancer@example.com" : null,
+                        contactVisible ? "010-0000-0002" : null
                 ),
                 null
         );
