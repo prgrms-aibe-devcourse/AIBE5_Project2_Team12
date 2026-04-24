@@ -45,6 +45,12 @@ public class PositionResolver {
         return ALLOWED_CATEGORY_NAMES;
     }
 
+    public boolean isAllowedPosition(Position position) {
+        return position != null
+                && StringUtils.hasText(position.getName())
+                && ALLOWED_CATEGORY_NAMES.contains(position.getName());
+    }
+
     public List<Position> findAllowedPositions() {
         return ALLOWED_CATEGORY_NAMES.stream()
                 .map(positionRepository::findByName)

@@ -91,6 +91,14 @@ class PositionResolverTest {
     }
 
     @Test
+    @DisplayName("허용 Position 여부는 정규 카테고리 이름과 정확히 일치할 때만 true다")
+    void isAllowedPosition_returnsTrueOnlyForCanonicalPositions() {
+        assertThat(positionResolver.isAllowedPosition(Position.create("백엔드 개발자"))).isTrue();
+        assertThat(positionResolver.isAllowedPosition(Position.create("백엔드"))).isFalse();
+        assertThat(positionResolver.isAllowedPosition(null)).isFalse();
+    }
+
+    @Test
     @DisplayName("Position 검색은 영어 alias와 대소문자를 무시하고 정규 카테고리를 반환한다")
     void search_returnsCanonicalCategoriesByAlias() {
         Position mobile = Position.create("모바일 앱 개발자");
