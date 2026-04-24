@@ -25,39 +25,62 @@ public class MatchingProfileController {
     @GetMapping("/matchings/{matchingId}/counterpart-profile")
     public String counterpartProfile(
             @PathVariable Long matchingId,
+            @RequestParam(name = "returnTo", required = false) String returnTo,
             @RequestParam(name = "backUrl", required = false) String backUrl,
             @AuthenticationPrincipal ItDaPrincipal principal,
             Model model,
             RedirectAttributes redirectAttributes
     ) {
+        String requestedBackUrl = resolveRequestedBackUrl(returnTo, backUrl);
+
         try {
             ProfileShellViewModel view = matchingProfileQueryService
                     .getCounterpartProfile(matchingId, principal.getEmail());
 
-            model.addAttribute("view", view.withBackUrl(resolveBackUrl(backUrl, view.backUrl())));
+            model.addAttribute("view", view.withBackUrl(resolveBackUrl(requestedBackUrl, view.backUrl())));
 
             return "profile/shell";
         } catch (IllegalArgumentException e) {
             log.warn("상대 프로필 조회 실패. matchingId={}, email={}",
                     matchingId, principal.getEmail(), e);
             redirectAttributes.addFlashAttribute("errorMessage", "존재하지 않는 매칭입니다.");
-            return redirectTo(backUrl, "/matchings/" + matchingId);
+            return redirectTo(requestedBackUrl, "/matchings/" + matchingId);
         } catch (AccessDeniedException e) {
             log.warn("상대 프로필 접근 거부. matchingId={}, email={}",
                     matchingId, principal.getEmail(), e);
             redirectAttributes.addFlashAttribute("errorMessage", "해당 매칭 정보에 접근할 수 없습니다.");
-            return redirectTo(backUrl, "/matchings/" + matchingId);
+            return redirectTo(requestedBackUrl, "/matchings/" + matchingId);
         }
     }
 
-    private String redirectTo(String backUrl, String fallback) {
-        return "redirect:" + resolveBackUrl(backUrl, fallback);
+    private String redirectTo(String requestedBackUrl, String fallback) {
+        return "redirect:" + resolveBackUrl(requestedBackUrl, fallback);
     }
 
-    private String resolveBackUrl(String backUrl, String fallback) {
-        if (StringUtils.hasText(backUrl) && backUrl.startsWith("/") && !backUrl.startsWith("//")) {
-            return backUrl;
+    private String resolveBackUrl(String requestedBackUrl, String fallback) {
+        if (requestedBackUrl != null) {
+            return requestedBackUrl;
         }
         return fallback;
+    }
+
+    private String resolveRequestedBackUrl(String returnTo, String backUrl) {
+        String resolvedReturnTo = normalizeLocalPath(returnTo);
+        if (resolvedReturnTo != null) {
+            return resolvedReturnTo;
+        }
+        return normalizeLocalPath(backUrl);
+    }
+
+    private String normalizeLocalPath(String candidate) {
+        if (!StringUtils.hasText(candidate)) {
+            return null;
+        }
+
+        String trimmed = candidate.trim();
+        if (trimmed.startsWith("/") && !trimmed.startsWith("//")) {
+            return trimmed;
+        }
+        return null;
     }
 }

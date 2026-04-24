@@ -32,23 +32,26 @@ public class MatchingController {
     @GetMapping("/matchings/{matchingId}")
     public String detail(
             @PathVariable Long matchingId,
+            @RequestParam(name = "backUrl", required = false) String backUrl,
             @AuthenticationPrincipal ItDaPrincipal principal,
             Model model,
             RedirectAttributes redirectAttributes
     ) {
         try {
-            model.addAttribute("view", matchingQueryService.getDetail(matchingId, principal.getEmail()));
+            var view = matchingQueryService.getDetail(matchingId, principal.getEmail());
+            model.addAttribute("view", view);
+            model.addAttribute("backUrl", resolveBackUrl(backUrl, view));
             return "matching/detail";
         } catch (IllegalArgumentException e) {
             log.warn("매칭 상세 조회 실패. matchingId={}, email={}",
                     matchingId, principal.getEmail(), e);
             redirectAttributes.addFlashAttribute("errorMessage", "존재하지 않는 매칭입니다.");
-            return "redirect:/";
+            return redirectTo(backUrl, "/");
         } catch (AccessDeniedException e) {
             log.warn("매칭 상세 접근 거부. matchingId={}, email={}",
                     matchingId, principal.getEmail(), e);
             redirectAttributes.addFlashAttribute("errorMessage", "해당 매칭 정보에 접근할 수 없습니다.");
-            return "redirect:/";
+            return redirectTo(backUrl, "/");
         }
     }
 
@@ -345,5 +348,17 @@ public class MatchingController {
             return "redirect:" + redirectTo;
         }
         return "redirect:" + fallback;
+    }
+
+    private String resolveBackUrl(String requestedBackUrl, com.generic4.itda.dto.matching.MatchingDetailViewModel view) {
+        if (StringUtils.hasText(requestedBackUrl)
+                && requestedBackUrl.startsWith("/")
+                && !requestedBackUrl.startsWith("//")) {
+            return requestedBackUrl;
+        }
+        if ("CLIENT".equals(view.viewerRole()) && view.project() != null && view.project().proposalId() != null) {
+            return "/proposals/" + view.project().proposalId() + "/matchings";
+        }
+        return "CLIENT".equals(view.viewerRole()) ? "/client/dashboard" : "/freelancers/dashboard";
     }
 }
