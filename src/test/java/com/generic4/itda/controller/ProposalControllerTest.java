@@ -13,6 +13,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
@@ -21,6 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import com.generic4.itda.annotation.ControllerTest;
+import com.generic4.itda.dto.recommend.RecommendationEntryPositionItem;
 import com.generic4.itda.domain.matching.Matching;
 import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
@@ -33,11 +35,13 @@ import com.generic4.itda.dto.security.ItDaPrincipal;
 import com.generic4.itda.exception.ProposalNotFoundException;
 import java.time.LocalDateTime;
 import org.springframework.security.access.AccessDeniedException;
+import com.generic4.itda.dto.recommend.RecommendationEntryViewModel;
 import com.generic4.itda.repository.MatchingRepository;
 import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.service.PositionResolver;
 import com.generic4.itda.service.ProposalAiInterviewService;
 import com.generic4.itda.service.ProposalService;
+import com.generic4.itda.service.recommend.RecommendationEntryService;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -67,6 +71,9 @@ class ProposalControllerTest {
 
     @MockitoBean
     private MatchingRepository matchingRepository;
+
+    @MockitoBean
+    private RecommendationEntryService recommendationEntryService;
 
     @Test
     @DisplayName("인증된 사용자가 새 제안서 작성 화면을 조회하면 편집기를 렌더링한다")
@@ -148,7 +155,7 @@ class ProposalControllerTest {
     }
 
     @Test
-    @DisplayName("제안서 등록 요청이 유효하면 추천 진입 화면으로 이동한다")
+    @DisplayName("제안서 등록 요청이 유효하면 제안서 상세 추천 모달로 이동한다")
     void registerAndRedirectToRecommendationEntry() throws Exception {
         Proposal proposal = org.mockito.Mockito.mock(Proposal.class);
         given(proposal.getId()).willReturn(3L);
@@ -183,7 +190,7 @@ class ProposalControllerTest {
                         .param("positions[0].expectedPeriod", "4")
                         .param("positions[0].essentialSkillNames[0]", "Node.js"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/proposals/3/recommendations"));
+                .andExpect(redirectedUrl("/proposals/3?openRecommendModal=true"));
 
         then(proposalService).should().register(anyString(), any(ProposalForm.class));
     }
@@ -359,7 +366,7 @@ class ProposalControllerTest {
     }
 
     @Test
-    @DisplayName("수정 요청에서 register 액션이 유효하면 추천 진입 화면으로 이동한다")
+    @DisplayName("수정 요청에서 register 액션이 유효하면 제안서 상세 추천 모달로 이동한다")
     void registerAfterUpdateAndRedirectToRecommendationEntry() throws Exception {
         Proposal proposal = org.mockito.Mockito.mock(Proposal.class);
         given(proposal.getId()).willReturn(1L);
@@ -393,7 +400,7 @@ class ProposalControllerTest {
                         .param("positions[0].expectedPeriod", "4")
                         .param("positions[0].essentialSkillNames[0]", "Node.js"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/proposals/1/recommendations"));
+                .andExpect(redirectedUrl("/proposals/1?openRecommendModal=true"));
 
         then(proposalService).should().register(any(Long.class), anyString(), any(ProposalForm.class));
     }
@@ -881,5 +888,81 @@ class ProposalControllerTest {
                 .andExpect(redirectedUrl("/client/dashboard"));
 
         then(proposalService).should().delete(1L, "client@example.com");
+    }
+
+    @Test
+    @DisplayName("MATCHING 상태 제안서 상세 조회 시 recommendEntry 모델에 포함되고 모달 DOM이 렌더된다")
+    void detailForMatchingProposalIncludesRecommendEntry() throws Exception {
+        var client = createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678");
+        Proposal proposal = org.mockito.Mockito.mock(Proposal.class);
+        given(proposal.getId()).willReturn(1L);
+        given(proposal.getTitle()).willReturn("핀테크 앱 프로젝트");
+        given(proposal.getDescription()).willReturn("설명");
+        given(proposal.getStatus()).willReturn(ProposalStatus.MATCHING);
+        given(proposal.getExpectedPeriod()).willReturn(8L);
+        given(proposal.getTotalBudgetMin()).willReturn(3_000_000L);
+        given(proposal.getTotalBudgetMax()).willReturn(4_000_000L);
+        given(proposal.getModifiedAt()).willReturn(java.time.LocalDateTime.of(2026, 4, 23, 12, 0));
+        given(proposal.getPositions()).willReturn(List.of());
+
+        RecommendationEntryPositionItem positionItem = new RecommendationEntryPositionItem(
+                10L, "백엔드 개발자", "백엔드", 2L, "3,000,000 ~ 5,000,000", 8L, List.of(),
+                "OPEN", "모집 중"
+        );
+        RecommendationEntryViewModel recommendEntry = new RecommendationEntryViewModel(
+                1L, "핀테크 앱 프로젝트", "MATCHING", true,
+                "추천을 실행할 수 있습니다.", 10L, List.of(positionItem)
+        );
+
+        given(proposalService.findOwnedProposal(1L, "client@example.com")).willReturn(proposal);
+        given(matchingRepository.findWithPositionAndFreelancerByProposalIdAndClientEmail(1L, "client@example.com"))
+                .willReturn(List.of());
+        given(recommendationEntryService.getEntry(1L, "client@example.com")).willReturn(recommendEntry);
+
+        ItDaPrincipal principal = ItDaPrincipal.from(client);
+
+        mockMvc.perform(get("/proposals/1")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("client/proposalDetail"))
+                .andExpect(model().attribute("viewerRole", "CLIENT"))
+                .andExpect(model().attributeExists("recommendEntry"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("id=\"recommendModal\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("id=\"recommendModalBackdrop\"")));
+    }
+
+    @Test
+    @DisplayName("MATCHING 제안서에서 getEntry 예외 발생 시에도 페이지는 200으로 렌더되고 모달은 표시되지 않는다")
+    void detailPageRendersEvenWhenGetEntryFails() throws Exception {
+        var client = createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678");
+        Proposal proposal = org.mockito.Mockito.mock(Proposal.class);
+        given(proposal.getId()).willReturn(1L);
+        given(proposal.getTitle()).willReturn("핀테크 앱 프로젝트");
+        given(proposal.getDescription()).willReturn("설명");
+        given(proposal.getStatus()).willReturn(ProposalStatus.MATCHING);
+        given(proposal.getExpectedPeriod()).willReturn(8L);
+        given(proposal.getTotalBudgetMin()).willReturn(3_000_000L);
+        given(proposal.getTotalBudgetMax()).willReturn(4_000_000L);
+        given(proposal.getModifiedAt()).willReturn(java.time.LocalDateTime.of(2026, 4, 23, 12, 0));
+        given(proposal.getPositions()).willReturn(List.of());
+
+        given(proposalService.findOwnedProposal(1L, "client@example.com")).willReturn(proposal);
+        given(matchingRepository.findWithPositionAndFreelancerByProposalIdAndClientEmail(1L, "client@example.com"))
+                .willReturn(List.of());
+        given(recommendationEntryService.getEntry(1L, "client@example.com"))
+                .willThrow(new IllegalArgumentException("존재하지 않는 제안서입니다."));
+
+        ItDaPrincipal principal = ItDaPrincipal.from(client);
+
+        mockMvc.perform(get("/proposals/1")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("client/proposalDetail"))
+                .andExpect(model().attribute("viewerRole", "CLIENT"))
+                .andExpect(model().attributeDoesNotExist("recommendEntry"));
     }
 }
