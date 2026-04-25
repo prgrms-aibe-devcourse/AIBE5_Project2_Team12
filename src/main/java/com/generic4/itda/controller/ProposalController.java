@@ -270,6 +270,26 @@ public class ProposalController {
         return "redirect:/client/dashboard";
     }
 
+    @PostMapping("/{proposalId}/positions/{positionId}/close")
+    public String closePosition(
+            @PathVariable Long proposalId,
+            @PathVariable Long positionId,
+            @AuthenticationPrincipal ItDaPrincipal principal,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            proposalService.closePosition(positionId, principal.getEmail());
+            redirectAttributes.addFlashAttribute("noticeMessage", "해당 포지션의 모집이 종료되었습니다.");
+        } catch (IllegalArgumentException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", "존재하지 않는 모집 포지션입니다.");
+        } catch (AccessDeniedException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", "본인 제안서의 모집 포지션만 종료할 수 있습니다.");
+        } catch (IllegalStateException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
+        }
+        return "redirect:/proposals/" + proposalId;
+    }
+
     @PostMapping("/{proposalId}/edit-draft")
     public String createEditDraft(
             @PathVariable Long proposalId,
