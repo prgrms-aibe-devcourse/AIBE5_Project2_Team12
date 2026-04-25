@@ -370,6 +370,105 @@ class RecommendationRunRepositoryTest {
         }
     }
 
+    @Nested
+    @DisplayName("findAllByProposalPosition_IdOrderByCreatedAtDescIdDesc")
+    class FindAllByProposalPositionIdOrderByCreatedAtDescIdDesc {
+
+        @Test
+        @DisplayName("지정한 proposalPositionId에 해당하는 데이터만 조회되고 다른 포지션 데이터는 포함되지 않는다")
+        void 지정한_proposalPositionId에_해당하는_데이터만_조회된다() {
+            // given
+            RecommendationRun run1 = recommendationRunRepository.saveAndFlush(
+                    RecommendationRun.create(proposalPosition, "fp-target-1", RecommendationAlgorithm.HEURISTIC_V1, 5));
+            RecommendationRun run2 = recommendationRunRepository.saveAndFlush(
+                    RecommendationRun.create(proposalPosition, "fp-target-2", RecommendationAlgorithm.HEURISTIC_V1, 5));
+
+            Position otherPos = persistPosition("프론트엔드 개발자");
+            ProposalPosition otherPP = proposal.addPosition(otherPos, "프론트엔드 개발자",
+                    null, 1L, 300_000L, 600_000L, null, null, null, null);
+            em.flush(); // managed proposal의 dirty-check로 cascade persist → otherPP에 ID 설정
+            recommendationRunRepository.saveAndFlush(
+                    RecommendationRun.create(otherPP, "fp-other-1", RecommendationAlgorithm.HEURISTIC_V1, 5));
+            em.clear();
+
+            // when
+            List<RecommendationRun> result =
+                    recommendationRunRepository.findAllByProposalPosition_IdOrderByCreatedAtDescIdDesc(
+                            proposalPosition.getId());
+
+            // then
+            assertThat(result).hasSize(2);
+            assertThat(result)
+                    .extracting(run -> run.getProposalPosition().getId())
+                    .containsOnly(proposalPosition.getId());
+        }
+
+        @Test
+        @DisplayName("createdAt 내림차순으로 정렬되어 조회된다")
+        void createdAt_내림차순으로_정렬된다() {
+            // given
+            RecommendationRun run1 = recommendationRunRepository.saveAndFlush(
+                    RecommendationRun.create(proposalPosition, "fp-order-1", RecommendationAlgorithm.HEURISTIC_V1, 5));
+            RecommendationRun run2 = recommendationRunRepository.saveAndFlush(
+                    RecommendationRun.create(proposalPosition, "fp-order-2", RecommendationAlgorithm.HEURISTIC_V1, 5));
+            RecommendationRun run3 = recommendationRunRepository.saveAndFlush(
+                    RecommendationRun.create(proposalPosition, "fp-order-3", RecommendationAlgorithm.HEURISTIC_V1, 5));
+
+            forceCreatedAt(run1, LocalDateTime.of(2026, 1, 1, 10, 0));
+            forceCreatedAt(run2, LocalDateTime.of(2026, 1, 3, 10, 0));
+            forceCreatedAt(run3, LocalDateTime.of(2026, 1, 2, 10, 0));
+            em.flush();
+            em.clear();
+
+            // when
+            List<RecommendationRun> result =
+                    recommendationRunRepository.findAllByProposalPosition_IdOrderByCreatedAtDescIdDesc(
+                            proposalPosition.getId());
+
+            // then
+            assertThat(result)
+                    .extracting(RecommendationRun::getId)
+                    .containsExactly(run2.getId(), run3.getId(), run1.getId());
+        }
+
+        @Test
+        @DisplayName("createdAt이 같으면 id 내림차순으로 정렬된다")
+        void createdAt이_같으면_id_내림차순으로_정렬된다() {
+            // given
+            LocalDateTime sameTime = LocalDateTime.of(2026, 1, 1, 10, 0);
+
+            RecommendationRun run1 = recommendationRunRepository.saveAndFlush(
+                    RecommendationRun.create(proposalPosition, "fp-same-1", RecommendationAlgorithm.HEURISTIC_V1, 5));
+            RecommendationRun run2 = recommendationRunRepository.saveAndFlush(
+                    RecommendationRun.create(proposalPosition, "fp-same-2", RecommendationAlgorithm.HEURISTIC_V1, 5));
+            RecommendationRun run3 = recommendationRunRepository.saveAndFlush(
+                    RecommendationRun.create(proposalPosition, "fp-same-3", RecommendationAlgorithm.HEURISTIC_V1, 5));
+
+            forceCreatedAt(run1, sameTime);
+            forceCreatedAt(run2, sameTime);
+            forceCreatedAt(run3, sameTime);
+            em.flush();
+            em.clear();
+
+            // when
+            List<RecommendationRun> result =
+                    recommendationRunRepository.findAllByProposalPosition_IdOrderByCreatedAtDescIdDesc(
+                            proposalPosition.getId());
+
+            // then
+            assertThat(result)
+                    .extracting(RecommendationRun::getId)
+                    .containsExactly(run3.getId(), run2.getId(), run1.getId());
+        }
+
+        private void forceCreatedAt(RecommendationRun run, LocalDateTime target) {
+            em.createNativeQuery("UPDATE recommendation_run SET created_at = :ts WHERE id = :id")
+                    .setParameter("ts", target)
+                    .setParameter("id", run.getId())
+                    .executeUpdate();
+        }
+    }
+
     private Position persistPosition(String name) {
         Position position = Position.create(name);
         em.persist(position);

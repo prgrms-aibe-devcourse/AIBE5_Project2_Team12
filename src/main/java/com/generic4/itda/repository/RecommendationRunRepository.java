@@ -22,6 +22,8 @@ public interface RecommendationRunRepository extends JpaRepository<Recommendatio
             RecommendationAlgorithm algorithm
     );
 
+    List<RecommendationRun> findAllByProposalPosition_IdOrderByCreatedAtDescIdDesc(Long proposalPositionId);
+
     @Query("""
             select rr
             from RecommendationRun rr
