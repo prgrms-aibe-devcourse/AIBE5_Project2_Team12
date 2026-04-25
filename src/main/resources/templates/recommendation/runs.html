@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/base}">
+<head>
+  <title th:text="${view.proposalTitle} + ' | 추천 실행 이력'">추천 실행 이력 | IT-da</title>
+</head>
+<body>
+<div layout:fragment="content">
+  <main class="min-h-screen bg-slate-50 px-4 py-6 lg:px-8 lg:py-8">
+    <div class="mx-auto max-w-6xl">
+
+      <section th:if="${errorMessage != null}"
+               class="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-600">
+        <p th:text="${errorMessage}">오류 메시지</p>
+      </section>
+      <section th:if="${noticeMessage != null}"
+               class="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+        <p th:text="${noticeMessage}">안내 메시지</p>
+      </section>
+
+      <div
+          class="sticky top-0 z-10 mb-6 rounded-[28px] border border-slate-200 bg-white/95 px-6 py-5 shadow-sm shadow-slate-200/60 backdrop-blur">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center gap-4">
+            <a th:href="${backUrl}"
+               class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600">
+              <i data-lucide="arrow-left" class="h-4 w-4"></i>
+              제안서로
+            </a>
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">Recommendation History</p>
+              <h1 class="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl"
+                  th:text="${view.positionTitle}">백엔드 개발자</h1>
+              <p class="mt-1 text-sm text-slate-500"
+                 th:text="${view.proposalTitle} + ' · 추천 실행 이력'">제안서 제목 · 추천 실행 이력</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3">
+                        <span th:classappend="${view.positionStatusName == 'OPEN'} ? 'border-blue-200 bg-blue-50 text-blue-600' :
+                                              (${view.positionStatusName == 'FULL'} ? 'border-amber-200 bg-amber-50 text-amber-600' :
+                                                                                      'border-slate-200 bg-slate-100 text-slate-500')"
+                              class="inline-flex items-center rounded-full border px-4 py-1.5 text-xs font-bold"
+                              th:text="${view.positionStatusLabel}">모집 중</span>
+
+            <form th:if="${view.runnable}"
+                  th:action="@{/proposal-positions/{proposalPositionId}/recommendations/more(proposalPositionId=${view.proposalPositionId})}"
+                  method="post">
+              <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+              <input type="hidden" name="proposalPositionId" th:value="${view.proposalPositionId}">
+              <input type="hidden" name="backUrl" th:value="${currentUrl}">
+              <input type="hidden" name="proposalId" th:value="${view.proposalId}">
+              <button type="submit"
+                      class="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-100 transition hover:bg-blue-700">
+                <i data-lucide="sparkles" class="h-4 w-4"></i>
+                추가추천받기
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <section class="mb-6 rounded-[28px] border border-slate-200 bg-white px-6 py-5 shadow-sm shadow-slate-200/60">
+        <p class="text-sm leading-relaxed text-slate-600" th:text="${view.helperMessage}">
+          이전 추천 실행을 확인하거나 새 추천을 실행할 수 있습니다.
+        </p>
+      </section>
+
+      <section th:if="${!view.hasRuns()}"
+               class="rounded-[32px] border border-dashed border-slate-200 bg-white px-6 py-16 text-center shadow-sm shadow-slate-200/40">
+        <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-slate-400">
+          <i data-lucide="sparkles" class="h-7 w-7"></i>
+        </div>
+        <h2 class="mt-5 text-xl font-bold text-slate-900">아직 추천 실행 이력이 없습니다</h2>
+        <p class="mt-2 text-sm leading-relaxed text-slate-500">
+          이 모집단위에 대해 추천을 실행하면 상태와 결과 이력이 이 화면에 쌓입니다.
+        </p>
+        <form th:if="${view.runnable}"
+              th:action="@{/proposals/{proposalId}/recommendations(proposalId=${view.proposalId})}" method="post"
+              class="mt-8">
+          <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+          <input type="hidden" name="proposalPositionId" th:value="${view.proposalPositionId}">
+          <input type="hidden" name="backUrl" th:value="${currentUrl}">
+          <button type="submit"
+                  class="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-blue-100 transition hover:bg-blue-700">
+            <i data-lucide="sparkles" class="h-4 w-4"></i>
+            첫 추천 실행하기
+          </button>
+        </form>
+      </section>
+
+      <section th:if="${view.hasRuns()}" class="space-y-4">
+        <article th:each="run : ${view.runs}"
+                 class="rounded-[28px] border border-slate-200 bg-white px-6 py-5 shadow-sm shadow-slate-200/50">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div class="space-y-3">
+              <div class="flex flex-wrap items-center gap-2">
+                                <span
+                                    class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600"
+                                    th:text="${'RUN #' + run.runId}">RUN #301</span>
+                <span th:classappend="${run.status.name() == 'COMPUTED'} ? 'border-emerald-200 bg-emerald-50 text-emerald-700' :
+                                                      (${run.status.name() == 'FAILED'} ? 'border-rose-200 bg-rose-50 text-rose-600' :
+                                                                                          'border-blue-200 bg-blue-50 text-blue-700')"
+                      class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-bold"
+                      th:text="${run.statusLabel}">계산 완료</span>
+              </div>
+              <div class="grid gap-3 text-sm text-slate-600 sm:grid-cols-3">
+                <p>
+                  <span class="block text-xs font-semibold uppercase tracking-widest text-slate-400">요청 시각</span>
+                  <span
+                      th:text="${run.requestedAt != null ? #temporals.format(run.requestedAt, 'yyyy.MM.dd HH:mm') : '-'}">2026.04.25 11:30</span>
+                </p>
+                <p>
+                  <span class="block text-xs font-semibold uppercase tracking-widest text-slate-400">최근 갱신</span>
+                  <span th:text="${run.updatedAt != null ? #temporals.format(run.updatedAt, 'yyyy.MM.dd HH:mm') : '-'}">2026.04.25 11:35</span>
+                </p>
+                <p>
+                  <span class="block text-xs font-semibold uppercase tracking-widest text-slate-400">후보 수</span>
+                  <span th:text="${run.candidateCount != null ? run.candidateCount + '명' : '-'}">3명</span>
+                </p>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <a th:if="${run.completed()}"
+                 th:href="@{/proposals/{proposalId}/recommendations/results(proposalId=${view.proposalId}, runId=${run.runId}, backUrl=${currentUrl})}"
+                 class="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-100 transition hover:bg-blue-700">
+                <i data-lucide="users" class="h-4 w-4"></i>
+                결과 보기
+              </a>
+              <a th:unless="${run.completed()}"
+                 th:href="@{/proposals/{proposalId}/runs/{runId}(proposalId=${view.proposalId}, runId=${run.runId}, backUrl=${currentUrl})}"
+                 class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600">
+                <i th:if="${run.processing()}" data-lucide="loader" class="h-4 w-4"></i>
+                <i th:if="${!run.processing()}" data-lucide="file-search" class="h-4 w-4"></i>
+                상태 보기
+              </a>
+            </div>
+          </div>
+        </article>
+      </section>
+
+    </div>
+  </main>
+</div>
+</body>
+</html>
