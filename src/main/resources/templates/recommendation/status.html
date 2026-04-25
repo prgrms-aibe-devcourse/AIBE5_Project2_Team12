@@ -16,10 +16,10 @@
             <div class="sticky top-0 z-10 mb-6 rounded-[28px] border border-slate-200 bg-white/95 px-6 py-5 shadow-sm shadow-slate-200/60 backdrop-blur">
                 <div class="flex flex-wrap items-center justify-between gap-4">
                     <div class="flex items-center gap-4">
-                        <a th:href="@{/proposals/{id}/recommendations(id=${view.proposalId})}"
+                        <a th:href="${backUrl}"
                            class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-blue-300 hover:text-blue-600">
                             <i data-lucide="arrow-left" class="h-4 w-4"></i>
-                            추천 진입으로
+                            이전으로
                         </a>
                         <div>
                             <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">Recommendation</p>
@@ -68,7 +68,7 @@
 
                     <!-- 수동 새로고침 -->
                     <div class="mt-6">
-                        <a th:href="@{/proposals/{proposalId}/runs/{runId}(proposalId=${view.proposalId}, runId=${view.runId}, from=${from})}"
+                        <a th:href="${refreshUrl}"
                            class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100">
                             <i data-lucide="refresh-cw" class="h-4 w-4"></i>
                             지금 새로고침
@@ -90,15 +90,15 @@
                        th:text="${view.message}">추천 결과를 확인해보세요.</p>
 
                     <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
-                        <a th:if="${view.nextActionUrl != null}"
-                           th:href="${view.nextActionUrl}"
+                        <a th:if="${nextActionUrl != null}"
+                           th:href="${nextActionUrl}"
                            class="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-blue-100 transition hover:bg-blue-700">
                             <i data-lucide="users" class="h-4 w-4"></i>
                             <span th:text="${view.nextActionLabel}">추천 결과 보기</span>
                         </a>
-                        <a th:href="@{/proposals/{id}(id=${view.proposalId})}"
+                        <a th:href="${backUrl}"
                            class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
-                            제안서로 돌아가기
+                            이전 화면으로
                         </a>
                     </div>
                 </section>
@@ -117,15 +117,15 @@
                        th:text="${view.message}">오류가 발생했습니다. 다시 시도해주세요.</p>
 
                     <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
-                        <a th:if="${view.nextActionUrl != null}"
-                           th:href="${view.nextActionUrl}"
+                        <a th:if="${nextActionUrl != null}"
+                           th:href="${nextActionUrl}"
                            class="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-6 py-3 text-sm font-bold text-white transition hover:bg-slate-700">
                             <i data-lucide="refresh-cw" class="h-4 w-4"></i>
                             <span th:text="${view.nextActionLabel}">다시 시도</span>
                         </a>
-                        <a th:href="@{/proposals/{id}(id=${view.proposalId})}"
+                        <a th:href="${backUrl}"
                            class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50">
-                            제안서로 돌아가기
+                            이전 화면으로
                         </a>
                     </div>
                 </section>
@@ -139,7 +139,7 @@
     <th:block th:if="${view.status.name() == 'COMPUTED' and view.nextActionUrl != null}">
         <script th:inline="javascript">
             (function () {
-                var nextUrl = /*[[${view.nextActionUrl}]]*/ null;
+                var nextUrl = /*[[${nextActionUrl}]]*/ null;
                 if (!nextUrl) return;
 
                 setTimeout(function () {

@@ -16,7 +16,7 @@
       <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
 
         <div class="flex items-center gap-4">
-          <a th:href="@{/proposals/{id}(id=${view.proposalId})}"
+          <a th:href="${backUrl}"
              class="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700">
             <i data-lucide="arrow-left" class="h-4 w-4"></i>
           </a>
@@ -38,6 +38,7 @@
           <form th:action="@{/proposal-positions/{id}/recommendations/more(id=${view.proposalPositionId()})}"
                 th:method="post">
             <input type="hidden" name="proposalId" th:value="${view.proposalId()}"/>
+            <input type="hidden" name="backUrl" th:value="${currentUrl}"/>
             <button
                 class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50">
               <i data-lucide="refresh-cw" class="h-3.5 w-3.5"></i>
@@ -102,7 +103,7 @@
             <article th:each="candidate : ${view.candidates}"
                      th:classappend="${candidate.matchingStatus == 'REJECTED' or candidate.matchingStatus == 'COMPLETED' or candidate.matchingStatus == 'CANCELED'} ? 'opacity-60' : ''"
                      class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-200/50 transition-all hover:border-slate-300 hover:shadow-md">
-              <a th:href="@{/proposals/{proposalId}/recommendations/results/{resultId}(proposalId=${view.proposalId}, resultId=${candidate.resultId})}"
+              <a th:href="@{/proposals/{proposalId}/recommendations/results/{resultId}(proposalId=${view.proposalId}, resultId=${candidate.resultId}, backUrl=${backUrl})}"
                  class="block focus:outline-none">
 
                 <!-- ── 카드 상단: 이름 + 스킬 + 점수 ── -->
@@ -174,9 +175,9 @@
                                           method="post">
                                         <input type="hidden" name="_csrf" th:value="${_csrf.token}">
                                         <input type="hidden" name="redirectTo"
-                                               th:value="@{/proposals/{proposalId}/recommendations/results(proposalId=${view.proposalId}, runId=${view.runId})}">
+                                               th:value="${currentUrl}">
                                         <input type="hidden" name="errorRedirectTo"
-                                               th:value="@{/proposals/{proposalId}/recommendations/results(proposalId=${view.proposalId}, runId=${view.runId})}">
+                                               th:value="${currentUrl}">
                                         <button type="submit"
                                                 class="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700">
                                             <i data-lucide="send" class="h-4 w-4"></i>

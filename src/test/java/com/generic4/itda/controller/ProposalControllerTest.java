@@ -936,6 +936,80 @@ class ProposalControllerTest {
     }
 
     @Test
+    @DisplayName("MATCHING 상태의 클라이언트 제안서 상세에서는 모집단위별 추천 결과 보기 CTA가 노출된다")
+    void detailForMatchingProposalShowsRecommendationRunHistoryCta() throws Exception {
+        var client = createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678");
+        Proposal proposal = org.mockito.Mockito.mock(Proposal.class);
+        ProposalPosition proposalPosition = org.mockito.Mockito.mock(ProposalPosition.class);
+        Position position = org.mockito.Mockito.mock(Position.class);
+
+        given(proposal.getId()).willReturn(1L);
+        given(proposal.getTitle()).willReturn("핀테크 앱 프로젝트");
+        given(proposal.getDescription()).willReturn("설명");
+        given(proposal.getStatus()).willReturn(ProposalStatus.MATCHING);
+        given(proposal.getExpectedPeriod()).willReturn(8L);
+        given(proposal.getTotalBudgetMin()).willReturn(3_000_000L);
+        given(proposal.getTotalBudgetMax()).willReturn(4_000_000L);
+        given(proposal.getModifiedAt()).willReturn(LocalDateTime.of(2026, 4, 25, 9, 0));
+        given(proposal.getPositions()).willReturn(List.of(proposalPosition));
+
+        given(position.getName()).willReturn("백엔드 개발자");
+
+        given(proposalPosition.getId()).willReturn(10L);
+        given(proposalPosition.getProposal()).willReturn(proposal);
+        given(proposalPosition.getPosition()).willReturn(position);
+        given(proposalPosition.getTitle()).willReturn("Node.js 백엔드 개발자");
+        given(proposalPosition.getStatus()).willReturn(ProposalPositionStatus.OPEN);
+        given(proposalPosition.getHeadCount()).willReturn(1L);
+        given(proposalPosition.getUnitBudgetMin()).willReturn(3_000_000L);
+        given(proposalPosition.getUnitBudgetMax()).willReturn(4_000_000L);
+        given(proposalPosition.getExpectedPeriod()).willReturn(4L);
+        given(proposalPosition.getSkills()).willReturn(List.of());
+        given(proposalPosition.getWorkType()).willReturn(ProposalWorkType.REMOTE);
+        given(proposalPosition.getWorkPlace()).willReturn(null);
+        given(proposalPosition.getCareerMinYears()).willReturn(null);
+        given(proposalPosition.getCareerMaxYears()).willReturn(null);
+
+        RecommendationEntryViewModel recommendEntry = new RecommendationEntryViewModel(
+                1L,
+                "핀테크 앱 프로젝트",
+                "MATCHING",
+                true,
+                "추천을 실행할 수 있습니다.",
+                10L,
+                List.of(new RecommendationEntryPositionItem(
+                        10L,
+                        "Node.js 백엔드 개발자",
+                        "백엔드 개발자",
+                        1L,
+                        "3,000,000 ~ 4,000,000",
+                        4L,
+                        List.of(),
+                        "OPEN",
+                        "모집 중"
+                ))
+        );
+
+        given(proposalService.findOwnedProposal(1L, "client@example.com")).willReturn(proposal);
+        given(matchingRepository.findWithPositionAndFreelancerByProposalIdAndClientEmail(1L, "client@example.com"))
+                .willReturn(List.of());
+        given(recommendationEntryService.getEntry(1L, "client@example.com")).willReturn(recommendEntry);
+
+        ItDaPrincipal principal = ItDaPrincipal.from(client);
+
+        mockMvc.perform(get("/proposals/1")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("client/proposalDetail"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("추천 결과 보기")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "/proposal-positions/10/recommendations/runs?proposalId=1")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("backUrl=/proposals/1")));
+    }
+
+    @Test
     @DisplayName("MATCHING 제안서에서 getEntry 예외 발생 시에도 페이지는 200으로 렌더되고 모달은 표시되지 않는다")
     void detailPageRendersEvenWhenGetEntryFails() throws Exception {
         var client = createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678");

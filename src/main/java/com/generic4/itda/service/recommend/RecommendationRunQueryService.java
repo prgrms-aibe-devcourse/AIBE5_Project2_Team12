@@ -4,6 +4,8 @@ import com.generic4.itda.domain.matching.constant.MatchingStatus;
 import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
+import com.generic4.itda.domain.proposal.ProposalPositionStatus;
+import com.generic4.itda.domain.proposal.ProposalStatus;
 import com.generic4.itda.domain.recommendation.RecommendationResult;
 import com.generic4.itda.domain.recommendation.RecommendationRun;
 import com.generic4.itda.domain.recommendation.constant.LlmStatus;
@@ -15,9 +17,12 @@ import com.generic4.itda.dto.recommend.RecommendationResultsViewModel;
 import com.generic4.itda.dto.recommend.RecommendationResumeCareerItem;
 import com.generic4.itda.dto.recommend.RecommendationResumeDetailViewModel;
 import com.generic4.itda.dto.recommend.RecommendationResumeSkillItem;
+import com.generic4.itda.dto.recommend.RecommendationRunHistoryItemViewModel;
+import com.generic4.itda.dto.recommend.RecommendationRunHistoryViewModel;
 import com.generic4.itda.dto.recommend.RecommendationRunStatusViewModel;
 import com.generic4.itda.dto.matching.LatestMatchingSummary;
 import com.generic4.itda.repository.MatchingRepository;
+import com.generic4.itda.repository.ProposalRepository;
 import com.generic4.itda.repository.RecommendationResultRepository;
 import com.generic4.itda.repository.RecommendationRunRepository;
 import java.math.BigDecimal;
@@ -34,9 +39,43 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class RecommendationRunQueryService {
 
+    private final ProposalRepository proposalRepository;
     private final RecommendationRunRepository recommendationRunRepository;
     private final RecommendationResultRepository recommendationResultRepository;
     private final MatchingRepository matchingRepository;
+
+    public RecommendationRunHistoryViewModel getRecommendationRunHistory(Long proposalId, Long proposalPositionId, String email) {
+        Proposal proposal = proposalRepository.findWithPositionsById(proposalId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 제안서입니다."));
+
+        validateOwnership(proposal, email);
+
+        ProposalPosition proposalPosition = proposal.getPositions().stream()
+                .filter(position -> position.getId().equals(proposalPositionId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("해당 제안서에 속한 모집 포지션이 아닙니다."));
+
+        List<RecommendationRunHistoryItemViewModel> runs = recommendationRunRepository
+                .findAllByProposalPosition_IdOrderByCreatedAtDescIdDesc(proposalPositionId)
+                .stream()
+                .map(this::toRunHistoryItem)
+                .toList();
+
+        boolean runnable = proposal.getStatus() == ProposalStatus.MATCHING
+                && proposalPosition.getStatus() == ProposalPositionStatus.OPEN;
+
+        return new RecommendationRunHistoryViewModel(
+                proposal.getId(),
+                proposalPosition.getId(),
+                proposal.getTitle(),
+                resolvePositionTitle(proposalPosition),
+                proposalPosition.getStatus().name(),
+                proposalPosition.getStatus().getDescription(),
+                runnable,
+                buildRunHistoryHelperMessage(proposal, proposalPosition, runs.isEmpty()),
+                runs
+        );
+    }
 
     public RecommendationRunStatusViewModel getRecommendationRunStatus(Long proposalId, Long runId, String email) {
         RecommendationRun run = recommendationRunRepository.findDetailById(runId)
@@ -187,6 +226,18 @@ public class RecommendationRunQueryService {
         );
     }
 
+    private RecommendationRunHistoryItemViewModel toRunHistoryItem(RecommendationRun run) {
+        return new RecommendationRunHistoryItemViewModel(
+                run.getId(),
+                run.getStatus(),
+                run.getStatus().getDescription(),
+                run.getCandidateCount(),
+                run.getTopK(),
+                run.getCreatedAt(),
+                run.getModifiedAt()
+        );
+    }
+
     private static String maskName(String name) {
         if (name == null || name.length() <= 1) return name;
         if (name.length() == 2) return name.charAt(0) + "*";
@@ -251,6 +302,19 @@ public class RecommendationRunQueryService {
         if (!proposal.getMember().getEmail().getValue().equals(email)) {
             throw new IllegalArgumentException("접근 권한이 없습니다.");
         }
+    }
+
+    private String buildRunHistoryHelperMessage(Proposal proposal, ProposalPosition proposalPosition, boolean empty) {
+        if (proposal.getStatus() != ProposalStatus.MATCHING) {
+            return "제안서가 MATCHING 상태일 때만 새로운 추천을 실행할 수 있습니다.";
+        }
+        if (proposalPosition.getStatus() != ProposalPositionStatus.OPEN) {
+            return "OPEN 상태의 모집 포지션만 새로운 추천을 실행할 수 있습니다.";
+        }
+        if (empty) {
+            return "아직 추천 실행 이력이 없습니다. 첫 추천을 실행해보세요.";
+        }
+        return "이전 추천 실행을 확인하거나 새 추천을 실행할 수 있습니다.";
     }
 
     private RecommendationRunStatusViewModel toViewModel(
