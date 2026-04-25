@@ -159,6 +159,7 @@ public class MatchingQueryService {
                 proposalPosition.getProposal().getDescription(),
                 proposalPosition.getTitle(),
                 proposalPosition.getPosition().getName(),
+                proposalPosition.getStatus() != null ? proposalPosition.getStatus().name() : null,
                 formatBudgetText(proposalPosition.getUnitBudgetMin(), proposalPosition.getUnitBudgetMax()),
                 formatExpectedPeriod(proposalPosition.getExpectedPeriod()),
                 proposalPosition.getWorkType() != null ? proposalPosition.getWorkType().getDescription() : "미정",

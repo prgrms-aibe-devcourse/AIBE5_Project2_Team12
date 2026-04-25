@@ -8,6 +8,7 @@ public record MatchingDetailProjectSummaryViewModel(
         String description,
         String positionTitle,
         String positionCategory,
+        String positionStatusName,
         String budgetText,
         String expectedPeriodText,
         String workTypeLabel,
