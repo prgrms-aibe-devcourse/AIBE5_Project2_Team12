@@ -34,9 +34,11 @@ import com.generic4.itda.dto.recommend.RecommendationResumeDetailViewModel;
 import com.generic4.itda.dto.recommend.RecommendationResultsViewModel;
 import com.generic4.itda.dto.recommend.RecommendationRunStatusViewModel;
 import com.generic4.itda.repository.MatchingRepository;
+import com.generic4.itda.repository.ProposalRepository;
 import com.generic4.itda.repository.RecommendationResultRepository;
 import com.generic4.itda.repository.RecommendationRunRepository;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -68,6 +70,9 @@ class RecommendationRunQueryServiceTest {
     private RecommendationResultRepository recommendationResultRepository;
 
     @Mock
+    private ProposalRepository proposalRepository;
+
+    @Mock
     private MatchingRepository matchingRepository;
 
     @InjectMocks
@@ -83,6 +88,75 @@ class RecommendationRunQueryServiceTest {
                 .isInstanceOf(IllegalStateException.class);
 
         then(recommendationRunRepository).should().findDetailById(RUN_ID);
+    }
+
+    @Test
+    @DisplayName("모집단위 기준 추천 실행 이력을 조회한다")
+    void getRecommendationRunHistory_returnsRunsForProposalPosition() {
+        RecommendationRun computedRun = createOwnedRun(RecommendationRunStatus.COMPUTED);
+        RecommendationRun failedRun = createOwnedRun(RecommendationRunStatus.FAILED);
+
+        ReflectionTestUtils.setField(computedRun, "id", 401L);
+        ReflectionTestUtils.setField(failedRun, "id", 402L);
+        ReflectionTestUtils.setField(computedRun, "createdAt", LocalDateTime.of(2026, 4, 25, 10, 0));
+        ReflectionTestUtils.setField(computedRun, "modifiedAt", LocalDateTime.of(2026, 4, 25, 10, 3));
+        ReflectionTestUtils.setField(failedRun, "createdAt", LocalDateTime.of(2026, 4, 25, 11, 0));
+        ReflectionTestUtils.setField(failedRun, "modifiedAt", LocalDateTime.of(2026, 4, 25, 11, 2));
+
+        Proposal proposal = computedRun.getProposalPosition().getProposal();
+
+        given(proposalRepository.findWithPositionsById(PROPOSAL_ID)).willReturn(Optional.of(proposal));
+        given(recommendationRunRepository.findAllByProposalPosition_IdOrderByCreatedAtDescIdDesc(PROPOSAL_POSITION_ID))
+                .willReturn(List.of(failedRun, computedRun));
+
+        var view = service.getRecommendationRunHistory(PROPOSAL_ID, PROPOSAL_POSITION_ID, OWNER_EMAIL);
+
+        assertThat(view.proposalId()).isEqualTo(PROPOSAL_ID);
+        assertThat(view.proposalPositionId()).isEqualTo(PROPOSAL_POSITION_ID);
+        assertThat(view.positionTitle()).isEqualTo("Backend Dev");
+        assertThat(view.positionStatusName()).isEqualTo("OPEN");
+        assertThat(view.runnable()).isTrue();
+        assertThat(view.hasRuns()).isTrue();
+        assertThat(view.runs()).hasSize(2);
+        assertThat(view.runs().get(0).runId()).isEqualTo(402L);
+        assertThat(view.runs().get(0).status()).isEqualTo(RecommendationRunStatus.FAILED);
+        assertThat(view.runs().get(0).requestedAt()).isEqualTo(LocalDateTime.of(2026, 4, 25, 11, 0));
+        assertThat(view.runs().get(1).runId()).isEqualTo(401L);
+        assertThat(view.runs().get(1).candidateCount()).isEqualTo(1);
+
+        then(proposalRepository).should().findWithPositionsById(PROPOSAL_ID);
+        then(recommendationRunRepository).should()
+                .findAllByProposalPosition_IdOrderByCreatedAtDescIdDesc(PROPOSAL_POSITION_ID);
+    }
+
+    @Test
+    @DisplayName("모집단위의 추천 실행 이력이 없으면 Empty State용 모델을 반환한다")
+    void getRecommendationRunHistory_returnsEmptyStateWhenNoRuns() {
+        RecommendationRun run = createOwnedRun(RecommendationRunStatus.PENDING);
+        Proposal proposal = run.getProposalPosition().getProposal();
+
+        given(proposalRepository.findWithPositionsById(PROPOSAL_ID)).willReturn(Optional.of(proposal));
+        given(recommendationRunRepository.findAllByProposalPosition_IdOrderByCreatedAtDescIdDesc(PROPOSAL_POSITION_ID))
+                .willReturn(List.of());
+
+        var view = service.getRecommendationRunHistory(PROPOSAL_ID, PROPOSAL_POSITION_ID, OWNER_EMAIL);
+
+        assertThat(view.hasRuns()).isFalse();
+        assertThat(view.helperMessage()).isEqualTo("아직 추천 실행 이력이 없습니다. 첫 추천을 실행해보세요.");
+        assertThat(view.runnable()).isTrue();
+    }
+
+    @Test
+    @DisplayName("다른 제안서의 모집단위로 추천 실행 이력을 조회하면 예외를 던진다")
+    void getRecommendationRunHistory_throwsWhenPositionDoesNotBelongToProposal() {
+        RecommendationRun run = createOwnedRun(RecommendationRunStatus.PENDING);
+        Proposal proposal = run.getProposalPosition().getProposal();
+
+        given(proposalRepository.findWithPositionsById(PROPOSAL_ID)).willReturn(Optional.of(proposal));
+
+        assertThatThrownBy(() -> service.getRecommendationRunHistory(PROPOSAL_ID, 999L, OWNER_EMAIL))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("해당 제안서에 속한 모집 포지션이 아닙니다.");
     }
 
     @Test
