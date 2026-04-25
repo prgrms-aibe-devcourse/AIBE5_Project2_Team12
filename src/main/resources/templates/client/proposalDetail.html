@@ -82,7 +82,7 @@
 
                              <th:block th:if="${selectedPos != null}"
                                        th:with="selectedMatching=${matchingByPositionId != null ? matchingByPositionId[selectedPos.id] : null}">
-                                 <th:block th:if="${selectedMatching != null and selectedMatching.status.name() == 'PROPOSED'}">
+                                 <th:block th:if="${selectedMatching != null and selectedMatching.status.name() == 'PROPOSED' and selectedPos.status.name() != 'CLOSED'}">
                                      <div class="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
                                          <p class="text-xs font-black uppercase tracking-widest text-slate-400">현재 응답할 포지션</p>
                                          <div class="flex flex-wrap items-center justify-between gap-2">
@@ -118,7 +118,7 @@
 
                                  <th:block th:if="${#lists.size(proposedPositions) == 1}"
                                            th:with="pos=${proposedPositions[0]}, myMatching=${matchingByPositionId != null ? matchingByPositionId[proposedPositions[0].id] : null}">
-                                     <th:block th:if="${myMatching != null and myMatching.status.name() == 'PROPOSED'}">
+                                     <th:block th:if="${myMatching != null and myMatching.status.name() == 'PROPOSED' and proposedPositions[0].status.name() != 'CLOSED'}">
                                          <form th:action="@{/matchings/{id}/accept(id=${myMatching.id})}" method="post" class="inline">
                                              <input type="hidden" name="_csrf" th:value="${_csrf.token}">
                                              <input type="hidden" name="redirectTo" th:value="@{/matchings/{id}(id=${myMatching.id})}">
@@ -159,7 +159,7 @@
                                          <div class="flex flex-col gap-2">
                                              <th:block th:each="pos : ${proposedPositions}"
                                                        th:with="myMatching=${matchingByPositionId != null ? matchingByPositionId[pos.id] : null}">
-                                                 <div th:if="${myMatching != null and myMatching.status.name() == 'PROPOSED'}"
+                                                 <div th:if="${myMatching != null and myMatching.status.name() == 'PROPOSED' and pos.status.name() != 'CLOSED'}"
                                                       class="flex flex-wrap items-center justify-between gap-2">
                                                      <span class="text-sm font-bold text-slate-700" th:text="${pos.title}">포지션</span>
                                                      <div class="flex items-center gap-2">
