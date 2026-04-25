@@ -41,6 +41,20 @@
         매칭 결과 보기
       </a>
 
+      <!-- 클라이언트: 모집 종료 CTA (MATCHING 상태 + OPEN/FULL 포지션에만 표시) -->
+      <form th:if="${viewerRole != 'FREELANCER' and pos.proposal.status.name() == 'MATCHING' and (pos.status.name() == 'OPEN' or pos.status.name() == 'FULL')}"
+            th:action="@{/proposals/{proposalId}/positions/{positionId}/close(proposalId=${pos.proposal.id}, positionId=${pos.id})}"
+            method="post"
+            class="inline"
+            onsubmit="return confirm('이 포지션의 모집을 종료하시겠습니까? 종료 후에는 추천 실행 및 매칭 요청이 불가합니다.')">
+        <input type="hidden" name="_csrf" th:value="${_csrf.token}">
+        <button type="submit"
+                class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-500 transition hover:border-red-300 hover:text-red-600">
+          <i data-lucide="lock" class="h-4 w-4"></i>
+          모집 종료
+        </button>
+      </form>
+
       <!-- 프리랜서: 이 포지션에 매칭 요청이 온 경우 상태 배지 (수락/거절은 상단 액션바에서 처리) -->
       <th:block
           th:if="${viewerRole == 'FREELANCER' and matchingByPositionId != null and matchingByPositionId[pos.id] != null}">

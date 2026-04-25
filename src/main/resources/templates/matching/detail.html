@@ -77,6 +77,15 @@
                 <p th:text="${noticeMessage}">안내 메시지</p>
             </section>
 
+            <!-- 모집 종료 안내 배너 -->
+            <section th:if="${view.project != null and view.project.positionStatusName == 'CLOSED'}"
+                     class="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-700">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="lock" class="h-4 w-4 shrink-0"></i>
+                    <p>클라이언트가 이 포지션의 모집을 종료했습니다. 더 이상 추천 및 매칭 요청이 진행되지 않습니다.</p>
+                </div>
+            </section>
+
             <div class="grid gap-6 xl:grid-cols-[minmax(0,1.8fr)_minmax(320px,0.95fr)] xl:items-start">
 
                 <section class="space-y-6">
@@ -396,10 +405,10 @@
                             </div>
                         </div>
 
-                        <div th:if="${(accepted or inProgress or canceled) and view.lifecycle.cancellation.requested}"
+                        <div th:if="${(accepted or inProgress or canceled or rejected) and view.lifecycle.cancellation.requested}"
                              class="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
                             <p class="text-sm font-bold text-amber-800"
-                               th:text="${canceled ? (contractCanceled ? '계약 취소 사유' : '매칭 취소 사유') : (view.lifecycle.cancellation.requestedByCurrentUser ? '취소 요청을 보냈습니다' : '취소 요청이 도착했습니다')}">
+                               th:text="${rejected ? '종료 사유' : (canceled ? (contractCanceled ? '계약 취소 사유' : '매칭 취소 사유') : (view.lifecycle.cancellation.requestedByCurrentUser ? '취소 요청을 보냈습니다' : '취소 요청이 도착했습니다'))}">
                                 취소 요청이 도착했습니다
                             </p>
                             <dl class="mt-4 space-y-2 text-sm text-amber-800">
