@@ -15,6 +15,7 @@
     -->
     <div th:with="isEditing=${isNew eq true or editable eq true}">
         <input type="hidden" id="isEditingFlag" th:value="${isEditing}">
+        <input type="hidden" id="isNewFlag" th:value="${isNew}">
         <main class="min-h-screen bg-slate-50 py-10 px-6">
             <div class="max-w-4xl mx-auto space-y-6">
 
@@ -352,6 +353,40 @@
                     <!-- career.version (Bean Validation 통과용 hidden) -->
                     <input type="hidden" th:field="*{career.version}">
 
+                    <!-- 신규 작성: 경력 임시 저장 hidden fields (저장 시 함께 생성) -->
+                    <div id="draftCareerFields" class="hidden" th:if="${isNew eq true}">
+                        <th:block th:each="item, iter : *{career.items}">
+                            <input type="hidden"
+                                   th:name="|career.items[${iter.index}].companyName|"
+                                   th:value="${item.companyName}">
+                            <input type="hidden"
+                                   th:name="|career.items[${iter.index}].position|"
+                                   th:value="${item.position}">
+                            <input type="hidden"
+                                   th:name="|career.items[${iter.index}].employmentType|"
+                                   th:value="${item.employmentType}">
+                            <input type="hidden"
+                                   th:name="|career.items[${iter.index}].startYearMonth|"
+                                   th:value="${item.startYearMonth}">
+                            <th:block th:if="${item.endYearMonth != null}">
+                                <input type="hidden"
+                                       th:name="|career.items[${iter.index}].endYearMonth|"
+                                       th:value="${item.endYearMonth}">
+                            </th:block>
+                            <input type="hidden"
+                                   th:name="|career.items[${iter.index}].currentlyWorking|"
+                                   th:value="${item.currentlyWorking}">
+                            <input type="hidden"
+                                   th:name="|career.items[${iter.index}].summary|"
+                                   th:value="${item.summary}">
+                            <th:block th:each="tech, techIter : ${item.techStack}">
+                                <input type="hidden"
+                                       th:name="|career.items[${iter.index}].techStack[${techIter.index}]|"
+                                       th:value="${tech}">
+                            </th:block>
+                        </th:block>
+                    </div>
+
                 </form>
 
                 <!-- ===== 경력 사항 (AJAX — 별도 POST, #careerSection 전체 교체) ===== -->
@@ -364,11 +399,16 @@
                         </button>
                     </div>
 
-                    <th:block th:if="${resume == null}">
-                        <p class="text-sm text-slate-400">이력서를 먼저 저장한 후 경력을 등록할 수 있습니다.</p>
+                    <th:block th:if="${isNew eq true}">
+                        <div class="space-y-4">
+                            <p id="draftCareersEmpty" class="text-sm text-slate-400">등록된 경력이 없습니다.</p>
+                            <div id="draftCareersList" class="space-y-4">
+                                <!-- JS render -->
+                            </div>
+                        </div>
                     </th:block>
 
-                    <th:block th:if="${resume != null}">
+                    <th:block th:if="${isNew eq false and resume != null}">
                         <p th:if="${resume.career.items.isEmpty()}" class="text-sm text-slate-400">등록된 경력이 없습니다.</p>
 
                         <div th:if="${not resume.career.items.isEmpty()}" class="space-y-4">
@@ -428,10 +468,6 @@
                     <!-- 신규: 이력서 저장 전 안내 -->
                     <th:block th:if="${resume == null}">
                         <div class="space-y-4">
-                            <p class="text-sm text-slate-500">
-                                저장 전에도 스킬을 추가할 수 있습니다. 추가한 스킬은 저장 시 함께 등록됩니다.
-                            </p>
-
                             <div id="draftSkillsChips" class="flex flex-wrap gap-3">
                                 <!-- JS 렌더링 -->
                             </div>
@@ -1203,6 +1239,39 @@
         var form = document.getElementById('careerForm');
         if (!form) return;
 
+        var draftFieldsRoot = document.getElementById('draftCareerFields');
+        var draftListRoot = document.getElementById('draftCareersList');
+        var draftEmptyEl = document.getElementById('draftCareersEmpty');
+        var isDraft = (document.getElementById('isNewFlag')?.value === 'true') && !!draftFieldsRoot;
+
+        if (isDraft && !draftListRoot) {
+            var careerSection = document.getElementById('careerSection');
+            if (!careerSection) {
+                isDraft = false;
+            } else {
+                if (!draftEmptyEl) {
+                    draftEmptyEl = document.createElement('p');
+                    draftEmptyEl.id = 'draftCareersEmpty';
+                    draftEmptyEl.className = 'text-sm text-slate-400';
+                    draftEmptyEl.textContent = '등록된 경력이 없습니다.';
+                    careerSection.appendChild(draftEmptyEl);
+                }
+
+                draftListRoot = document.createElement('div');
+                draftListRoot.id = 'draftCareersList';
+                draftListRoot.className = 'space-y-4';
+                careerSection.appendChild(draftListRoot);
+            }
+        }
+
+        var employmentLabelByValue = (function () {
+            var select = document.getElementById('careerEmploymentType');
+            if (!select) return new Map();
+            return new Map(Array.from(select.querySelectorAll('option'))
+                .filter(function (o) { return !!o.value; })
+                .map(function (o) { return [o.value, (o.textContent || '').trim()]; }));
+        })();
+
         function showCareerErrors(errors) {
             Object.keys(errors).forEach(function (field) {
                 var el = document.getElementById('err-' + field);
@@ -1213,9 +1282,295 @@
             });
         }
 
+        function parseYearMonth(value) {
+            var v = (value || '').trim();
+            return v ? v : '';
+        }
+
+        function parseTechStack(raw) {
+            if (!raw) return [];
+            return raw.split(',')
+                .map(function (s) { return (s || '').trim(); })
+                .filter(function (s) { return !!s; })
+                .slice(0, 20);
+        }
+
+        function readDraftCareersFromHidden() {
+            if (!isDraft) return [];
+
+            var inputs = Array.from(draftFieldsRoot.querySelectorAll('input[type="hidden"]'));
+            var byIndex = new Map();
+            var techByIndex = new Map(); // index -> Map(techIndex -> value)
+
+            inputs.forEach(function (input) {
+                var name = input.name || '';
+                var m = name.match(/^career\.items\[(\d+)\]\.(companyName|position|employmentType|startYearMonth|endYearMonth|currentlyWorking|summary)$/);
+                if (m) {
+                    var index = Number(m[1]);
+                    var field = m[2];
+                    if (!byIndex.has(index)) byIndex.set(index, {});
+                    byIndex.get(index)[field] = input.value;
+                    return;
+                }
+
+                var tm = name.match(/^career\.items\[(\d+)\]\.techStack\[(\d+)\]$/);
+                if (tm) {
+                    var i = Number(tm[1]);
+                    var j = Number(tm[2]);
+                    if (!techByIndex.has(i)) techByIndex.set(i, new Map());
+                    techByIndex.get(i).set(j, input.value);
+                }
+            });
+
+            return Array.from(byIndex.entries())
+                .sort(function (a, b) { return a[0] - b[0]; })
+                .map(function (entry) {
+                    var idx = entry[0];
+                    var v = entry[1] || {};
+                    var techMap = techByIndex.get(idx) || new Map();
+                    var tech = Array.from(techMap.entries())
+                        .sort(function (a, b) { return a[0] - b[0]; })
+                        .map(function (t) { return t[1]; })
+                        .filter(function (s) { return !!(s && String(s).trim()); });
+
+                    return {
+                        companyName: v.companyName || '',
+                        position: v.position || '',
+                        employmentType: v.employmentType || '',
+                        startYearMonth: v.startYearMonth || '',
+                        endYearMonth: v.endYearMonth || '',
+                        currentlyWorking: String(v.currentlyWorking) === 'true',
+                        summary: v.summary || '',
+                        techStack: tech
+                    };
+                });
+        }
+
+        function syncDraftHidden(careers) {
+            if (!isDraft) return;
+
+            draftFieldsRoot.innerHTML = '';
+
+            function addHidden(name, value) {
+                var input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = name;
+                input.value = value == null ? '' : String(value);
+                draftFieldsRoot.appendChild(input);
+            }
+
+            (careers || []).forEach(function (item, index) {
+                addHidden('career.items[' + index + '].companyName', item.companyName || '');
+                addHidden('career.items[' + index + '].position', item.position || '');
+                addHidden('career.items[' + index + '].employmentType', item.employmentType || '');
+                addHidden('career.items[' + index + '].startYearMonth', item.startYearMonth || '');
+                addHidden('career.items[' + index + '].currentlyWorking', item.currentlyWorking ? 'true' : 'false');
+                addHidden('career.items[' + index + '].summary', item.summary || '');
+
+                if (!item.currentlyWorking && item.endYearMonth) {
+                    addHidden('career.items[' + index + '].endYearMonth', item.endYearMonth);
+                }
+
+                (item.techStack || []).forEach(function (tech, j) {
+                    if (!tech) return;
+                    addHidden('career.items[' + index + '].techStack[' + j + ']', tech);
+                });
+            });
+        }
+
+        function renderDraftCareers(careers) {
+            if (!isDraft) return;
+
+            var list = careers || [];
+            draftListRoot.innerHTML = '';
+            if (draftEmptyEl) {
+                if (list.length === 0) draftEmptyEl.classList.remove('hidden');
+                else draftEmptyEl.classList.add('hidden');
+            }
+
+            var isEditing = document.getElementById('isEditingFlag')?.value === 'true';
+
+            list.forEach(function (item, index) {
+                var card = document.createElement('div');
+                card.className = 'p-5 border border-slate-100 rounded-2xl bg-slate-50 space-y-2';
+
+                card.dataset.index = String(index);
+                card.dataset.company = item.companyName || '';
+                card.dataset.position = item.position || '';
+                card.dataset.employmentType = item.employmentType || '';
+                card.dataset.start = item.startYearMonth || '';
+                card.dataset.end = item.endYearMonth || '';
+                card.dataset.currentlyWorking = item.currentlyWorking ? 'true' : 'false';
+                card.dataset.summary = item.summary || '';
+                card.dataset.techStack = (item.techStack || []).join(', ');
+
+                var header = document.createElement('div');
+                header.className = 'flex items-start justify-between gap-2';
+
+                var left = document.createElement('div');
+                left.className = 'space-y-1 flex-1';
+
+                var row = document.createElement('div');
+                row.className = 'flex items-center gap-2 flex-wrap';
+
+                var company = document.createElement('p');
+                company.className = 'text-sm font-bold text-slate-900';
+                company.textContent = item.companyName || '';
+
+                var badge = document.createElement('span');
+                badge.className = 'text-xs px-2 py-0.5 bg-slate-200 text-slate-600 rounded-lg font-medium';
+                badge.textContent = employmentLabelByValue.get(item.employmentType) || '';
+
+                row.appendChild(company);
+                row.appendChild(badge);
+
+                var position = document.createElement('p');
+                position.className = 'text-sm text-slate-500';
+                position.textContent = item.position || '';
+
+                var period = document.createElement('p');
+                period.className = 'text-xs text-slate-400';
+                period.textContent = (item.startYearMonth || '') + ' - ' + (item.currentlyWorking ? '현재' : (item.endYearMonth || ''));
+
+                left.appendChild(row);
+                left.appendChild(position);
+                left.appendChild(period);
+
+                header.appendChild(left);
+
+                if (isEditing) {
+                    var actions = document.createElement('div');
+                    actions.className = 'flex items-center gap-2 shrink-0';
+
+                    var editBtn = document.createElement('button');
+                    editBtn.type = 'button';
+                    editBtn.className = 'text-xs font-semibold text-slate-500 hover:text-blue-600 transition-colors';
+                    editBtn.textContent = '수정하기';
+                    editBtn.addEventListener('click', function () {
+                        window.openCareerModal('edit', card);
+                    });
+
+                    var delBtn = document.createElement('button');
+                    delBtn.type = 'button';
+                    delBtn.className = 'text-slate-300 hover:text-red-400 transition-colors flex items-center';
+                    delBtn.innerHTML = '<i data-lucide="x" class="w-4 h-4"></i>';
+                    delBtn.addEventListener('click', function () {
+                        window.removeCareer(index);
+                    });
+
+                    actions.appendChild(editBtn);
+                    actions.appendChild(delBtn);
+                    header.appendChild(actions);
+                }
+
+                card.appendChild(header);
+
+                if (item.summary && String(item.summary).trim()) {
+                    var summary = document.createElement('p');
+                    summary.className = 'text-xs text-slate-500 leading-relaxed';
+                    summary.textContent = item.summary;
+                    card.appendChild(summary);
+                }
+
+                if (item.techStack && item.techStack.length > 0) {
+                    var tags = document.createElement('div');
+                    tags.className = 'flex flex-wrap gap-1.5 pt-1';
+                    item.techStack.forEach(function (tech) {
+                        var tag = document.createElement('span');
+                        tag.className = 'px-2 py-0.5 bg-white border border-slate-200 text-slate-600 text-xs font-medium rounded-lg';
+                        tag.textContent = tech;
+                        tags.appendChild(tag);
+                    });
+                    card.appendChild(tags);
+                }
+
+                draftListRoot.appendChild(card);
+            });
+        }
+
+        var draftCareers = isDraft ? readDraftCareersFromHidden() : [];
+        if (isDraft) {
+            syncDraftHidden(draftCareers);
+            renderDraftCareers(draftCareers);
+            if (window.lucide) lucide.createIcons();
+
+            window.__resumeDraftCareerState = {
+                isDraft: true,
+                getItems: function () { return draftCareers; },
+                setItems: function (items) {
+                    draftCareers = items || [];
+                    syncDraftHidden(draftCareers);
+                    renderDraftCareers(draftCareers);
+                    if (window.lucide) lucide.createIcons();
+                }
+            };
+        }
+
         form.addEventListener('submit', function (e) {
             e.preventDefault();
             clearCareerErrors();
+
+            if (isDraft) {
+                var companyName = (document.getElementById('careerCompanyName').value || '').trim();
+                var position = (document.getElementById('careerPosition').value || '').trim();
+                var employmentType = (document.getElementById('careerEmploymentType').value || '').trim();
+                var startYearMonth = parseYearMonth(document.getElementById('careerStart').value);
+                var currentlyWorking = !!document.getElementById('careerCurrentlyWorking').checked;
+                var endYearMonth = currentlyWorking ? '' : parseYearMonth(document.getElementById('careerEnd').value);
+                var summary = (document.getElementById('careerSummary').value || '').trim();
+                var techStack = parseTechStack(document.getElementById('careerTechStack').value);
+
+                var errors = {};
+                var ymRegex = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+                if (!companyName) errors.companyName = '회사명을 입력해주세요.';
+                if (!position) errors.position = '직책을 입력해주세요.';
+                if (!employmentType) errors.employmentType = '고용 형태를 선택해주세요.';
+                if (!startYearMonth) errors.startYearMonth = '시작 연월을 입력해주세요.';
+                else if (!ymRegex.test(startYearMonth)) errors.startYearMonth = '시작 연월은 yyyy-MM 형식이어야 합니다.';
+
+                if (!currentlyWorking) {
+                    if (!endYearMonth) errors.endYearMonth = '종료 연월을 입력해주세요.';
+                    else if (!ymRegex.test(endYearMonth)) errors.endYearMonth = '종료 연월은 yyyy-MM 형식이어야 합니다.';
+                }
+
+                if (startYearMonth && endYearMonth && ymRegex.test(startYearMonth) && ymRegex.test(endYearMonth)) {
+                    if (endYearMonth < startYearMonth) {
+                        errors.endYearMonth = '종료 연월은 시작 연월보다 빠를 수 없습니다.';
+                    }
+                }
+
+                if (Object.keys(errors).length > 0) {
+                    showCareerErrors(errors);
+                    return;
+                }
+
+                var idxRaw = document.getElementById('careerIndex').value;
+                var idx = idxRaw !== '' ? Number(idxRaw) : null;
+                var item = {
+                    companyName: companyName,
+                    position: position,
+                    employmentType: employmentType,
+                    startYearMonth: startYearMonth,
+                    endYearMonth: currentlyWorking ? '' : endYearMonth,
+                    currentlyWorking: currentlyWorking,
+                    summary: summary,
+                    techStack: techStack
+                };
+
+                if (idx != null && idx >= 0 && idx < draftCareers.length) {
+                    draftCareers[idx] = item;
+                } else {
+                    draftCareers.push(item);
+                }
+
+                syncDraftHidden(draftCareers);
+                renderDraftCareers(draftCareers);
+                closeCareerModal();
+                if (window.lucide) lucide.createIcons();
+                return;
+            }
+
             var index = document.getElementById('careerIndex').value;
             var url   = index !== '' ? '/resumes/career/update' : '/resumes/career/add';
 
@@ -1296,6 +1651,12 @@
     };
 
     window.removeCareer = function (index) {
+        if (window.__resumeDraftCareerState && window.__resumeDraftCareerState.isDraft) {
+            var current = window.__resumeDraftCareerState.getItems();
+            var next = (current || []).filter(function (_, i) { return i !== index; });
+            window.__resumeDraftCareerState.setItems(next);
+            return;
+        }
         var csrfInput = document.querySelector('#careerForm input[name="_csrf"]');
         var data = new FormData();
         data.append('index', index);
