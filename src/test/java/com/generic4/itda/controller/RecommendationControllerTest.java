@@ -10,6 +10,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
@@ -22,12 +23,15 @@ import com.generic4.itda.dto.recommend.RecommendationCandidateItem;
 import com.generic4.itda.dto.recommend.RecommendationResumeCareerItem;
 import com.generic4.itda.dto.recommend.RecommendationResumeDetailViewModel;
 import com.generic4.itda.dto.recommend.RecommendationResumeSkillItem;
+import com.generic4.itda.dto.recommend.RecommendationRunHistoryItemViewModel;
+import com.generic4.itda.dto.recommend.RecommendationRunHistoryViewModel;
 import com.generic4.itda.dto.recommend.RecommendationResultsViewModel;
 import com.generic4.itda.dto.recommend.RecommendationRunStatusViewModel;
 import com.generic4.itda.dto.security.ItDaPrincipal;
 import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.service.recommend.RecommendationRunQueryService;
 import com.generic4.itda.service.recommend.RecommendationRunService;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -78,6 +82,71 @@ class RecommendationControllerTest {
     }
 
     @Test
+    @DisplayName("모집단위별 추천 실행 이력 조회가 성공하면 runs 화면을 렌더링한다")
+    void renderRunHistory() throws Exception {
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        RecommendationRunHistoryViewModel viewModel = new RecommendationRunHistoryViewModel(
+                PROPOSAL_ID,
+                PROPOSAL_POSITION_ID,
+                "추천 테스트 제안서",
+                "백엔드 개발자",
+                "OPEN",
+                "모집 중",
+                true,
+                "이전 추천 실행을 확인하거나 새 추천을 실행할 수 있습니다.",
+                List.of(new RecommendationRunHistoryItemViewModel(
+                        RUN_ID,
+                        RecommendationRunStatus.COMPUTED,
+                        "계산 완료",
+                        3,
+                        3,
+                        LocalDateTime.of(2026, 4, 25, 11, 0),
+                        LocalDateTime.of(2026, 4, 25, 11, 2)
+                ))
+        );
+
+        given(recommendationRunQueryService.getRecommendationRunHistory(eq(PROPOSAL_ID), eq(PROPOSAL_POSITION_ID), eq("client@example.com")))
+                .willReturn(viewModel);
+
+        mockMvc.perform(get("/proposal-positions/{proposalPositionId}/recommendations/runs", PROPOSAL_POSITION_ID)
+                        .param("proposalId", String.valueOf(PROPOSAL_ID))
+                        .param("backUrl", "/proposals/10")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(view().name("recommendation/runs"))
+                .andExpect(model().attributeExists("view"))
+                .andExpect(model().attribute("backUrl", "/proposals/10"))
+                .andExpect(model().attribute("currentUrl",
+                        "/proposal-positions/20/recommendations/runs?proposalId=10&backUrl=%2Fproposals%2F10"));
+    }
+
+    @Test
+    @DisplayName("모집단위별 추천 실행 이력 조회 실패 시 이전 화면으로 redirect하고 flash를 남긴다")
+    void redirectWhenRunHistoryFails() throws Exception {
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        given(recommendationRunQueryService.getRecommendationRunHistory(eq(PROPOSAL_ID), eq(PROPOSAL_POSITION_ID), eq("client@example.com")))
+                .willThrow(new IllegalArgumentException("해당 제안서에 속한 모집 포지션이 아닙니다."));
+
+        mockMvc.perform(get("/proposal-positions/{proposalPositionId}/recommendations/runs", PROPOSAL_POSITION_ID)
+                        .param("proposalId", String.valueOf(PROPOSAL_ID))
+                        .param("backUrl", "/proposals/10")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/proposals/10"))
+                .andExpect(flash().attribute("errorMessage", "해당 제안서의 모집단위를 다시 확인해주세요."));
+    }
+
+    @Test
     @DisplayName("추천 결과 조회가 성공하면 results 화면을 렌더링한다")
     void renderResults() throws Exception {
         // given
@@ -118,6 +187,7 @@ class RecommendationControllerTest {
         // when / then
         mockMvc.perform(get("/proposals/{proposalId}/recommendations/results", PROPOSAL_ID)
                         .param("runId", String.valueOf(RUN_ID))
+                        .param("backUrl", "/proposal-positions/20/recommendations/runs?proposalId=10")
                         .with(authentication(new UsernamePasswordAuthenticationToken(
                                 principal,
                                 null,
@@ -125,7 +195,48 @@ class RecommendationControllerTest {
                         ))))
                 .andExpect(status().isOk())
                 .andExpect(view().name("recommendation/results"))
-                .andExpect(model().attributeExists("view"));
+                .andExpect(model().attributeExists("view"))
+                .andExpect(model().attribute("backUrl", "/proposal-positions/20/recommendations/runs?proposalId=10"))
+                .andExpect(model().attribute("currentUrl",
+                        "/proposals/10/recommendations/results?runId=301&backUrl=%2Fproposal-positions%2F20%2Frecommendations%2Fruns%3FproposalId%3D10"))
+                .andExpect(content().string(containsString(
+                        "/proposals/10/recommendations/results/100?backUrl=/proposal-positions/20/recommendations/runs?proposalId%3D10")));
+
+        then(recommendationRunQueryService).should()
+                .getRecommendationResults(eq(PROPOSAL_ID), eq(RUN_ID), eq("client@example.com"));
+    }
+
+    @Test
+    @DisplayName("추천 결과 조회 시 깨진 comma backUrl은 첫 번째 내부 경로로 복구한다")
+    void renderResultsRepairsCommaJoinedBackUrl() throws Exception {
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        RecommendationResultsViewModel viewModel = new RecommendationResultsViewModel(
+                PROPOSAL_ID,
+                PROPOSAL_POSITION_ID,
+                RUN_ID,
+                "추천 테스트 제안서",
+                "백엔드 개발자",
+                3,
+                3,
+                List.of()
+        );
+
+        given(recommendationRunQueryService.getRecommendationResults(eq(PROPOSAL_ID), eq(RUN_ID), eq("client@example.com")))
+                .willReturn(viewModel);
+
+        mockMvc.perform(get("/proposals/{proposalId}/recommendations/results", PROPOSAL_ID)
+                        .param("runId", String.valueOf(RUN_ID))
+                        .param("backUrl", "/proposal-positions/20/recommendations/runs?proposalId=10,/proposals/10")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("backUrl", "/proposal-positions/20/recommendations/runs?proposalId=10"));
 
         then(recommendationRunQueryService).should()
                 .getRecommendationResults(eq(PROPOSAL_ID), eq(RUN_ID), eq("client@example.com"));
@@ -209,6 +320,7 @@ class RecommendationControllerTest {
 
         // when / then
         mockMvc.perform(get("/proposals/{proposalId}/recommendations/results/{resultId}", PROPOSAL_ID, RESULT_ID)
+                        .param("backUrl", "/proposal-positions/20/recommendations/runs?proposalId=10")
                         .with(authentication(new UsernamePasswordAuthenticationToken(
                                 principal,
                                 null,
@@ -217,6 +329,8 @@ class RecommendationControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(view().name("recommendation/resume"))
                 .andExpect(model().attributeExists("view"))
+                .andExpect(model().attribute("backUrl",
+                        "/proposals/10/recommendations/results?runId=301&backUrl=%2Fproposal-positions%2F20%2Frecommendations%2Fruns%3FproposalId%3D10"))
                 .andExpect(content().string(containsString("text-amber-600")));
 
         then(recommendationRunQueryService).should()
@@ -270,6 +384,7 @@ class RecommendationControllerTest {
 
         // when / then
         mockMvc.perform(get("/proposals/{proposalId}/runs/{runId}", PROPOSAL_ID, RUN_ID)
+                        .param("backUrl", "/proposal-positions/20/recommendations/runs?proposalId=10")
                         .with(authentication(new UsernamePasswordAuthenticationToken(
                                 principal,
                                 null,
@@ -277,7 +392,12 @@ class RecommendationControllerTest {
                         ))))
                 .andExpect(status().isOk())
                 .andExpect(view().name("recommendation/status"))
-                .andExpect(model().attributeExists("view"));
+                .andExpect(model().attributeExists("view"))
+                .andExpect(model().attribute("backUrl", "/proposal-positions/20/recommendations/runs?proposalId=10"))
+                .andExpect(model().attribute("refreshUrl",
+                        "/proposals/10/runs/301?backUrl=%2Fproposal-positions%2F20%2Frecommendations%2Fruns%3FproposalId%3D10"))
+                .andExpect(content().string(containsString(
+                        "/proposals/10/runs/301?backUrl=%2Fproposal-positions%2F20%2Frecommendations%2Fruns%3FproposalId%3D10")));
 
         then(recommendationRunQueryService).should()
                 .getRecommendationRunStatus(eq(PROPOSAL_ID), eq(RUN_ID), eq("client@example.com"));
@@ -350,7 +470,44 @@ class RecommendationControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(view().name("recommendation/status"))
                 .andExpect(model().attributeExists("view"))
-                .andExpect(model().attribute("from", "recommendation"));
+                .andExpect(model().attribute("from", "recommendation"))
+                .andExpect(model().attribute("refreshUrl",
+                        "/proposals/10/runs/301?from=recommendation"));
+
+        then(recommendationRunQueryService).should()
+                .getRecommendationRunStatus(eq(PROPOSAL_ID), eq(RUN_ID), eq("client@example.com"));
+    }
+
+    @Test
+    @DisplayName("COMPUTED 상태 직접 진입 시 backUrl을 유지한 채 결과 페이지로 리다이렉트한다")
+    void redirectToResultsWhenRunAlreadyComputedKeepsBackUrl() throws Exception {
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        RecommendationRunStatusViewModel computedView = new RecommendationRunStatusViewModel(
+                PROPOSAL_ID, RUN_ID, "추천 테스트 제안서",
+                RecommendationRunStatus.COMPUTED,
+                "추천 결과가 준비되었습니다.",
+                "추천 결과 목록으로 이동할 수 있습니다.",
+                "결과 보기",
+                "/proposals/" + PROPOSAL_ID + "/recommendations/results?runId=" + RUN_ID,
+                false
+        );
+
+        given(recommendationRunQueryService.getRecommendationRunStatus(eq(PROPOSAL_ID), eq(RUN_ID), eq("client@example.com")))
+                .willReturn(computedView);
+
+        mockMvc.perform(get("/proposals/{proposalId}/runs/{runId}", PROPOSAL_ID, RUN_ID)
+                        .param("backUrl", "/proposal-positions/20/recommendations/runs?proposalId=10")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(
+                        "/proposals/10/recommendations/results?runId=301&backUrl=%2Fproposal-positions%2F20%2Frecommendations%2Fruns%3FproposalId%3D10"));
 
         then(recommendationRunQueryService).should()
                 .getRecommendationRunStatus(eq(PROPOSAL_ID), eq(RUN_ID), eq("client@example.com"));
@@ -532,5 +689,49 @@ class RecommendationControllerTest {
                         ))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").exists());
+    }
+
+    @Test
+    @DisplayName("추천 시작 POST 요청은 backUrl을 유지한 채 상태 페이지로 redirect한다")
+    void runRedirectsToRunStatusWithBackUrl() throws Exception {
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        given(recommendationRunService.createOrReuse(eq(PROPOSAL_ID), eq(PROPOSAL_POSITION_ID), eq("client@example.com")))
+                .willReturn(RUN_ID);
+
+        mockMvc.perform(post("/proposals/{proposalId}/recommendations", PROPOSAL_ID)
+                        .param("proposalPositionId", String.valueOf(PROPOSAL_POSITION_ID))
+                        .param("backUrl", "/proposal-positions/20/recommendations/runs?proposalId=10")
+                        .with(csrf())
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(
+                        "/proposals/10/runs/301?backUrl=%2Fproposal-positions%2F20%2Frecommendations%2Fruns%3FproposalId%3D10"));
+    }
+
+    @Test
+    @DisplayName("추가 추천 POST 요청은 backUrl을 유지한 채 상태 페이지로 redirect한다")
+    void moreRedirectsToRunStatusWithBackUrl() throws Exception {
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        given(recommendationRunService.createAdditional(eq(PROPOSAL_ID), eq(PROPOSAL_POSITION_ID), eq("client@example.com")))
+                .willReturn(RUN_ID);
+
+        mockMvc.perform(post("/proposal-positions/{proposalPositionId}/recommendations/more", PROPOSAL_POSITION_ID)
+                        .param("proposalId", String.valueOf(PROPOSAL_ID))
+                        .param("backUrl", "/proposals/10/recommendations/results?runId=301")
+                        .with(csrf())
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl(
+                        "/proposals/10/runs/301?backUrl=%2Fproposals%2F10%2Frecommendations%2Fresults%3FrunId%3D301"));
     }
 }
