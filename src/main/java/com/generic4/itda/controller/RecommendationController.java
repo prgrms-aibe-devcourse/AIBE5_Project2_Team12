@@ -208,7 +208,7 @@ public class RecommendationController {
             Model model
     ) {
         String requestedBackUrl = normalizeLocalPath(backUrl);
-        String resolvedBackUrl = resolveBackUrl(requestedBackUrl, "/proposals/" + proposalId + "?openRecommendModal=true");
+        String resolvedBackUrl = resolveBackUrl(requestedBackUrl, "/proposals/" + proposalId);
         String normalizedFrom = (from != null && !from.isBlank()) ? from : null;
 
         try {
@@ -216,7 +216,7 @@ public class RecommendationController {
                     .getRecommendationRunStatus(proposalId, runId, principal.getEmail());
 
             if (view.status() == RecommendationRunStatus.COMPUTED && normalizedFrom == null) {
-                return "redirect:" + resolveRunStatusNextActionUrl(view, requestedBackUrl);
+                return "redirect:" + resolveRunStatusNextActionUrl(view, resolvedBackUrl);
             }
 
             model.addAttribute("view", view);
@@ -246,7 +246,7 @@ public class RecommendationController {
             Model model
     ) {
         String requestedBackUrl = normalizeLocalPath(backUrl);
-        String resolvedBackUrl = resolveBackUrl(requestedBackUrl, buildRunStatusUrl(proposalId, runId, null));
+        String resolvedBackUrl = resolveBackUrl(requestedBackUrl, "/proposals/" + proposalId);
 
         try {
             RecommendationResultsViewModel view = recommendationRunQueryService

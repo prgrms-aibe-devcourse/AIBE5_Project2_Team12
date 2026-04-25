@@ -243,6 +243,43 @@ class RecommendationControllerTest {
     }
 
     @Test
+    @DisplayName("추천 결과 조회 시 backUrl이 없으면 제안서 상세로 복귀시킨다")
+    void renderResultsFallsBackToProposalDetail() throws Exception {
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        RecommendationResultsViewModel viewModel = new RecommendationResultsViewModel(
+                PROPOSAL_ID,
+                PROPOSAL_POSITION_ID,
+                RUN_ID,
+                "추천 테스트 제안서",
+                "백엔드 개발자",
+                3,
+                3,
+                List.of()
+        );
+
+        given(recommendationRunQueryService.getRecommendationResults(eq(PROPOSAL_ID), eq(RUN_ID), eq("client@example.com")))
+                .willReturn(viewModel);
+
+        mockMvc.perform(get("/proposals/{proposalId}/recommendations/results", PROPOSAL_ID)
+                        .param("runId", String.valueOf(RUN_ID))
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal,
+                                null,
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("backUrl", "/proposals/10"))
+                .andExpect(model().attribute("currentUrl",
+                        "/proposals/10/recommendations/results?runId=301&backUrl=%2Fproposals%2F10"));
+
+        then(recommendationRunQueryService).should()
+                .getRecommendationResults(eq(PROPOSAL_ID), eq(RUN_ID), eq("client@example.com"));
+    }
+
+    @Test
     @DisplayName("추천 결과가 아직 준비되지 않으면 error 화면을 렌더링한다")
     void renderErrorWhenNotReady() throws Exception {
         // given
@@ -265,7 +302,7 @@ class RecommendationControllerTest {
                 .andExpect(view().name("recommendation/error"))
                 .andExpect(model().attribute("title", "추천 결과를 확인할 수 없습니다."))
                 .andExpect(model().attribute("message", "추천이 아직 완료되지 않았습니다. 잠시 후 다시 시도해주세요."))
-                .andExpect(model().attribute("backUrl", "/proposals/10/runs/301"));
+                .andExpect(model().attribute("backUrl", "/proposals/10"));
 
         then(recommendationRunQueryService).should()
                 .getRecommendationResults(eq(PROPOSAL_ID), eq(RUN_ID), eq("client@example.com"));
@@ -432,7 +469,8 @@ class RecommendationControllerTest {
                                 List.of(new SimpleGrantedAuthority("ROLE_USER"))
                         ))))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/proposals/" + PROPOSAL_ID + "/recommendations/results?runId=" + RUN_ID));
+                .andExpect(redirectedUrl(
+                        "/proposals/10/recommendations/results?runId=301&backUrl=%2Fproposals%2F10"));
 
         then(recommendationRunQueryService).should()
                 .getRecommendationRunStatus(eq(PROPOSAL_ID), eq(RUN_ID), eq("client@example.com"));
@@ -471,8 +509,12 @@ class RecommendationControllerTest {
                 .andExpect(view().name("recommendation/status"))
                 .andExpect(model().attributeExists("view"))
                 .andExpect(model().attribute("from", "recommendation"))
+                .andExpect(model().attribute("backUrl", "/proposals/10"))
+                .andExpect(model().attribute("nextActionUrl",
+                        "/proposals/10/recommendations/results?runId=301&backUrl=%2Fproposals%2F10"))
                 .andExpect(model().attribute("refreshUrl",
-                        "/proposals/10/runs/301?from=recommendation"));
+                        "/proposals/10/runs/301?from=recommendation"))
+                .andExpect(content().string(containsString("backUrl=%2Fproposals%2F10")));
 
         then(recommendationRunQueryService).should()
                 .getRecommendationRunStatus(eq(PROPOSAL_ID), eq(RUN_ID), eq("client@example.com"));
@@ -534,7 +576,7 @@ class RecommendationControllerTest {
                 .andExpect(view().name("recommendation/error"))
                 .andExpect(model().attribute("title", "추천 실행 정보를 확인할 수 없습니다."))
                 .andExpect(model().attribute("message", "존재하지 않거나 만료된 추천 실행입니다."))
-                .andExpect(model().attribute("backUrl", "/proposals/" + PROPOSAL_ID + "?openRecommendModal=true"));
+                .andExpect(model().attribute("backUrl", "/proposals/" + PROPOSAL_ID));
     }
 
     @Test
