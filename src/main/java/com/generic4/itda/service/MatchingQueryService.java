@@ -7,6 +7,7 @@ import com.generic4.itda.domain.matching.constant.MatchingParticipantRole;
 import com.generic4.itda.domain.matching.constant.MatchingStatus;
 import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.proposal.ProposalPosition;
+import com.generic4.itda.domain.proposal.ProposalPositionStatus;
 import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
 import com.generic4.itda.dto.matching.MatchingCancellationReasonOptionViewModel;
 import com.generic4.itda.dto.matching.MatchingDetailContactViewModel;
@@ -99,9 +100,11 @@ public class MatchingQueryService {
                     ? "프리랜서 응답을 기다리는 중입니다."
                     : "매칭 요청이 도착했습니다.";
             case ACCEPTED -> "매칭이 수락되었습니다.";
-            case REJECTED -> VIEWER_ROLE_CLIENT.equals(viewerRole)
+            case REJECTED -> isClosedByClient(matching)
+                    ? "클라이언트가 모집을 종료했습니다."
+                    : (VIEWER_ROLE_CLIENT.equals(viewerRole)
                     ? "매칭 요청이 거절되었습니다."
-                    : "매칭 요청을 거절했습니다.";
+                    : "매칭 요청을 거절했습니다.");
             case IN_PROGRESS -> "프로젝트가 진행 중입니다.";
             case COMPLETED -> "프로젝트가 완료되었습니다.";
             case CANCELED -> isContractCancellation(matching) ? "계약이 취소되었습니다." : "매칭이 취소되었습니다.";
@@ -112,9 +115,11 @@ public class MatchingQueryService {
                     ? "프리랜서가 요청을 확인하고 응답하면 다음 단계로 넘어갈 수 있습니다."
                     : "요청 내용을 확인한 뒤 수락 또는 거절할 수 있습니다.";
             case ACCEPTED -> "연락처가 공개되었습니다. 제안서를 다시 확인하고 협의를 이어가세요.";
-            case REJECTED -> VIEWER_ROLE_CLIENT.equals(viewerRole)
+            case REJECTED -> isClosedByClient(matching)
+                    ? rejectedReasonLabel(matching)
+                    : (VIEWER_ROLE_CLIENT.equals(viewerRole)
                     ? "다른 추천 후보를 검토하거나 제안서 상태를 다시 확인해보세요."
-                    : "이 매칭은 종료 상태이며 추가 응답은 필요하지 않습니다.";
+                    : "이 매칭은 종료 상태이며 추가 응답은 필요하지 않습니다.");
             case IN_PROGRESS -> "프로젝트가 진행 중입니다. 연락처와 제안서 정보를 확인하며 협업을 이어가세요.";
             case COMPLETED -> "완료된 매칭입니다. 프로젝트 진행 이력을 확인할 수 있습니다.";
             case CANCELED -> isContractCancellation(matching)
@@ -195,9 +200,11 @@ public class MatchingQueryService {
         if (matching.getRejectedAt() != null) {
             timeline.add(new MatchingTimelineItemViewModel(
                     matching.getRejectedAt(),
-                    "프리랜서",
+                    isClosedByClient(matching) ? "클라이언트" : "프리랜서",
                     "매칭 요청 거절",
-                    "매칭 요청이 거절되어 이 매칭은 종료되었습니다."
+                    isClosedByClient(matching)
+                            ? rejectedReasonLabel(matching)
+                            : "매칭 요청이 거절되어 이 매칭은 종료되었습니다."
             ));
         }
 
@@ -290,7 +297,10 @@ public class MatchingQueryService {
         boolean activeCancellationRequest = matching.hasCancellationRequest();
         boolean hasCancellationInfo = activeCancellationRequest
                 || (matching.getStatus() == MatchingStatus.CANCELED
-                && matching.getCancellationRequestedBy() != null);
+                && matching.getCancellationRequestedBy() != null)
+                || (matching.getStatus() == MatchingStatus.REJECTED
+                && matching.getCancellationRequestedBy() != null
+                && rejectedReasonLabel(matching) != null);
         boolean requestedByCurrentUser = hasCancellationInfo
                 && matching.getCancellationRequestedBy() == currentRole;
 
@@ -302,8 +312,8 @@ public class MatchingQueryService {
                 activeCancellationRequest && !requestedByCurrentUser,
                 hasCancellationInfo ? roleLabel(matching.getCancellationRequestedBy()) : null,
                 hasCancellationInfo ? roleLabel(oppositeRole(matching.getCancellationRequestedBy())) : null,
-                matching.getCancellationReason() != null ? matching.getCancellationReason().getLabel() : null,
-                matching.getCancellationReasonDetail(),
+                resolveCancellationReasonLabel(matching),
+                resolveCancellationReasonDetail(matching),
                 matching.getCancellationRequestedAt(),
                 matching.getCancellationAutoCancelAt(),
                 cancellationReasonOptions(matching, currentRole)
@@ -335,6 +345,35 @@ public class MatchingQueryService {
                         reason.isOther()
                 ))
                 .toList();
+    }
+
+    private String resolveCancellationReasonLabel(Matching matching) {
+        if (matching.getCancellationReason() != null) {
+            return matching.getCancellationReason().getLabel();
+        }
+        if (matching.getStatus() == MatchingStatus.REJECTED && isClosedByClient(matching)) {
+            return "모집 종료";
+        }
+        return null;
+    }
+
+    private String resolveCancellationReasonDetail(Matching matching) {
+        if (matching.getStatus() == MatchingStatus.REJECTED && isClosedByClient(matching)) {
+            return matching.getCancellationReasonDetail();
+        }
+        return matching.getCancellationReasonDetail();
+    }
+
+    private boolean isClosedByClient(Matching matching) {
+        return matching.getStatus() == MatchingStatus.REJECTED
+                && matching.getCancellationRequestedBy() == MatchingParticipantRole.CLIENT
+                && matching.getProposalPosition().getStatus() == ProposalPositionStatus.CLOSED
+                && rejectedReasonLabel(matching) != null;
+    }
+
+    private String rejectedReasonLabel(Matching matching) {
+        String reasonDetail = matching.getCancellationReasonDetail();
+        return StringUtils.hasText(reasonDetail) ? reasonDetail : null;
     }
 
     private MatchingParticipantRole toParticipantRole(String viewerRole) {

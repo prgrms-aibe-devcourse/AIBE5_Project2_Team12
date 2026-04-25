@@ -208,6 +208,21 @@ class MatchingTest {
                 .hasMessage("취소 요청 중인 매칭은 완료 확인을 할 수 없습니다.");
     }
 
+    @Test
+    @DisplayName("클라이언트 모집 종료로 거절되면 종료 사유와 시각이 함께 기록된다")
+    void rejectByClientClosingPosition_recordsReason() {
+        Matching matching = proposedMatching();
+
+        matching.rejectByClientClosingPosition("클라이언트가 모집을 종료했습니다.");
+
+        assertThat(matching.getStatus()).isEqualTo(MatchingStatus.REJECTED);
+        assertThat(matching.getRejectedAt()).isNotNull();
+        assertThat(matching.getCancellationRequestedBy()).isEqualTo(MatchingParticipantRole.CLIENT);
+        assertThat(matching.getCancellationReason()).isNull();
+        assertThat(matching.getCancellationReasonDetail()).isEqualTo("클라이언트가 모집을 종료했습니다.");
+        assertThat(matching.getCancellationRequestedAt()).isEqualTo(matching.getRejectedAt());
+    }
+
     private Matching acceptedMatching() {
         Matching matching = proposedMatching();
         matching.accept();
