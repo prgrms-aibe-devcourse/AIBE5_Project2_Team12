@@ -457,6 +457,66 @@ class AiBriefProposalMapperTest {
     }
 
     @Test
+    @DisplayName("AI 인터뷰 적용은 proposalPositionId가 맞으면 AI 응답 category가 달라도 기존 직무 category를 유지한다")
+    void applyForInterview_keepsExistingCategoryWhenProposalPositionIdMatchesEvenIfAiCategoryDiffers() {
+        Proposal proposal = createProposal();
+        Position backend = Position.create("백엔드 개발자");
+        Position frontend = Position.create("프론트엔드 개발자");
+
+        ProposalPosition paymentBackendPosition = proposal.addPosition(
+                backend,
+                "결제 서버 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                3_000_000L,
+                4_000_000L,
+                3L,
+                3,
+                6,
+                null
+        );
+        setProposalPositionId(paymentBackendPosition, 101L);
+
+        given(positionResolver.resolve("프론트엔드 개발자")).willReturn(Optional.of(frontend));
+
+        AiBriefResult aiBriefResult = AiBriefResult.of(
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(
+                        AiBriefPositionResult.of(
+                                101L,
+                                "프론트엔드 개발자",
+                                "결제 플랫폼 백엔드 개발자",
+                                null,
+                                2L,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                List.of()
+                        )
+                )
+        );
+
+        aiBriefProposalMapper.applyForInterview(
+                proposal,
+                aiBriefResult,
+                "결제 서버 백엔드 개발자 제목을 결제 플랫폼 백엔드 개발자로 바꾸고 인원은 2명으로 해줘."
+        );
+
+        assertThat(proposal.getPositions()).hasSize(1);
+        assertThat(paymentBackendPosition.getPosition()).isSameAs(backend);
+        assertThat(paymentBackendPosition.getPosition()).isNotSameAs(frontend);
+        assertThat(paymentBackendPosition.getTitle()).isEqualTo("결제 플랫폼 백엔드 개발자");
+        assertThat(paymentBackendPosition.getHeadCount()).isEqualTo(2L);
+    }
+
+    @Test
     @DisplayName("AI 인터뷰 적용은 title 변경 결과가 같은 category의 다른 모집 단위와 충돌하면 기존 title을 유지한다")
     void applyForInterview_keepsExistingTitleWhenTitleChangeConflictsWithSibling() {
         Proposal proposal = createProposal();

@@ -176,12 +176,13 @@ public class AiBriefProposalMapper {
             PositionApplication application
     ) {
         AiBriefPositionResult result = application.result();
+        Position position = resolveInterviewPosition(proposalPosition, application);
         ProposalWorkType workType = resolveInterviewWorkType(proposalPosition, result);
         String workPlace = resolveInterviewWorkPlace(proposalPosition, result, workType);
 
         proposalPosition.update(
-                application.position(),
-                resolveInterviewTitle(proposal, proposalPosition, application),
+                position,
+                resolveInterviewTitle(proposal, proposalPosition, position, result),
                 workType,
                 resolveInterviewHeadCount(proposalPosition, result),
                 resolveInterviewUnitBudgetMin(proposalPosition, result),
@@ -193,17 +194,24 @@ public class AiBriefProposalMapper {
         );
     }
 
+    private Position resolveInterviewPosition(ProposalPosition proposalPosition, PositionApplication application) {
+        if (hasProposalPositionId(application)) {
+            return proposalPosition.getPosition();
+        }
+        return application.position();
+    }
+
     private String resolveInterviewTitle(
             Proposal proposal,
             ProposalPosition proposalPosition,
-            PositionApplication application
+            Position position,
+            AiBriefPositionResult result
     ) {
-        AiBriefPositionResult result = application.result();
         if (!StringUtils.hasText(result.getTitle())) {
             return proposalPosition.getTitle();
         }
 
-        if (hasTitleConflict(proposal, proposalPosition, application.position(), result.getTitle())) {
+        if (hasTitleConflict(proposal, proposalPosition, position, result.getTitle())) {
             return proposalPosition.getTitle();
         }
 
