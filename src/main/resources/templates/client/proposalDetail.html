@@ -62,6 +62,18 @@
                                 <i data-lucide="sparkles" class="h-4 w-4"></i>
                                 추천 받아 보기
                             </button>
+
+                            <form th:if="${viewerRole == 'CLIENT' and proposal.status.name() == 'MATCHING'}"
+                                  th:action="@{/proposals/{id}/complete(id=${proposal.id})}"
+                                  method="post"
+                                  class="inline"
+                                  onsubmit="return confirm('제안서를 종료하시겠습니까? 모든 포지션의 모집이 종료되고, 대기 중인 매칭 요청이 거절됩니다.')">
+                                <button type="submit"
+                                        class="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-500 transition hover:border-red-300 hover:text-red-600">
+                                    <i data-lucide="square" class="h-4 w-4"></i>
+                                    제안서 모집 종료
+                                </button>
+                            </form>
                             
                             <span th:if="${proposal.status.name() == 'COMPLETE'}"
                                   class="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm font-bold text-emerald-600">
