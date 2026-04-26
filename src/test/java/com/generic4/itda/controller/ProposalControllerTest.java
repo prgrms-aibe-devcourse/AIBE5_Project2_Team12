@@ -895,7 +895,10 @@ class ProposalControllerTest {
     @Test
     @DisplayName("모집 포지션 종료 요청 시 proposalId와 positionId를 함께 검증하도록 서비스에 전달한다")
     void closePositionPassesProposalAndPositionIdsToService() throws Exception {
+        Proposal proposal = org.mockito.Mockito.mock(Proposal.class);
+        given(proposal.getStatus()).willReturn(ProposalStatus.MATCHING);
         ProposalPosition position = org.mockito.Mockito.mock(ProposalPosition.class);
+        given(position.getProposal()).willReturn(proposal);
         given(proposalService.closePosition(1L, 10L, "client@example.com")).willReturn(position);
 
         ItDaPrincipal principal = ItDaPrincipal.from(
@@ -912,6 +915,30 @@ class ProposalControllerTest {
                 .andExpect(flash().attribute("noticeMessage", "해당 포지션의 모집이 종료되었습니다."));
 
         then(proposalService).should().closePosition(1L, 10L, "client@example.com");
+    }
+
+    @Test
+    @DisplayName("마지막 포지션 종료 시 자동 완료되면 안내 메시지가 포함된다")
+    void closePositionShowsAutoCompleteMessage() throws Exception {
+        Proposal proposal = org.mockito.Mockito.mock(Proposal.class);
+        given(proposal.getStatus()).willReturn(ProposalStatus.COMPLETE);
+        ProposalPosition position = org.mockito.Mockito.mock(ProposalPosition.class);
+        given(position.getProposal()).willReturn(proposal);
+        given(proposalService.closePosition(1L, 10L, "client@example.com")).willReturn(position);
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(post("/proposals/1/positions/10/close")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        )))
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/proposals/1"))
+                .andExpect(flash().attribute("noticeMessage",
+                        "해당 포지션의 모집이 종료되었습니다. 모든 포지션이 종료되어 제안서가 완료 처리되었습니다."));
     }
 
     @Test
@@ -1084,5 +1111,89 @@ class ProposalControllerTest {
                 .andExpect(view().name("client/proposalDetail"))
                 .andExpect(model().attribute("viewerRole", "CLIENT"))
                 .andExpect(model().attributeDoesNotExist("recommendEntry"));
+    }
+
+    // ── completeProposal 테스트 ──
+
+    @Test
+    @DisplayName("제안서 종료 요청이 성공하면 성공 메시지와 함께 제안서 상세로 리다이렉트된다")
+    void completeProposalRedirectsWithSuccessMessage() throws Exception {
+        Proposal proposal = org.mockito.Mockito.mock(Proposal.class);
+        given(proposalService.completeProposal(1L, "client@example.com")).willReturn(proposal);
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라���언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(post("/proposals/1/complete")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        )))
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/proposals/1"))
+                .andExpect(flash().attribute("noticeMessage", "제안서가 종료되었습니다."));
+
+        then(proposalService).should().completeProposal(1L, "client@example.com");
+    }
+
+    @Test
+    @DisplayName("MATCHING이 아닌 제안서 종료 요청이면 에러 메시지와 함께 리다이렉트된다")
+    void completeProposalRedirectsWithErrorForInvalidState() throws Exception {
+        willThrow(new IllegalStateException("매칭 중인 제안서만 종료할 수 있습니다."))
+                .given(proposalService).completeProposal(1L, "client@example.com");
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언��", "010-1234-5678")
+        );
+
+        mockMvc.perform(post("/proposals/1/complete")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        )))
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/proposals/1"))
+                .andExpect(flash().attribute("errorMessage", "매칭 중인 제안서만 종료할 수 있습니다."));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 제안서 종료 요청이면 에러 메시지와 함께 리다이렉트된다")
+    void completeProposalRedirectsWithErrorForNotFound() throws Exception {
+        willThrow(new ProposalNotFoundException("제안서를 찾을 수 없습니다."))
+                .given(proposalService).completeProposal(999L, "client@example.com");
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(post("/proposals/999/complete")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        )))
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/proposals/999"))
+                .andExpect(flash().attribute("errorMessage", "존재하지 않는 제안서입니다."));
+    }
+
+    @Test
+    @DisplayName("소유자가 아닌 사용자의 제안서 종료 요청이면 에러 메시지와 함께 리다이렉트된다")
+    void completeProposalRedirectsWithErrorForAccessDenied() throws Exception {
+        willThrow(new AccessDeniedException("본인 제안서만 조회하거나 수정할 수 있습니다."))
+                .given(proposalService).completeProposal(1L, "other@example.com");
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("other@example.com", "hashed-password", "다른사용자", "010-9999-9999")
+        );
+
+        mockMvc.perform(post("/proposals/1/complete")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        )))
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/proposals/1"))
+                .andExpect(flash().attribute("errorMessage", "본인 제안서만 종료할 수 있습니다."));
     }
 }

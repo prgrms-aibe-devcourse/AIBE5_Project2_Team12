@@ -279,12 +279,36 @@ public class ProposalController {
             RedirectAttributes redirectAttributes
     ) {
         try {
-            proposalService.closePosition(proposalId, positionId, principal.getEmail());
-            redirectAttributes.addFlashAttribute("noticeMessage", "해당 포지션의 모집이 종료되었습니다.");
+            ProposalPosition closedPosition = proposalService.closePosition(proposalId, positionId, principal.getEmail());
+            if (closedPosition.getProposal().getStatus() == ProposalStatus.COMPLETE) {
+                redirectAttributes.addFlashAttribute("noticeMessage",
+                        "해당 포지션의 모집이 종료되었습니다. 모든 포지션이 종료되어 제안서가 완료 처리되었습니다.");
+            } else {
+                redirectAttributes.addFlashAttribute("noticeMessage", "해당 포지션의 모집이 종료되었습니다.");
+            }
         } catch (IllegalArgumentException e) {
             redirectAttributes.addFlashAttribute("errorMessage", "존재하지 않는 모집 포지션입니다.");
         } catch (AccessDeniedException e) {
             redirectAttributes.addFlashAttribute("errorMessage", "본인 제안서의 모집 포지션만 종료할 수 있습니다.");
+        } catch (IllegalStateException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
+        }
+        return "redirect:/proposals/" + proposalId;
+    }
+
+    @PostMapping("/{proposalId}/complete")
+    public String completeProposal(
+            @PathVariable Long proposalId,
+            @AuthenticationPrincipal ItDaPrincipal principal,
+            RedirectAttributes redirectAttributes
+    ) {
+        try {
+            proposalService.completeProposal(proposalId, principal.getEmail());
+            redirectAttributes.addFlashAttribute("noticeMessage", "제안서가 종료되었습니다.");
+        } catch (ProposalNotFoundException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", "존재하지 않는 제안서입니다.");
+        } catch (AccessDeniedException e) {
+            redirectAttributes.addFlashAttribute("errorMessage", "본인 제안서만 종료할 수 있습니다.");
         } catch (IllegalStateException e) {
             redirectAttributes.addFlashAttribute("errorMessage", e.getMessage());
         }
