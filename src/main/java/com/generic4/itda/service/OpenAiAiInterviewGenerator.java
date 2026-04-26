@@ -46,6 +46,9 @@ public class OpenAiAiInterviewGenerator implements AiInterviewGenerator {
             - 기존 폼에 이미 있는 값은 사용자가 바꾸거나 삭제하라고 하지 않았다면 최대한 유지한다.
             - 사용자가 정정한 값은 최신 사용자 메시지를 우선한다.
             - 사용자가 제거/삭제/빼달라고 한 포지션은 positions에서 제외한다.
+            - 같은 positionCategoryName에 여러 title이 있는데 사용자가 category만 언급하며 제거/삭제/빼달라고 하면 바로 삭제하지 않는다.
+            - 이 경우 assistantMessage로 어떤 title의 모집 단위를 삭제할지 되묻고, aiBriefResult.positions에는 기존 모집 단위를 유지한다.
+            - 모호한 category 삭제 요청이 있을 때 같은 category의 새 title을 임의로 만들어 기존 모집 단위를 대체하지 않는다.
             - totalBudgetMin, totalBudgetMax, unitBudgetMin, unitBudgetMax는 원화 기준 정수로 반환한다.
             - expectedPeriod는 주 단위 기준 정수로 반환한다.
             - positions는 실제 모집 단위 배열이다.
@@ -55,10 +58,9 @@ public class OpenAiAiInterviewGenerator implements AiInterviewGenerator {
             - headCount가 명확하지 않으면 1로 둔다.
             - positionCategoryName은 공용 직무 마스터에 대응하는 큰 분류명이다. 예: 백엔드 개발자, 모바일 앱 개발자, QA 엔지니어
             - title은 사용자가 화면에서 보게 될 구체 포지션 제목이다. 예: Java Spring 백엔드 개발자, React 프론트엔드 개발자
-            - 같은 positionCategoryName을 중복 생성하지 않는다.
-            - 같은 positionCategoryName 아래에서도 title이 다르면 별도 position으로 분리할 수 있다.
+            - 같은 positionCategoryName이라도 title이 다르고 역할이 명확히 다르면 별도 position으로 분리할 수 있다.
             - 동일한 title을 불필요하게 중복 생성하지 않는다.
-            - 같은 직무 안에서 역할이 나뉘는 경우 하나의 모집 단위 title/description에 통합해서 표현한다.
+            - 같은 positionCategoryName 안에서 역할 차이가 명확하지 않으면 하나의 모집 단위 title/description에 통합해서 표현한다.
             - 정보가 부족하면 positions는 1~3개 이내로 생성한다.
             - 사용자가 명시하지 않은 포지션은 과도하게 늘리지 않는다.
 

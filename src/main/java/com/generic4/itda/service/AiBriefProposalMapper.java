@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -38,14 +39,14 @@ public class AiBriefProposalMapper {
         Assert.notNull(aiBriefResult, "AI 브리프 결과는 필수값입니다.");
 
         applyProposalFields(proposal, aiBriefResult);
-        mergePositions(proposal, aiBriefResult.getPositions(), true, Set.of());
+        mergePositions(proposal, aiBriefResult.getPositions(), true, DeletedPositionKeys.empty());
     }
 
     public void applyForInterview(Proposal proposal, AiBriefResult aiBriefResult, String userMessage) {
         Assert.notNull(proposal, "제안서는 필수값입니다.");
         Assert.notNull(aiBriefResult, "AI 브리프 결과는 필수값입니다.");
 
-        Set<String> deletedPositionKeys = removeExplicitlyDeletedPositions(proposal, userMessage);
+        DeletedPositionKeys deletedPositionKeys = removeExplicitlyDeletedPositions(proposal, userMessage);
         applyProposalFields(proposal, aiBriefResult);
         mergePositions(proposal, aiBriefResult.getPositions(), false, deletedPositionKeys);
     }
@@ -65,26 +66,36 @@ public class AiBriefProposalMapper {
             Proposal proposal,
             List<AiBriefPositionResult> positionResults,
             boolean removePositionsNotInAiResult,
-            Set<String> ignoredPositionKeys
+            DeletedPositionKeys ignoredPositionKeys
     ) {
         if (positionResults == null || positionResults.isEmpty()) {
             return;
         }
 
-        Map<String, ProposalPosition> existingByPositionName = existingPositionsByPositionName(proposal);
-        List<PositionApplication> applications = mergePositionApplicationsByPositionName(positionResults);
+        List<PositionApplication> applications = mergePositionApplicationsByPositionKey(positionResults);
         if (applications.isEmpty()) {
             return;
         }
+
+        Map<String, ProposalPosition> existingByPositionKey = existingPositionsByPositionKey(proposal);
+        Map<String, List<ProposalPosition>> existingByCategoryKey = existingPositionsByCategoryKey(proposal);
+        Map<String, Long> applicationCountByCategoryKey = applicationCountByCategoryKey(applications);
         Set<ProposalPosition> appliedPositions = new HashSet<>();
 
         for (PositionApplication application : applications) {
-            String positionKey = normalizeKey(application.position().getName());
-            if (ignoredPositionKeys.contains(positionKey)) {
+            String positionKey = positionKey(application.position(), application.result().getTitle());
+            String categoryKey = categoryKey(application.position());
+            if (ignoredPositionKeys.positionKeys().contains(positionKey)
+                    || ignoredPositionKeys.categoryKeys().contains(categoryKey)) {
                 continue;
             }
 
-            ProposalPosition proposalPosition = existingByPositionName.get(positionKey);
+            ProposalPosition proposalPosition = findExistingPosition(
+                    application,
+                    existingByPositionKey,
+                    existingByCategoryKey,
+                    applicationCountByCategoryKey
+            );
             AiBriefPositionResult result = application.result();
             ProposalWorkType workType = resolveWorkType(result);
             String workPlace = resolveWorkPlace(workType, result.getWorkPlace());
@@ -126,30 +137,40 @@ public class AiBriefProposalMapper {
         }
     }
 
-    private Set<String> removeExplicitlyDeletedPositions(Proposal proposal, String userMessage) {
+    private DeletedPositionKeys removeExplicitlyDeletedPositions(Proposal proposal, String userMessage) {
         Set<String> deletedPositionKeys = new HashSet<>();
+        Set<String> deletedCategoryKeys = new HashSet<>();
         if (!StringUtils.hasText(userMessage)) {
-            return deletedPositionKeys;
+            return new DeletedPositionKeys(deletedPositionKeys, deletedCategoryKeys);
         }
 
         List<String> messageParts = splitMessageParts(userMessage);
         List<ProposalPosition> existingPositions = new ArrayList<>(proposal.getPositions());
+        Map<String, List<ProposalPosition>> existingByCategoryKey = existingPositionsByCategoryKey(proposal);
 
         for (ProposalPosition existingPosition : existingPositions) {
-            if (isExplicitlyDeleted(existingPosition, messageParts)) {
-                if (existingPosition.getPosition() != null) {
-                    deletedPositionKeys.add(normalizeKey(existingPosition.getPosition().getName()));
-                }
+            DeleteDecision deleteDecision = decideDeletion(existingPosition, existingByCategoryKey, messageParts);
+            if (deleteDecision.ignoreCategory()) {
+                deletedCategoryKeys.add(categoryKey(existingPosition));
+            }
+            if (deleteDecision.deletePosition()) {
+                deletedPositionKeys.add(positionKey(existingPosition));
                 proposal.removePosition(existingPosition);
             }
         }
 
-        return deletedPositionKeys;
+        return new DeletedPositionKeys(deletedPositionKeys, deletedCategoryKeys);
     }
 
-    private boolean isExplicitlyDeleted(ProposalPosition existingPosition, List<String> messageParts) {
+    private DeleteDecision decideDeletion(
+            ProposalPosition existingPosition,
+            Map<String, List<ProposalPosition>> existingByCategoryKey,
+            List<String> messageParts
+    ) {
+        String categoryKey = categoryKey(existingPosition);
         String positionName = existingPosition.getPosition() == null ? "" : existingPosition.getPosition().getName();
         String title = existingPosition.getTitle();
+        int sameCategoryCount = existingByCategoryKey.getOrDefault(categoryKey, List.of()).size();
 
         for (String messagePart : messageParts) {
             if (!hasDeleteIntent(messagePart)) {
@@ -157,15 +178,22 @@ public class AiBriefProposalMapper {
             }
 
             String normalizedMessagePart = normalizeForContains(messagePart);
-            boolean positionNameMatched = containsNormalized(normalizedMessagePart, positionName);
             boolean titleMatched = containsNormalized(normalizedMessagePart, title);
+            boolean positionNameMatched = containsNormalized(normalizedMessagePart, positionName);
 
-            if (positionNameMatched || titleMatched) {
-                return true;
+            if (titleMatched) {
+                return new DeleteDecision(true, false);
+            }
+
+            if (positionNameMatched) {
+                if (sameCategoryCount == 1) {
+                    return new DeleteDecision(true, true);
+                }
+                return new DeleteDecision(false, true);
             }
         }
 
-        return false;
+        return new DeleteDecision(false, false);
     }
 
     private List<String> splitMessageParts(String userMessage) {
@@ -217,17 +245,30 @@ public class AiBriefProposalMapper {
         }
     }
 
-    private Map<String, ProposalPosition> existingPositionsByPositionName(Proposal proposal) {
+    private Map<String, ProposalPosition> existingPositionsByPositionKey(Proposal proposal) {
         Map<String, ProposalPosition> existingPositions = new LinkedHashMap<>();
         for (ProposalPosition proposalPosition : proposal.getPositions()) {
             if (proposalPosition.getPosition() != null && StringUtils.hasText(proposalPosition.getPosition().getName())) {
-                existingPositions.put(normalizeKey(proposalPosition.getPosition().getName()), proposalPosition);
+                existingPositions.put(positionKey(proposalPosition), proposalPosition);
             }
         }
         return existingPositions;
     }
 
-    private List<PositionApplication> mergePositionApplicationsByPositionName(List<AiBriefPositionResult> positionResults) {
+    private Map<String, List<ProposalPosition>> existingPositionsByCategoryKey(Proposal proposal) {
+        Map<String, List<ProposalPosition>> existingPositions = new LinkedHashMap<>();
+        for (ProposalPosition proposalPosition : proposal.getPositions()) {
+            if (proposalPosition.getPosition() == null || !StringUtils.hasText(proposalPosition.getPosition().getName())) {
+                continue;
+            }
+
+            String categoryKey = normalizeKey(proposalPosition.getPosition().getName());
+            existingPositions.computeIfAbsent(categoryKey, ignored -> new ArrayList<>()).add(proposalPosition);
+        }
+        return existingPositions;
+    }
+
+    private List<PositionApplication> mergePositionApplicationsByPositionKey(List<AiBriefPositionResult> positionResults) {
         Map<String, PositionApplication> merged = new LinkedHashMap<>();
 
         for (AiBriefPositionResult positionResult : positionResults) {
@@ -237,10 +278,44 @@ public class AiBriefProposalMapper {
             }
 
             Position position = resolvedPosition.get();
-            merged.put(normalizeKey(position.getName()), new PositionApplication(position, positionResult));
+            merged.put(positionKey(position, positionResult.getTitle()), new PositionApplication(position, positionResult));
         }
 
         return new ArrayList<>(merged.values());
+    }
+
+    private Map<String, Long> applicationCountByCategoryKey(List<PositionApplication> applications) {
+        Map<String, Long> countByCategory = new LinkedHashMap<>();
+
+        for (PositionApplication application : applications) {
+            String categoryKey = normalizeKey(application.position().getName());
+            countByCategory.put(categoryKey, countByCategory.getOrDefault(categoryKey, 0L) + 1L);
+        }
+
+        return countByCategory;
+    }
+
+    private ProposalPosition findExistingPosition(
+            PositionApplication application,
+            Map<String, ProposalPosition> existingByPositionKey,
+            Map<String, List<ProposalPosition>> existingByCategoryKey,
+            Map<String, Long> applicationCountByCategoryKey
+    ) {
+        String positionKey = positionKey(application.position(), application.result().getTitle());
+        ProposalPosition exactMatch = existingByPositionKey.get(positionKey);
+        if (exactMatch != null) {
+            return exactMatch;
+        }
+
+        String categoryKey = normalizeKey(application.position().getName());
+        List<ProposalPosition> categoryMatches = existingByCategoryKey.getOrDefault(categoryKey, List.of());
+        Long categoryApplicationCount = applicationCountByCategoryKey.getOrDefault(categoryKey, 0L);
+
+        if (categoryMatches.size() == 1 && categoryApplicationCount == 1L) {
+            return categoryMatches.get(0);
+        }
+
+        return null;
     }
 
     private Long resolveHeadCount(AiBriefPositionResult result) {
@@ -352,13 +427,50 @@ public class AiBriefProposalMapper {
         return proposal.getExpectedPeriod();
     }
 
+    private String positionKey(ProposalPosition proposalPosition) {
+        if (proposalPosition == null || proposalPosition.getPosition() == null) {
+            return "";
+        }
+        return positionKey(proposalPosition.getPosition(), proposalPosition.getTitle());
+    }
+
+    private String positionKey(Position position, String title) {
+        return categoryKey(position) + "::" + normalizeKey(title);
+    }
+
+    private String categoryKey(ProposalPosition proposalPosition) {
+        if (proposalPosition == null || proposalPosition.getPosition() == null) {
+            return "";
+        }
+        return categoryKey(proposalPosition.getPosition());
+    }
+
+    private String categoryKey(Position position) {
+        return position == null ? "" : normalizeKey(position.getName());
+    }
+
     private String normalizeKey(String value) {
-        return value == null ? "" : value.trim();
+        if (value == null) {
+            return "";
+        }
+        return value.toLowerCase(Locale.ROOT)
+                .replaceAll("\\s+", "")
+                .trim();
     }
 
     private record PositionApplication(Position position, AiBriefPositionResult result) {
     }
 
     private record SkillApplication(Skill skill, ProposalPositionSkillImportance importance) {
+    }
+
+    private record DeletedPositionKeys(Set<String> positionKeys, Set<String> categoryKeys) {
+
+        private static DeletedPositionKeys empty() {
+            return new DeletedPositionKeys(Set.of(), Set.of());
+        }
+    }
+
+    private record DeleteDecision(boolean deletePosition, boolean ignoreCategory) {
     }
 }
