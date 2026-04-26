@@ -55,10 +55,9 @@ public class OpenAiAiInterviewGenerator implements AiInterviewGenerator {
             - headCount가 명확하지 않으면 1로 둔다.
             - positionCategoryName은 공용 직무 마스터에 대응하는 큰 분류명이다. 예: 백엔드 개발자, 모바일 앱 개발자, QA 엔지니어
             - title은 사용자가 화면에서 보게 될 구체 포지션 제목이다. 예: Java Spring 백엔드 개발자, React 프론트엔드 개발자
-            - 같은 positionCategoryName을 중복 생성하지 않는다.
-            - 같은 positionCategoryName 아래에서도 title이 다르면 별도 position으로 분리할 수 있다.
+            - 같은 positionCategoryName이라도 title이 다르고 역할이 명확히 다르면 별도 position으로 분리할 수 있다.
             - 동일한 title을 불필요하게 중복 생성하지 않는다.
-            - 같은 직무 안에서 역할이 나뉘는 경우 하나의 모집 단위 title/description에 통합해서 표현한다.
+            - 같은 positionCategoryName 안에서 역할 차이가 명확하지 않으면 하나의 모집 단위 title/description에 통합해서 표현한다.
             - 정보가 부족하면 positions는 1~3개 이내로 생성한다.
             - 사용자가 명시하지 않은 포지션은 과도하게 늘리지 않는다.
 
