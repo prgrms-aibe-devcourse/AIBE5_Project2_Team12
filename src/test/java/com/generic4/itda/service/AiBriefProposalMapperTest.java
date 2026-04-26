@@ -1379,6 +1379,92 @@ class AiBriefProposalMapperTest {
     }
 
     @Test
+    @DisplayName("AI 인터뷰 skillChanges REMOVE는 사용자 메시지에 해당 스킬 삭제 의도가 없으면 무시한다")
+    void applyForInterview_ignoresRemoveSkillChangeWhenUserMessageHasNoSkillDeleteIntent() {
+        Proposal proposal = createProposalWithExpectedPeriod(8L);
+        Position backend = Position.create("백엔드 개발자");
+        Skill java = Skill.create("Java", null);
+        Skill springBoot = Skill.create("Spring Boot", null);
+        Skill redis = Skill.create("Redis", null);
+
+        ProposalPosition backendPosition = proposal.addPosition(
+                backend,
+                "결제 서버 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                3_000_000L,
+                4_000_000L,
+                8L,
+                3,
+                6,
+                null
+        );
+        backendPosition.addSkill(java, ProposalPositionSkillImportance.PREFERENCE);
+        backendPosition.addSkill(springBoot, ProposalPositionSkillImportance.PREFERENCE);
+        setProposalPositionId(backendPosition, 101L);
+
+        given(positionResolver.resolve("백엔드 개발자")).willReturn(Optional.of(backend));
+        given(skillResolver.resolve("Java")).willReturn(Optional.of(java));
+        given(skillResolver.resolve("Spring Boot")).willReturn(Optional.of(springBoot));
+        given(skillResolver.resolve("Redis")).willReturn(Optional.of(redis));
+
+        AiBriefResult aiBriefResult = AiBriefResult.of(
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(
+                        AiBriefPositionResult.of(
+                                101L,
+                                "백엔드 개발자",
+                                "결제 서버 백엔드 개발자",
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                List.of(),
+                                List.of(
+                                        AiInterviewSkillChangeResult.of(
+                                                AiInterviewSkillChangeAction.ADD,
+                                                "Redis",
+                                                ProposalPositionSkillImportance.PREFERENCE
+                                        ),
+                                        AiInterviewSkillChangeResult.of(
+                                                AiInterviewSkillChangeAction.REMOVE,
+                                                "Spring Boot",
+                                                null
+                                        ),
+                                        AiInterviewSkillChangeResult.of(
+                                                AiInterviewSkillChangeAction.UPDATE_IMPORTANCE,
+                                                "Java",
+                                                ProposalPositionSkillImportance.ESSENTIAL
+                                        )
+                                )
+                        )
+                )
+        );
+
+        aiBriefProposalMapper.applyForInterview(
+                proposal,
+                aiBriefResult,
+                "결제 서버 백엔드 개발자에 Redis 추가하고 Java는 필수로 바꿔줘."
+        );
+
+        assertThat(backendPosition.getSkills())
+                .extracting(skill -> skill.getSkill().getName(), skill -> skill.getImportance())
+                .containsExactly(
+                        tuple("Java", ProposalPositionSkillImportance.ESSENTIAL),
+                        tuple("Spring Boot", ProposalPositionSkillImportance.PREFERENCE),
+                        tuple("Redis", ProposalPositionSkillImportance.PREFERENCE)
+                );
+    }
+
+    @Test
     @DisplayName("AI 인터뷰 skillChanges ADD importance가 null이면 우대로 추가한다")
     void applyForInterview_addsSkillChangeAsPreferenceWhenAddImportanceIsNull() {
         Proposal proposal = createProposalWithExpectedPeriod(8L);

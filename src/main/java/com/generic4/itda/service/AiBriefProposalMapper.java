@@ -41,7 +41,7 @@ public class AiBriefProposalMapper {
         Assert.notNull(aiBriefResult, "AI 브리프 결과는 필수값입니다.");
 
         applyProposalFields(proposal, aiBriefResult);
-        mergePositions(proposal, aiBriefResult.getPositions(), PositionMergeMode.AI_BRIEF, DeletedPositionKeys.empty());
+        mergePositions(proposal, aiBriefResult.getPositions(), PositionMergeMode.AI_BRIEF, DeletedPositionKeys.empty(), null);
     }
 
     public void applyForInterview(Proposal proposal, AiBriefResult aiBriefResult, String userMessage) {
@@ -50,7 +50,7 @@ public class AiBriefProposalMapper {
 
         DeletedPositionKeys deletedPositionKeys = removeExplicitlyDeletedPositions(proposal, userMessage);
         applyProposalFields(proposal, aiBriefResult);
-        mergePositions(proposal, aiBriefResult.getPositions(), PositionMergeMode.AI_INTERVIEW, deletedPositionKeys);
+        mergePositions(proposal, aiBriefResult.getPositions(), PositionMergeMode.AI_INTERVIEW, deletedPositionKeys, userMessage);
     }
 
     private void applyProposalFields(Proposal proposal, AiBriefResult aiBriefResult) {
@@ -68,7 +68,8 @@ public class AiBriefProposalMapper {
             Proposal proposal,
             List<AiBriefPositionResult> positionResults,
             PositionMergeMode mergeMode,
-            DeletedPositionKeys ignoredPositionKeys
+            DeletedPositionKeys ignoredPositionKeys,
+            String userMessage
     ) {
         if (positionResults == null || positionResults.isEmpty()) {
             if (mergeMode == PositionMergeMode.AI_BRIEF) {
@@ -118,7 +119,7 @@ public class AiBriefProposalMapper {
             } else if (mergeMode == PositionMergeMode.AI_INTERVIEW) {
                 updateExistingPositionForInterview(proposal, proposalPosition, application);
                 mergeSkillsForInterview(proposalPosition, application.result().getSkills());
-                applySkillChangesForInterview(proposalPosition, application.result().getSkillChanges());
+                applySkillChangesForInterview(proposalPosition, application.result().getSkillChanges(), userMessage);
             } else {
                 updateExistingPositionForAiBrief(proposalPosition, application);
                 replaceSkills(proposalPosition, application.result().getSkills());
@@ -627,7 +628,8 @@ public class AiBriefProposalMapper {
 
     private void applySkillChangesForInterview(
             ProposalPosition proposalPosition,
-            List<AiInterviewSkillChangeResult> skillChanges
+            List<AiInterviewSkillChangeResult> skillChanges,
+            String userMessage
     ) {
         if (skillChanges == null || skillChanges.isEmpty()) {
             return;
@@ -643,14 +645,15 @@ public class AiBriefProposalMapper {
                 continue;
             }
 
-            applySkillChangeForInterview(proposalPosition, resolvedSkill.get(), skillChange);
+            applySkillChangeForInterview(proposalPosition, resolvedSkill.get(), skillChange, userMessage);
         }
     }
 
     private void applySkillChangeForInterview(
             ProposalPosition proposalPosition,
             Skill skill,
-            AiInterviewSkillChangeResult skillChange
+            AiInterviewSkillChangeResult skillChange,
+            String userMessage
     ) {
         if (skillChange.getAction() == AiInterviewSkillChangeAction.ADD) {
             addSkillForInterview(proposalPosition, skill, skillChange.getImportance());
@@ -658,13 +661,23 @@ public class AiBriefProposalMapper {
         }
 
         if (skillChange.getAction() == AiInterviewSkillChangeAction.REMOVE) {
-            removeSkillForInterview(proposalPosition, skill);
+            if (canRemoveSkill(userMessage, skillChange.getSkillName())) {
+                removeSkillForInterview(proposalPosition, skill);
+            }
             return;
         }
 
         if (skillChange.getAction() == AiInterviewSkillChangeAction.UPDATE_IMPORTANCE) {
             updateSkillImportanceForInterview(proposalPosition, skill, skillChange.getImportance());
         }
+    }
+
+    private boolean canRemoveSkill(String userMessage, String skillName) {
+        if (!StringUtils.hasText(userMessage) || !StringUtils.hasText(skillName)) {
+            return false;
+        }
+
+        return hasTargetedDeleteIntent(normalizeForContains(userMessage), skillName);
     }
 
     private void addSkillForInterview(
