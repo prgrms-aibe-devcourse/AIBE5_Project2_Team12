@@ -171,8 +171,8 @@ public class Matching extends BaseTimeEntity {
     }
 
     public void rejectByClientClosingPosition(String reasonDetail) {
-        if (this.status != MatchingStatus.PROPOSED) {
-            throw new IllegalStateException("제안 상태의 매칭만 거절할 수 있습니다.");
+        if (this.status != MatchingStatus.PROPOSED && this.status != MatchingStatus.ACCEPTED) {
+            throw new IllegalStateException("제안 또는 수락 상태의 매칭만 거절할 수 있습니다.");
         }
 
         LocalDateTime now = LocalDateTime.now();

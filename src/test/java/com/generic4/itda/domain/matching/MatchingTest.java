@@ -223,6 +223,20 @@ class MatchingTest {
         assertThat(matching.getCancellationRequestedAt()).isEqualTo(matching.getRejectedAt());
     }
 
+    @Test
+    @DisplayName("수락된 매칭도 클라이언트 모집 종료로 거절 처리할 수 있다")
+    void rejectByClientClosingPosition_allowsAcceptedMatching() {
+        Matching matching = acceptedMatching();
+
+        matching.rejectByClientClosingPosition("클라이언트가 모집을 종료했습니다.");
+
+        assertThat(matching.getStatus()).isEqualTo(MatchingStatus.REJECTED);
+        assertThat(matching.getAcceptedAt()).isNotNull();
+        assertThat(matching.getRejectedAt()).isNotNull();
+        assertThat(matching.getCancellationRequestedBy()).isEqualTo(MatchingParticipantRole.CLIENT);
+        assertThat(matching.getCancellationReasonDetail()).isEqualTo("클라이언트가 모집을 종료했습니다.");
+    }
+
     private Matching acceptedMatching() {
         Matching matching = proposedMatching();
         matching.accept();

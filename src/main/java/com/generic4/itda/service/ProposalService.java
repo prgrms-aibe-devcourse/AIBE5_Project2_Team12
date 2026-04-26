@@ -226,7 +226,7 @@ public class ProposalService {
             throw new IllegalStateException("이미 종료된 모집 포지션입니다.");
         }
 
-        rejectPendingMatchings(positionId, memberEmail, POSITION_CLOSED_REJECTION_REASON);
+        rejectClosableMatchings(positionId, memberEmail, POSITION_CLOSED_REJECTION_REASON);
         position.changeStatus(ProposalPositionStatus.CLOSED);
 
         boolean allClosed = proposal.getPositions().stream()
@@ -249,7 +249,7 @@ public class ProposalService {
                 .orElseThrow(() -> new ProposalNotFoundException("제안서를 찾을 수 없습니다. id=" + proposalId));
 
         for (ProposalPosition position : proposalWithPositions.getPositions()) {
-            rejectPendingMatchings(position.getId(), memberEmail, PROPOSAL_CLOSED_REJECTION_REASON);
+            rejectClosableMatchings(position.getId(), memberEmail, PROPOSAL_CLOSED_REJECTION_REASON);
             if (position.getStatus() != ProposalPositionStatus.CLOSED) {
                 position.changeStatus(ProposalPositionStatus.CLOSED);
             }
@@ -267,14 +267,15 @@ public class ProposalService {
         return calculateTotalBudgetMax(getPositionForms(form));
     }
 
-    private void rejectPendingMatchings(Long positionId, String memberEmail, String reason) {
+    private void rejectClosableMatchings(Long positionId, String memberEmail, String reason) {
         List<Matching> matchings = matchingRepository.findByProposalPosition_IdAndClientMember_Email_Value(
                 positionId,
                 memberEmail
         );
 
         matchings.stream()
-                .filter(matching -> matching.getStatus() == MatchingStatus.PROPOSED)
+                .filter(matching -> matching.getStatus() == MatchingStatus.PROPOSED
+                        || matching.getStatus() == MatchingStatus.ACCEPTED)
                 .forEach(matching -> matching.rejectByClientClosingPosition(reason));
     }
 
