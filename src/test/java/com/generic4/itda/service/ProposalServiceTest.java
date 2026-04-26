@@ -91,12 +91,15 @@ class ProposalServiceTest {
         member = createMember(EMAIL, "hashed-password", "클라이언트", "010-1234-5678");
 
         lenient().when(memberRepository.findByEmail_Value(EMAIL)).thenReturn(member);
-        lenient().when(proposalRepository.save(any(Proposal.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(proposalRepository.save(any(Proposal.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(matchingRepository.existsByProposalPosition_Proposal_IdAndStatusIn(any(Long.class), any()))
                 .thenReturn(false);
         lenient().when(matchingRepository.findByProposalPosition_IdAndClientMember_Email_Value(any(Long.class), any()))
                 .thenReturn(List.of());
-        lenient().when(proposalRepository.findFirstBySourceProposal_IdAndStatusOrderByModifiedAtDescIdDesc(any(Long.class), any()))
+        lenient().when(
+                        proposalRepository.findFirstBySourceProposal_IdAndStatusOrderByModifiedAtDescIdDesc(any(Long.class),
+                                any()))
                 .thenReturn(Optional.empty());
         lenient().when(positionResolver.isAllowedPosition(any(Position.class))).thenReturn(true);
         lenient().when(aiInterviewMessageRepository.findAllByProposalIdOrderBySequenceAsc(any(Long.class)))
@@ -718,7 +721,8 @@ class ProposalServiceTest {
         ReflectionTestUtils.setField(existingDraft, "id", 7L);
 
         when(proposalRepository.findById(1L)).thenReturn(Optional.of(source));
-        when(proposalRepository.findFirstBySourceProposal_IdAndStatusOrderByModifiedAtDescIdDesc(1L, ProposalStatus.WRITING))
+        when(proposalRepository.findFirstBySourceProposal_IdAndStatusOrderByModifiedAtDescIdDesc(1L,
+                ProposalStatus.WRITING))
                 .thenReturn(Optional.of(existingDraft));
 
         Proposal reused = proposalService.createEditDraft(1L, EMAIL);
@@ -1074,6 +1078,164 @@ class ProposalServiceTest {
                 .hasMessageContaining("proposalId=1")
                 .hasMessageContaining("positionId=10");
         then(matchingRepository).should(never()).findByProposalPosition_IdAndClientMember_Email_Value(any(), any());
+    }
+
+    // ── closePosition 자동 완료 테스트 ──
+
+    @Test
+    @DisplayName("마지막 포지션을 종료하면 제안서가 자동으로 COMPLETE 상태가 된다")
+    void closePosition_autoCompletesProposalWhenAllPositionsClosed() {
+        Proposal proposal = createMatchingProposal(member);
+        ProposalPosition position1 = proposal.addPosition(
+                Position.create("백엔드"), "백엔드 개발자",
+                ProposalWorkType.REMOTE, 2L, 1_000_000L, 2_000_000L, 4L, 1, 5, null);
+        ReflectionTestUtils.setField(position1, "id", 10L);
+        position1.changeStatus(ProposalPositionStatus.CLOSED);
+
+        ProposalPosition position2 = proposal.addPosition(
+                Position.create("프론트엔드"), "프론트엔드 개발자",
+                ProposalWorkType.REMOTE, 1L, 1_000_000L, 2_000_000L, 4L, 1, 5, null);
+        ReflectionTestUtils.setField(position2, "id", 20L);
+
+        when(proposalPositionRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(position2));
+
+        proposalService.closePosition(1L, 20L, EMAIL);
+
+        assertThat(position2.getStatus()).isEqualTo(ProposalPositionStatus.CLOSED);
+        assertThat(proposal.getStatus()).isEqualTo(ProposalStatus.COMPLETE);
+    }
+
+    @Test
+    @DisplayName("다른 포지션이 아직 OPEN이면 제안서는 MATCHING 상태를 유지한다")
+    void closePosition_doesNotAutoCompleteWhenOtherPositionsOpen() {
+        Proposal proposal = createMatchingProposal(member);
+        ProposalPosition position1 = proposal.addPosition(
+                Position.create("백엔드"), "백엔드 개발자",
+                ProposalWorkType.REMOTE, 2L, 1_000_000L, 2_000_000L, 4L, 1, 5, null);
+        ReflectionTestUtils.setField(position1, "id", 10L);
+
+        ProposalPosition position2 = proposal.addPosition(
+                Position.create("프론트엔드"), "프론트엔드 개발자",
+                ProposalWorkType.REMOTE, 1L, 1_000_000L, 2_000_000L, 4L, 1, 5, null);
+        ReflectionTestUtils.setField(position2, "id", 20L);
+
+        when(proposalPositionRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(position1));
+
+        proposalService.closePosition(1L, 10L, EMAIL);
+
+        assertThat(position1.getStatus()).isEqualTo(ProposalPositionStatus.CLOSED);
+        assertThat(proposal.getStatus()).isEqualTo(ProposalStatus.MATCHING);
+    }
+
+    // ── completeProposal 테스트 ──
+
+    @Test
+    @DisplayName("MATCHING 상태 제안서를 종료하면 COMPLETE로 전환되고 모든 포지션이 CLOSED가 된다")
+    void completeProposal_completesProposalAndClosesAllPositions() {
+        Proposal proposal = createMatchingProposal(member);
+        ProposalPosition position1 = proposal.addPosition(
+                Position.create("백엔드"), "백엔드 개발자",
+                ProposalWorkType.REMOTE, 2L, 1_000_000L, 2_000_000L, 4L, 1, 5, null);
+        ReflectionTestUtils.setField(position1, "id", 10L);
+        ProposalPosition position2 = proposal.addPosition(
+                Position.create("프론트엔드"), "프론트엔드 개발자",
+                ProposalWorkType.REMOTE, 1L, 1_000_000L, 2_000_000L, 4L, 1, 5, null);
+        ReflectionTestUtils.setField(position2, "id", 20L);
+
+        when(proposalRepository.findById(1L)).thenReturn(Optional.of(proposal));
+        when(proposalRepository.findWithPositionsById(1L)).thenReturn(Optional.of(proposal));
+
+        Proposal result = proposalService.completeProposal(1L, EMAIL);
+
+        assertThat(result.getStatus()).isEqualTo(ProposalStatus.COMPLETE);
+        assertThat(position1.getStatus()).isEqualTo(ProposalPositionStatus.CLOSED);
+        assertThat(position2.getStatus()).isEqualTo(ProposalPositionStatus.CLOSED);
+    }
+
+    @Test
+    @DisplayName("제안서 종료 시 PROPOSED 매칭은 제안서 종료 사유와 함께 거절되고 ACCEPTED 매칭은 유지된다")
+    void completeProposal_rejectsPendingMatchingsWithProposalReason() {
+        Proposal proposal = createMatchingProposal(member);
+        ProposalPosition position = proposal.addPosition(
+                Position.create("백엔드"), "백엔드 개발자",
+                ProposalWorkType.REMOTE, 2L, 1_000_000L, 2_000_000L, 4L, 1, 5, null);
+        ReflectionTestUtils.setField(position, "id", 10L);
+
+        Member freelancerA = createMember("freelancer-a@example.com", "hashed-password", "프리랜서A", "010-1111-1111");
+        Member freelancerB = createMember("freelancer-b@example.com", "hashed-password", "프리랜서B", "010-2222-2222");
+        Matching proposed = Matching.create(null, position, member, freelancerA);
+        Matching accepted = Matching.create(null, position, member, freelancerB);
+        accepted.accept();
+
+        when(proposalRepository.findById(1L)).thenReturn(Optional.of(proposal));
+        when(proposalRepository.findWithPositionsById(1L)).thenReturn(Optional.of(proposal));
+        when(matchingRepository.findByProposalPosition_IdAndClientMember_Email_Value(10L, EMAIL))
+                .thenReturn(List.of(proposed, accepted));
+
+        proposalService.completeProposal(1L, EMAIL);
+
+        assertThat(proposed.getStatus()).isEqualTo(MatchingStatus.REJECTED);
+        assertThat(proposed.getCancellationReasonDetail()).isEqualTo("클라이언트가 제안서 모집을 종료했습니다.");
+        assertThat(accepted.getStatus()).isEqualTo(MatchingStatus.ACCEPTED);
+    }
+
+    @Test
+    @DisplayName("제안서 종료 시 이미 CLOSED인 포지션은 건너뛴다")
+    void completeProposal_skipsAlreadyClosedPositions() {
+        Proposal proposal = createMatchingProposal(member);
+        ProposalPosition closedPosition = proposal.addPosition(
+                Position.create("백엔드"), "백엔드 개발자",
+                ProposalWorkType.REMOTE, 2L, 1_000_000L, 2_000_000L, 4L, 1, 5, null);
+        ReflectionTestUtils.setField(closedPosition, "id", 10L);
+        closedPosition.changeStatus(ProposalPositionStatus.CLOSED);
+
+        ProposalPosition openPosition = proposal.addPosition(
+                Position.create("프론트엔드"), "프론트엔드 개발자",
+                ProposalWorkType.REMOTE, 1L, 1_000_000L, 2_000_000L, 4L, 1, 5, null);
+        ReflectionTestUtils.setField(openPosition, "id", 20L);
+
+        when(proposalRepository.findById(1L)).thenReturn(Optional.of(proposal));
+        when(proposalRepository.findWithPositionsById(1L)).thenReturn(Optional.of(proposal));
+
+        proposalService.completeProposal(1L, EMAIL);
+
+        assertThat(proposal.getStatus()).isEqualTo(ProposalStatus.COMPLETE);
+        then(matchingRepository).should(never()).findByProposalPosition_IdAndClientMember_Email_Value(eq(10L), any());
+        then(matchingRepository).should().findByProposalPosition_IdAndClientMember_Email_Value(20L, EMAIL);
+    }
+
+    @Test
+    @DisplayName("MATCHING이 아닌 제안서를 종료하면 예외가 발생한다")
+    void completeProposal_throws_whenNotMatching() {
+        Proposal proposal = Proposal.create(
+                member, "프로젝트", "", "설명", null, null, 6L);
+        ReflectionTestUtils.setField(proposal, "id", 1L);
+
+        when(proposalRepository.findById(1L)).thenReturn(Optional.of(proposal));
+
+        assertThatThrownBy(() -> proposalService.completeProposal(1L, EMAIL))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("매칭 중인 제안서만 종료할 수 있습니다.");
+    }
+
+    @Test
+    @DisplayName("소유자가 아닌 사용자가 제안서를 종료하면 예외가 발생한다")
+    void completeProposal_throws_whenNotOwner() {
+        Proposal proposal = createMatchingProposal(member);
+
+        when(proposalRepository.findById(1L)).thenReturn(Optional.of(proposal));
+
+        assertThatThrownBy(() -> proposalService.completeProposal(1L, OTHER_EMAIL))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 제안서를 종료하면 예외가 발생한다")
+    void completeProposal_throws_whenNotFound() {
+        when(proposalRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> proposalService.completeProposal(999L, EMAIL))
+                .isInstanceOf(ProposalNotFoundException.class);
     }
 
     private Proposal createMatchingProposal(Member owner) {
