@@ -690,7 +690,7 @@ class ProposalServiceTest {
 
         when(proposalPositionRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(position));
 
-        ProposalPosition result = proposalService.closePosition(10L, EMAIL);
+        ProposalPosition result = proposalService.closePosition(1L, 10L, EMAIL);
 
         assertThat(result.getStatus()).isEqualTo(ProposalPositionStatus.CLOSED);
     }
@@ -707,7 +707,7 @@ class ProposalServiceTest {
 
         when(proposalPositionRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(position));
 
-        ProposalPosition result = proposalService.closePosition(10L, EMAIL);
+        ProposalPosition result = proposalService.closePosition(1L, 10L, EMAIL);
 
         assertThat(result.getStatus()).isEqualTo(ProposalPositionStatus.CLOSED);
     }
@@ -731,7 +731,7 @@ class ProposalServiceTest {
         when(matchingRepository.findByProposalPosition_IdAndClientMember_Email_Value(10L, EMAIL))
                 .thenReturn(List.of(proposed, accepted));
 
-        ProposalPosition result = proposalService.closePosition(10L, EMAIL);
+        ProposalPosition result = proposalService.closePosition(1L, 10L, EMAIL);
 
         assertThat(result.getStatus()).isEqualTo(ProposalPositionStatus.CLOSED);
         assertThat(proposed.getStatus()).isEqualTo(MatchingStatus.REJECTED);
@@ -752,7 +752,7 @@ class ProposalServiceTest {
 
         when(proposalPositionRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(position));
 
-        assertThatThrownBy(() -> proposalService.closePosition(10L, EMAIL))
+        assertThatThrownBy(() -> proposalService.closePosition(1L, 10L, EMAIL))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("이미 종료된 모집 포지션입니다.");
     }
@@ -770,7 +770,7 @@ class ProposalServiceTest {
 
         when(proposalPositionRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(position));
 
-        assertThatThrownBy(() -> proposalService.closePosition(10L, EMAIL))
+        assertThatThrownBy(() -> proposalService.closePosition(1L, 10L, EMAIL))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("모집/추천 진행 중인 제안서의 포지션만 종료할 수 있습니다.");
     }
@@ -786,7 +786,7 @@ class ProposalServiceTest {
 
         when(proposalPositionRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(position));
 
-        assertThatThrownBy(() -> proposalService.closePosition(10L, OTHER_EMAIL))
+        assertThatThrownBy(() -> proposalService.closePosition(1L, 10L, OTHER_EMAIL))
                 .isInstanceOf(AccessDeniedException.class);
     }
 
@@ -795,8 +795,27 @@ class ProposalServiceTest {
     void closePosition_throws_whenPositionNotFound() {
         when(proposalPositionRepository.findByIdForUpdate(999L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> proposalService.closePosition(999L, EMAIL))
+        assertThatThrownBy(() -> proposalService.closePosition(1L, 999L, EMAIL))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("다른 제안서 경로의 포지션을 종료하면 예외가 발생한다")
+    void closePosition_throws_whenPositionDoesNotBelongToProposal() {
+        Proposal proposal = createMatchingProposal(member);
+        ReflectionTestUtils.setField(proposal, "id", 2L);
+        ProposalPosition position = proposal.addPosition(
+                Position.create("백엔드"), "백엔드 개발자",
+                ProposalWorkType.REMOTE, 2L, 1_000_000L, 2_000_000L, 4L, 1, 5, null);
+        ReflectionTestUtils.setField(position, "id", 10L);
+
+        when(proposalPositionRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(position));
+
+        assertThatThrownBy(() -> proposalService.closePosition(1L, 10L, EMAIL))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("proposalId=1")
+                .hasMessageContaining("positionId=10");
+        then(matchingRepository).should(never()).findByProposalPosition_IdAndClientMember_Email_Value(any(), any());
     }
 
     private Proposal createMatchingProposal(Member owner) {

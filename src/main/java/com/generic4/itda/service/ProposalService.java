@@ -200,11 +200,18 @@ public class ProposalService {
         return ProposalForm.from(proposal);
     }
 
-    public ProposalPosition closePosition(Long positionId, String memberEmail) {
+    public ProposalPosition closePosition(Long proposalId, Long positionId, String memberEmail) {
         ProposalPosition position = proposalPositionRepository.findByIdForUpdate(positionId)
                 .orElseThrow(() -> new IllegalArgumentException("모집 포지션을 찾을 수 없습니다. id=" + positionId));
 
         Proposal proposal = position.getProposal();
+
+        if (!proposal.getId().equals(proposalId)) {
+            throw new IllegalArgumentException(
+                    "해당 제안서에 속한 모집 포지션을 찾을 수 없습니다. proposalId=%d, positionId=%d"
+                            .formatted(proposalId, positionId)
+            );
+        }
 
         if (!proposal.getMember().getEmail().getValue().equals(memberEmail)) {
             throw new AccessDeniedException("본인 제안서의 모집 포지션만 종료할 수 있습니다.");

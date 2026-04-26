@@ -893,6 +893,50 @@ class ProposalControllerTest {
     }
 
     @Test
+    @DisplayName("모집 포지션 종료 요청 시 proposalId와 positionId를 함께 검증하도록 서비스에 전달한다")
+    void closePositionPassesProposalAndPositionIdsToService() throws Exception {
+        ProposalPosition position = org.mockito.Mockito.mock(ProposalPosition.class);
+        given(proposalService.closePosition(1L, 10L, "client@example.com")).willReturn(position);
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(post("/proposals/1/positions/10/close")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        )))
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/proposals/1"))
+                .andExpect(flash().attribute("noticeMessage", "해당 포지션의 모집이 종료되었습니다."));
+
+        then(proposalService).should().closePosition(1L, 10L, "client@example.com");
+    }
+
+    @Test
+    @DisplayName("다른 제안서 경로의 포지션 종료 요청이면 에러 메시지와 함께 원래 제안서 상세로 돌아간다")
+    void closePositionRedirectsWithErrorWhenPositionDoesNotBelongToProposal() throws Exception {
+        willThrow(new IllegalArgumentException("해당 제안서에 속한 모집 포지션을 찾을 수 없습니다. proposalId=1, positionId=10"))
+                .given(proposalService).closePosition(1L, 10L, "client@example.com");
+
+        ItDaPrincipal principal = ItDaPrincipal.from(
+                createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678")
+        );
+
+        mockMvc.perform(post("/proposals/1/positions/10/close")
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                        )))
+                        .with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/proposals/1"))
+                .andExpect(flash().attribute("errorMessage", "존재하지 않는 모집 포지션입니다."));
+
+        then(proposalService).should().closePosition(1L, 10L, "client@example.com");
+    }
+
+    @Test
     @DisplayName("MATCHING 상태 제안서 상세 조회 시 recommendEntry 모델에 포함되고 모달 DOM이 렌더된다")
     void detailForMatchingProposalIncludesRecommendEntry() throws Exception {
         var client = createMember("client@example.com", "hashed-password", "클라이언트", "010-1234-5678");

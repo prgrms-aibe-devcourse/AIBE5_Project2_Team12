@@ -12,8 +12,8 @@ import com.generic4.itda.dto.recommend.RecommendationEntryViewModel;
 import com.generic4.itda.dto.security.ItDaPrincipal;
 import com.generic4.itda.exception.ProposalNotFoundException;
 import com.generic4.itda.repository.MatchingRepository;
-import com.generic4.itda.service.ProposalAiInterviewService;
 import com.generic4.itda.service.PositionResolver;
+import com.generic4.itda.service.ProposalAiInterviewService;
 import com.generic4.itda.service.ProposalService;
 import com.generic4.itda.service.recommend.RecommendationEntryService;
 import jakarta.validation.Valid;
@@ -191,7 +191,8 @@ public class ProposalController {
         }
     }
 
-    private ProposalPosition resolveSelectedProposalPosition(List<ProposalPosition> proposedPositions, Long proposalPositionId) {
+    private ProposalPosition resolveSelectedProposalPosition(List<ProposalPosition> proposedPositions,
+            Long proposalPositionId) {
         if (proposalPositionId == null || proposedPositions == null || proposedPositions.isEmpty()) {
             return null;
         }
@@ -278,7 +279,7 @@ public class ProposalController {
             RedirectAttributes redirectAttributes
     ) {
         try {
-            proposalService.closePosition(positionId, principal.getEmail());
+            proposalService.closePosition(proposalId, positionId, principal.getEmail());
             redirectAttributes.addFlashAttribute("noticeMessage", "해당 포지션의 모집이 종료되었습니다.");
         } catch (IllegalArgumentException e) {
             redirectAttributes.addFlashAttribute("errorMessage", "존재하지 않는 모집 포지션입니다.");
@@ -486,7 +487,8 @@ public class ProposalController {
                     "제안서 등록을 위해서는 전체 예상 기간을 입력해야 합니다.");
         }
 
-        if (proposalService.calculateTotalBudgetMin(form) == null || proposalService.calculateTotalBudgetMax(form) == null) {
+        if (proposalService.calculateTotalBudgetMin(form) == null
+                || proposalService.calculateTotalBudgetMax(form) == null) {
             rejectGlobal(bindingResult, "제안서 등록을 위해서는 모든 포지션의 인원과 최소/최대 예산이 입력되어야 합니다.");
         }
 
