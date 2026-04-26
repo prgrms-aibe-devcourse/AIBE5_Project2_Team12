@@ -370,7 +370,7 @@ class AiBriefProposalMapperTest {
     @Test
     @DisplayName("AI 인터뷰에서 기존 모집 단위 인원만 수정하면 예산, 기간, 경력, 근무 형태, 근무지, 스킬은 유지한다")
     void applyForInterview_preservesExistingFieldsAndSkillsWhenOnlyHeadCountChanges() {
-        Proposal proposal = createProposal();
+        Proposal proposal = createProposalWithExpectedPeriod(12L);
         Position backend = Position.create("백엔드 개발자");
         Skill java = Skill.create("Java", null);
         Skill springBoot = Skill.create("Spring Boot", null);
@@ -443,7 +443,7 @@ class AiBriefProposalMapperTest {
     @Test
     @DisplayName("AI 인터뷰에서 기존 모집 단위 예산만 수정하면 인원, 기간, 경력, 근무 형태, 근무지, 스킬은 유지한다")
     void applyForInterview_preservesExistingFieldsAndSkillsWhenOnlyBudgetChanges() {
-        Proposal proposal = createProposal();
+        Proposal proposal = createProposalWithExpectedPeriod(12L);
         Position backend = Position.create("백엔드 개발자");
         Skill java = Skill.create("Java", null);
         Skill springBoot = Skill.create("Spring Boot", null);
@@ -516,7 +516,7 @@ class AiBriefProposalMapperTest {
     @Test
     @DisplayName("AI 인터뷰 응답 positions가 비어 있어도 기존 모집 단위는 유지한다")
     void applyForInterview_preservesExistingPositionsWhenAiReturnsEmptyPositions() {
-        Proposal proposal = createProposal();
+        Proposal proposal = createProposalWithExpectedPeriod(8L);
         Position backend = Position.create("백엔드 개발자");
         Position frontend = Position.create("프론트엔드 개발자");
 
@@ -1154,6 +1154,10 @@ class AiBriefProposalMapperTest {
     }
 
     private Proposal createProposal() {
+        return createProposalWithExpectedPeriod(3L);
+    }
+
+    private Proposal createProposalWithExpectedPeriod(Long expectedPeriod) {
         return Proposal.create(
                 createMember(),
                 "제안서 제목",
@@ -1161,7 +1165,7 @@ class AiBriefProposalMapperTest {
                 "기존 설명",
                 1_000_000L,
                 2_000_000L,
-                3L
+                expectedPeriod
         );
     }
 }
