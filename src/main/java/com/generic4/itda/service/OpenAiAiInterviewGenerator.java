@@ -55,6 +55,9 @@ public class OpenAiAiInterviewGenerator implements AiInterviewGenerator {
             - totalBudgetMin, totalBudgetMax, unitBudgetMin, unitBudgetMax는 원화 기준 정수로 반환한다.
             - expectedPeriod는 주 단위 기준 정수로 반환한다.
             - positions는 실제 모집 단위 배열이다.
+            - proposalPositionId는 현재 제안서 폼의 positions[].id에 대응하는 기존 모집 단위 식별자다.
+            - 기존 모집 단위를 수정하는 경우 현재 제안서 폼의 positions[].id 값을 proposalPositionId로 반드시 그대로 반환한다.
+            - 신규 모집 단위를 생성하는 경우 proposalPositionId는 null로 반환한다.
             - positionCategoryName은 공용 직무 마스터에 대응하는 큰 분류명이다. 예: 백엔드 개발자, 모바일 앱 개발자, QA 엔지니어
             - title은 사용자가 화면에서 보게 될 구체 포지션 제목이다. 예: Java Spring 백엔드 개발자, React 프론트엔드 개발자
             - 같은 positionCategoryName이라도 title이 다르고 역할이 명확히 다르면 별도 position으로 분리할 수 있다.
@@ -65,13 +68,14 @@ public class OpenAiAiInterviewGenerator implements AiInterviewGenerator {
 
             기존 모집 단위 갱신 규칙:
             - 기존 모집 단위를 수정할 때 사용자가 언급한 필드만 변경한다.
-            - 기존 모집 단위를 수정할 때도 positionCategoryName과 title은 대상 식별을 위해 반드시 현재 폼의 값을 그대로 반환한다.
+            - 기존 모집 단위를 수정할 때 proposalPositionId는 대상 식별을 위해 반드시 현재 폼의 positions[].id 값을 그대로 반환한다.
+            - 기존 모집 단위를 수정할 때도 positionCategoryName과 title은 대상 식별 보조 정보로 현재 폼의 값을 그대로 반환한다.
             - 기존 모집 단위의 title은 식별 키로 사용되므로 AI 인터뷰에서 직접 변경하지 않는다.
             - 사용자가 title 변경을 요청하더라도 title은 기존 값을 그대로 반환한다.
             - title 변경 요청이 있으면 assistantMessage에서 현재는 모집 단위 제목 변경을 직접 반영하지 않고 별도 수정이 필요하다고 짧게 안내한다.
             - 기존 모집 단위의 workType, workPlace, headCount, unitBudgetMin, unitBudgetMax, expectedPeriod, careerMinYears, careerMaxYears는 사용자가 변경 의도를 밝힌 경우에만 값을 반환한다.
             - 기존 모집 단위에서 사용자가 언급하지 않은 수정 필드는 null로 반환한다.
-            - 단, positionCategoryName과 title은 기존 모집 단위 식별을 위해 null로 반환하지 않는다.
+            - 단, proposalPositionId, positionCategoryName, title은 기존 모집 단위 식별을 위해 null로 반환하지 않는다.
             - 기존 모집 단위에서 headCount가 명확하지 않다고 해서 1로 채우지 않는다.
             - 기존 모집 단위에서 workType이 명확하지 않다고 해서 REMOTE로 채우지 않는다.
             - 기존 모집 단위에서 workPlace가 명확하지 않다고 해서 "협의"로 채우지 않는다.
@@ -81,6 +85,7 @@ public class OpenAiAiInterviewGenerator implements AiInterviewGenerator {
             - 서버는 기존 모집 단위의 null 필드를 기존 값 유지로 처리한다.
 
             신규 모집 단위 생성 규칙:
+            - 신규 모집 단위를 생성할 때는 proposalPositionId를 null로 반환한다.
             - 신규 모집 단위를 생성할 때는 필수값 보정을 허용한다.
             - 신규 모집 단위의 workType은 SITE, REMOTE, HYBRID 중 하나만 사용한다.
             - 신규 모집 단위에서 workType이 명확하지 않으면 REMOTE로 둔다.
@@ -333,6 +338,7 @@ public class OpenAiAiInterviewGenerator implements AiInterviewGenerator {
         List<String> allowedCategoryNames = positionResolver.findAllowedCategoryNames();
 
         schema.put("required", List.of(
+                "proposalPositionId",
                 "positionCategoryName",
                 "title",
                 "workType",
@@ -347,6 +353,7 @@ public class OpenAiAiInterviewGenerator implements AiInterviewGenerator {
         ));
 
         Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("proposalPositionId", nullableIntegerSchema());
         properties.put("positionCategoryName", enumSchema(allowedCategoryNames));
         properties.put("title", Map.of("type", "string"));
         properties.put("workType", nullableEnumSchema("SITE", "REMOTE", "HYBRID"));
@@ -534,6 +541,7 @@ public class OpenAiAiInterviewGenerator implements AiInterviewGenerator {
         List<AiBriefPositionResult> positions = new ArrayList<>();
         for (JsonNode positionNode : positionsNode) {
             positions.add(AiBriefPositionResult.of(
+                    asLong(positionNode.get("proposalPositionId")),
                     normalizeRequiredText(positionNode.get("positionCategoryName"), "AI 인터뷰 포지션 카테고리는 필수값입니다."),
                     normalizeRequiredText(positionNode.get("title"), "AI 인터뷰 포지션 제목은 필수값입니다."),
                     parseWorkType(positionNode.get("workType")),

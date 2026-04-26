@@ -91,6 +91,7 @@ class OpenAiAiInterviewGeneratorTest {
                         "expectedPeriod", 6,
                         "positions", List.of(
                                 Map.ofEntries(
+                                        Map.entry("proposalPositionId", 11),
                                         Map.entry("positionCategoryName", "백엔드 개발자"),
                                         Map.entry("title", "Java Spring 백엔드 개발자"),
                                         Map.entry("workType", "REMOTE"),
@@ -124,12 +125,16 @@ class OpenAiAiInterviewGeneratorTest {
                 .andExpect(jsonPath("$.instructions").value(containsString("AI 인터뷰는 제안서를 새로 생성하는 기능이 아니라 기존 제안서 폼을 부분 수정하는 기능이다.")))
                 .andExpect(jsonPath("$.instructions").value(containsString("기존 폼에 이미 있는 값은 사용자가 명시적으로 바꾸거나 삭제하라고 하지 않았다면 유지한다.")))
                 .andExpect(jsonPath("$.instructions").value(containsString("null, blank, 빈 배열은 기존 값을 삭제하라는 뜻이 아니다.")))
-                .andExpect(jsonPath("$.instructions").value(containsString("기존 모집 단위를 수정할 때도 positionCategoryName과 title은 대상 식별을 위해 반드시 현재 폼의 값을 그대로 반환한다.")))
+                .andExpect(jsonPath("$.instructions").value(containsString("proposalPositionId는 현재 제안서 폼의 positions[].id에 대응하는 기존 모집 단위 식별자다.")))
+                .andExpect(jsonPath("$.instructions").value(containsString("기존 모집 단위를 수정하는 경우 현재 제안서 폼의 positions[].id 값을 proposalPositionId로 반드시 그대로 반환한다.")))
+                .andExpect(jsonPath("$.instructions").value(containsString("신규 모집 단위를 생성하는 경우 proposalPositionId는 null로 반환한다.")))
+                .andExpect(jsonPath("$.instructions").value(containsString("기존 모집 단위를 수정할 때 proposalPositionId는 대상 식별을 위해 반드시 현재 폼의 positions[].id 값을 그대로 반환한다.")))
+                .andExpect(jsonPath("$.instructions").value(containsString("기존 모집 단위를 수정할 때도 positionCategoryName과 title은 대상 식별 보조 정보로 현재 폼의 값을 그대로 반환한다.")))
                 .andExpect(jsonPath("$.instructions").value(containsString("기존 모집 단위의 title은 식별 키로 사용되므로 AI 인터뷰에서 직접 변경하지 않는다.")))
                 .andExpect(jsonPath("$.instructions").value(containsString("사용자가 title 변경을 요청하더라도 title은 기존 값을 그대로 반환한다.")))
                 .andExpect(jsonPath("$.instructions").value(containsString("title 변경 요청이 있으면 assistantMessage에서 현재는 모집 단위 제목 변경을 직접 반영하지 않고 별도 수정이 필요하다고 짧게 안내한다.")))
                 .andExpect(jsonPath("$.instructions").value(containsString("기존 모집 단위에서 사용자가 언급하지 않은 수정 필드는 null로 반환한다.")))
-                .andExpect(jsonPath("$.instructions").value(containsString("단, positionCategoryName과 title은 기존 모집 단위 식별을 위해 null로 반환하지 않는다.")))
+                .andExpect(jsonPath("$.instructions").value(containsString("단, proposalPositionId, positionCategoryName, title은 기존 모집 단위 식별을 위해 null로 반환하지 않는다.")))
                 .andExpect(jsonPath("$.instructions").value(containsString("기존 모집 단위에서 skills에 포함되지 않은 기존 스킬은 서버에서 삭제하지 않는다.")))
                 .andExpect(jsonPath("$.instructions").value(containsString("assistantMessage에는 사용자에게 보여줄 다음 AI 메시지를 한국어로 자연스럽게 작성한다.")))
                 .andExpect(jsonPath("$.instructions").value(containsString("skills.skillName은 반드시 아래 정규 Skill 목록 중 하나만 사용한다.")))
@@ -159,6 +164,7 @@ class OpenAiAiInterviewGeneratorTest {
                 )))
                 .andExpect(jsonPath("$.text.format.schema.properties.aiBriefResult.properties.positions.items.required[*]")
                         .value(containsInAnyOrder(
+                                "proposalPositionId",
                                 "positionCategoryName",
                                 "title",
                                 "workType",
@@ -171,6 +177,8 @@ class OpenAiAiInterviewGeneratorTest {
                                 "workPlace",
                                 "skills"
                         )))
+                .andExpect(jsonPath("$.text.format.schema.properties.aiBriefResult.properties.positions.items.properties.proposalPositionId.type[*]")
+                        .value(containsInAnyOrder("integer", "null")))
                 .andExpect(jsonPath("$.text.format.schema.properties.aiBriefResult.properties.positions.items.properties.positionCategoryName.enum[*]")
                         .value(containsInAnyOrder(ALLOWED_POSITIONS.toArray())))
                 .andExpect(jsonPath("$.text.format.schema.properties.aiBriefResult.properties.positions.items.properties.skills.items.required[*]")
@@ -193,6 +201,7 @@ class OpenAiAiInterviewGeneratorTest {
         assertThat(result.getAiBriefResult().getTotalBudgetMax()).isEqualTo(8_000_000L);
         assertThat(result.getAiBriefResult().getExpectedPeriod()).isEqualTo(6L);
         assertThat(result.getAiBriefResult().getPositions()).hasSize(1);
+        assertThat(result.getAiBriefResult().getPositions().get(0).getProposalPositionId()).isEqualTo(11L);
         assertThat(result.getAiBriefResult().getPositions().get(0).getPositionCategoryName()).isEqualTo("백엔드 개발자");
         assertThat(result.getAiBriefResult().getPositions().get(0).getTitle()).isEqualTo("Java Spring 백엔드 개발자");
         assertThat(result.getAiBriefResult().getPositions().get(0).getWorkType()).isEqualTo(ProposalWorkType.REMOTE);
@@ -234,6 +243,7 @@ class OpenAiAiInterviewGeneratorTest {
                         "description", "설명",
                         "positions", List.of(
                                 Map.ofEntries(
+                                        Map.entry("proposalPositionId", 1),
                                         Map.entry("positionCategoryName", "백엔드 개발자"),
                                         Map.entry("title", "백엔드 개발자"),
                                         Map.entry("workType", "OFFICE"),
