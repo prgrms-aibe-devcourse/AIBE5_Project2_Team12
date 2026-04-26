@@ -317,7 +317,14 @@ public class ProposalService {
         if (positionForm.getId() == null) {
             return null;
         }
-        return existingById.get(positionForm.getId());
+
+        ProposalPosition proposalPosition = existingById.get(positionForm.getId());
+        if (proposalPosition == null) {
+            throw new IllegalArgumentException(
+                    "제안서에 속하지 않는 모집 포지션입니다. proposalPositionId=" + positionForm.getId()
+            );
+        }
+        return proposalPosition;
     }
 
     private void removeMissingPositions(Proposal proposal, Set<ProposalPosition> appliedPositions) {

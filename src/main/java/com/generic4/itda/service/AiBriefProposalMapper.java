@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -449,7 +450,12 @@ public class AiBriefProposalMapper {
     }
 
     private String normalizeKey(String value) {
-        return value == null ? "" : value.trim();
+        if (value == null) {
+            return "";
+        }
+        return value.toLowerCase(Locale.ROOT)
+                .replaceAll("\\s+", "")
+                .trim();
     }
 
     private record PositionApplication(Position position, AiBriefPositionResult result) {

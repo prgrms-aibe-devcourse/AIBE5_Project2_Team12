@@ -299,6 +299,75 @@ class AiBriefProposalMapperTest {
     }
 
     @Test
+    @DisplayName("AI 인터뷰 적용은 같은 category 안에서 title 공백 차이가 있어도 기존 모집 단위를 갱신한다")
+    void applyForInterview_updatesExistingPositionWhenNormalizedTitleMatches() {
+        Proposal proposal = createProposal();
+        Position backend = Position.create("백엔드 개발자");
+
+        ProposalPosition paymentBackendPosition = proposal.addPosition(
+                backend,
+                "결제 서버 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                3_000_000L,
+                4_000_000L,
+                3L,
+                3,
+                6,
+                null
+        );
+        ProposalPosition settlementBackendPosition = proposal.addPosition(
+                backend,
+                "정산 서버 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                3_500_000L,
+                4_500_000L,
+                3L,
+                3,
+                6,
+                null
+        );
+
+        given(positionResolver.resolve("백엔드 개발자")).willReturn(Optional.of(backend));
+
+        AiBriefResult aiBriefResult = AiBriefResult.of(
+                "커머스 백엔드 개발",
+                "결제 서버 인원을 늘립니다.",
+                null,
+                null,
+                3L,
+                List.of(
+                        AiBriefPositionResult.of(
+                                "백엔드 개발자",
+                                "결제서버백엔드개발자",
+                                ProposalWorkType.REMOTE,
+                                2L,
+                                3_000_000L,
+                                4_000_000L,
+                                3L,
+                                3,
+                                6,
+                                null,
+                                List.of()
+                        )
+                )
+        );
+
+        aiBriefProposalMapper.applyForInterview(
+                proposal,
+                aiBriefResult,
+                "결제 서버 백엔드 개발자는 2명으로 늘려줘."
+        );
+
+        assertThat(proposal.getPositions()).hasSize(2);
+        assertThat(paymentBackendPosition.getTitle()).isEqualTo("결제서버백엔드개발자");
+        assertThat(paymentBackendPosition.getHeadCount()).isEqualTo(2L);
+        assertThat(findProposalPositionByTitle(proposal, "결제서버백엔드개발자")).isSameAs(paymentBackendPosition);
+        assertThat(findProposalPositionByTitle(proposal, "정산 서버 백엔드 개발자")).isSameAs(settlementBackendPosition);
+    }
+
+    @Test
     @DisplayName("AI 브리프가 기존 스킬을 다시 제안하면 중복 추가하지 않고 중요도만 갱신한다")
     void apply_updatesExistingSkillImportanceWithoutDuplicatingSkill() {
         Proposal proposal = createProposal();

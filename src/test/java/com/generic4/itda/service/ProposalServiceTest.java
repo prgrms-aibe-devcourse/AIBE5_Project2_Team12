@@ -282,6 +282,62 @@ class ProposalServiceTest {
     }
 
     @Test
+    @DisplayName("제안서 수정 요청의 proposalPositionId가 현재 제안서에 없으면 예외가 발생한다")
+    void saveDraft_throwsWhenProposalPositionIdDoesNotBelongToProposal() {
+        Proposal proposal = Proposal.create(
+                member,
+                "기존 프로젝트",
+                "기존 원본 입력",
+                "기존 설명",
+                null,
+                null,
+                8L
+        );
+        ReflectionTestUtils.setField(proposal, "id", 1L);
+
+        Position backend = Position.create("백엔드 개발자");
+        ReflectionTestUtils.setField(backend, "id", 1L);
+
+        ProposalPosition existingPaymentBackend = proposal.addPosition(
+                backend,
+                "기존 결제 서버 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                2_000_000L,
+                3_000_000L,
+                4L,
+                2,
+                5,
+                null
+        );
+        ReflectionTestUtils.setField(existingPaymentBackend, "id", 10L);
+
+        ProposalPositionForm foreignPositionForm = new ProposalPositionForm();
+        foreignPositionForm.setId(99L);
+        foreignPositionForm.setPositionId(1L);
+        foreignPositionForm.setTitle("다른 제안서의 백엔드 개발자");
+        foreignPositionForm.setWorkType(ProposalWorkType.REMOTE);
+        foreignPositionForm.setHeadCount(1L);
+        foreignPositionForm.setUnitBudgetMin(3_000_000L);
+        foreignPositionForm.setUnitBudgetMax(4_000_000L);
+        foreignPositionForm.setExpectedPeriod(4L);
+
+        ProposalForm form = new ProposalForm();
+        form.setTitle("수정된 프로젝트");
+        form.setRawInputText("수정된 원본 입력");
+        form.setDescription("수정된 설명");
+        form.setExpectedPeriod(8L);
+        form.getPositions().add(foreignPositionForm);
+
+        when(proposalRepository.findById(1L)).thenReturn(Optional.of(proposal));
+        when(positionRepository.findById(1L)).thenReturn(Optional.of(backend));
+
+        assertThatThrownBy(() -> proposalService.saveDraft(1L, EMAIL, form))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("제안서에 속하지 않는 모집 포지션입니다. proposalPositionId=99");
+    }
+
+    @Test
     @DisplayName("MATCHING 상태 원본 제안서는 직접 임시저장할 수 없다")
     void saveDraft_blocksDirectUpdateForMatchingProposal() {
         Proposal proposal = Proposal.create(
