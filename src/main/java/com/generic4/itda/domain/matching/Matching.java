@@ -170,6 +170,21 @@ public class Matching extends BaseTimeEntity {
         this.rejectedAt = LocalDateTime.now();
     }
 
+    public void rejectByClientClosingPosition(String reasonDetail) {
+        if (this.status != MatchingStatus.PROPOSED) {
+            throw new IllegalStateException("제안 상태의 매칭만 거절할 수 있습니다.");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        this.status = MatchingStatus.REJECTED;
+        this.rejectedAt = now;
+        this.cancellationRequestedBy = MatchingParticipantRole.CLIENT;
+        this.cancellationReason = null;
+        this.cancellationReasonDetail = normalize(reasonDetail);
+        this.cancellationRequestedAt = now;
+        this.cancellationAutoCancelAt = null;
+    }
+
     public void acceptContractStart(MatchingParticipantRole participantRole) {
         if (this.status != MatchingStatus.ACCEPTED) {
             throw new IllegalStateException("수락된 매칭만 계약 시작을 수락할 수 있습니다.");

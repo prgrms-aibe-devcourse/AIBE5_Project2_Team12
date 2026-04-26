@@ -15,6 +15,7 @@ import com.generic4.itda.domain.member.Member;
 import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
 import com.generic4.itda.domain.proposal.ProposalPosition;
+import com.generic4.itda.domain.proposal.ProposalPositionStatus;
 import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.domain.resume.CareerPayload;
 import com.generic4.itda.domain.resume.Resume;
@@ -163,6 +164,30 @@ class MatchingQueryServiceTest {
         assertThat(result.lifecycle().cancellation().requestedAt()).isNotNull();
         assertThat(result.timeline().get(result.timeline().size() - 1).actionLabel()).isEqualTo("계약 취소");
         assertThat(result.timeline().get(result.timeline().size() - 1).description()).isEqualTo("계약이 취소되었습니다.");
+
+        verify(matchingRepository).findDetailById(401L);
+        verifyNoMoreInteractions(matchingRepository);
+    }
+
+    @Test
+    @DisplayName("모집 종료로 거절된 상세는 종료 사유를 반환한다")
+    void getDetail_returnsClosureReasonWhenRejectedByClosedPosition() {
+        Matching matching = createProposedMatching();
+        ReflectionTestUtils.setField(matching.getProposalPosition(), "status", ProposalPositionStatus.CLOSED);
+        matching.rejectByClientClosingPosition("클라이언트가 모집을 종료했습니다.");
+        given(matchingRepository.findDetailById(401L)).willReturn(Optional.of(matching));
+
+        MatchingDetailViewModel result = matchingQueryService.getDetail(401L, FREELANCER_EMAIL);
+
+        assertThat(result.status()).isEqualTo(MatchingStatus.REJECTED);
+        assertThat(result.summary().headline()).isEqualTo("클라이언트가 모집을 종료했습니다.");
+        assertThat(result.summary().helperMessage()).isEqualTo("클라이언트가 모집을 종료했습니다.");
+        assertThat(result.lifecycle().cancellation().requested()).isTrue();
+        assertThat(result.lifecycle().cancellation().reasonLabel()).isEqualTo("모집 종료");
+        assertThat(result.lifecycle().cancellation().reasonDetail()).isEqualTo("클라이언트가 모집을 종료했습니다.");
+        assertThat(result.lifecycle().cancellation().requesterRoleLabel()).isEqualTo("클라이언트");
+        assertThat(result.timeline().get(result.timeline().size() - 1).actorLabel()).isEqualTo("클라이언트");
+        assertThat(result.timeline().get(result.timeline().size() - 1).description()).isEqualTo("클라이언트가 모집을 종료했습니다.");
 
         verify(matchingRepository).findDetailById(401L);
         verifyNoMoreInteractions(matchingRepository);
