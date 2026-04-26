@@ -39,7 +39,7 @@ public class AiBriefProposalMapper {
         Assert.notNull(aiBriefResult, "AI 브리프 결과는 필수값입니다.");
 
         applyProposalFields(proposal, aiBriefResult);
-        mergePositions(proposal, aiBriefResult.getPositions(), true, DeletedPositionKeys.empty());
+        mergePositions(proposal, aiBriefResult.getPositions(), PositionMergeMode.AI_BRIEF, DeletedPositionKeys.empty());
     }
 
     public void applyForInterview(Proposal proposal, AiBriefResult aiBriefResult, String userMessage) {
@@ -48,7 +48,7 @@ public class AiBriefProposalMapper {
 
         DeletedPositionKeys deletedPositionKeys = removeExplicitlyDeletedPositions(proposal, userMessage);
         applyProposalFields(proposal, aiBriefResult);
-        mergePositions(proposal, aiBriefResult.getPositions(), false, deletedPositionKeys);
+        mergePositions(proposal, aiBriefResult.getPositions(), PositionMergeMode.AI_INTERVIEW, deletedPositionKeys);
     }
 
     private void applyProposalFields(Proposal proposal, AiBriefResult aiBriefResult) {
@@ -65,15 +65,21 @@ public class AiBriefProposalMapper {
     private void mergePositions(
             Proposal proposal,
             List<AiBriefPositionResult> positionResults,
-            boolean removePositionsNotInAiResult,
+            PositionMergeMode mergeMode,
             DeletedPositionKeys ignoredPositionKeys
     ) {
         if (positionResults == null || positionResults.isEmpty()) {
+            if (mergeMode == PositionMergeMode.AI_BRIEF) {
+                removePositionsNotInAiResult(proposal, Set.of());
+            }
             return;
         }
 
         List<PositionApplication> applications = mergePositionApplicationsByPositionKey(positionResults);
         if (applications.isEmpty()) {
+            if (mergeMode == PositionMergeMode.AI_BRIEF) {
+                removePositionsNotInAiResult(proposal, Set.of());
+            }
             return;
         }
 
@@ -96,45 +102,176 @@ public class AiBriefProposalMapper {
                     existingByCategoryKey,
                     applicationCountByCategoryKey
             );
-            AiBriefPositionResult result = application.result();
-            ProposalWorkType workType = resolveWorkType(result);
-            String workPlace = resolveWorkPlace(workType, result.getWorkPlace());
 
             if (proposalPosition == null) {
-                proposalPosition = proposal.addPosition(
-                        application.position(),
-                        result.getTitle(),
-                        workType,
-                        resolveHeadCount(result),
-                        result.getUnitBudgetMin(),
-                        result.getUnitBudgetMax(),
-                        result.getExpectedPeriod(),
-                        result.getCareerMinYears(),
-                        result.getCareerMaxYears(),
-                        workPlace
-                );
+                proposalPosition = addNewPosition(proposal, application);
+                replaceSkills(proposalPosition, application.result().getSkills());
+            } else if (mergeMode == PositionMergeMode.AI_INTERVIEW) {
+                updateExistingPositionForInterview(proposal, proposalPosition, application);
+                mergeSkillsForInterview(proposalPosition, application.result().getSkills());
             } else {
-                proposalPosition.update(
-                        application.position(),
-                        result.getTitle(),
-                        workType,
-                        resolveHeadCount(result),
-                        result.getUnitBudgetMin(),
-                        result.getUnitBudgetMax(),
-                        result.getExpectedPeriod(),
-                        result.getCareerMinYears(),
-                        result.getCareerMaxYears(),
-                        workPlace
-                );
+                updateExistingPositionForAiBrief(proposalPosition, application);
+                replaceSkills(proposalPosition, application.result().getSkills());
             }
 
-            replaceSkills(proposalPosition, result.getSkills());
             appliedPositions.add(proposalPosition);
         }
 
-        if (removePositionsNotInAiResult) {
+        if (mergeMode == PositionMergeMode.AI_BRIEF) {
             removePositionsNotInAiResult(proposal, appliedPositions);
         }
+    }
+
+    private ProposalPosition addNewPosition(Proposal proposal, PositionApplication application) {
+        AiBriefPositionResult result = application.result();
+        ProposalWorkType workType = resolveWorkType(result);
+        String workPlace = resolveWorkPlace(workType, result.getWorkPlace());
+
+        return proposal.addPosition(
+                application.position(),
+                result.getTitle(),
+                workType,
+                resolveHeadCount(result),
+                result.getUnitBudgetMin(),
+                result.getUnitBudgetMax(),
+                result.getExpectedPeriod(),
+                result.getCareerMinYears(),
+                result.getCareerMaxYears(),
+                workPlace
+        );
+    }
+
+    private void updateExistingPositionForAiBrief(ProposalPosition proposalPosition, PositionApplication application) {
+        AiBriefPositionResult result = application.result();
+        ProposalWorkType workType = resolveWorkType(result);
+        String workPlace = resolveWorkPlace(workType, result.getWorkPlace());
+
+        proposalPosition.update(
+                application.position(),
+                result.getTitle(),
+                workType,
+                resolveHeadCount(result),
+                result.getUnitBudgetMin(),
+                result.getUnitBudgetMax(),
+                result.getExpectedPeriod(),
+                result.getCareerMinYears(),
+                result.getCareerMaxYears(),
+                workPlace
+        );
+    }
+
+    private void updateExistingPositionForInterview(
+            Proposal proposal,
+            ProposalPosition proposalPosition,
+            PositionApplication application
+    ) {
+        AiBriefPositionResult result = application.result();
+        ProposalWorkType workType = resolveInterviewWorkType(proposalPosition, result);
+        String workPlace = resolveInterviewWorkPlace(proposalPosition, result, workType);
+
+        proposalPosition.update(
+                application.position(),
+                resolveInterviewTitle(proposalPosition, result),
+                workType,
+                resolveInterviewHeadCount(proposalPosition, result),
+                resolveInterviewUnitBudgetMin(proposalPosition, result),
+                resolveInterviewUnitBudgetMax(proposalPosition, result),
+                resolveInterviewExpectedPeriod(proposal, proposalPosition, result),
+                resolveInterviewCareerMinYears(proposalPosition, result),
+                resolveInterviewCareerMaxYears(proposalPosition, result),
+                workPlace
+        );
+    }
+
+    private String resolveInterviewTitle(ProposalPosition proposalPosition, AiBriefPositionResult result) {
+        if (StringUtils.hasText(result.getTitle())) {
+            return result.getTitle();
+        }
+        return proposalPosition.getTitle();
+    }
+
+    private ProposalWorkType resolveInterviewWorkType(ProposalPosition proposalPosition, AiBriefPositionResult result) {
+        if (result.getWorkType() != null) {
+            return result.getWorkType();
+        }
+        return proposalPosition.getWorkType();
+    }
+
+    private String resolveInterviewWorkPlace(
+            ProposalPosition proposalPosition,
+            AiBriefPositionResult result,
+            ProposalWorkType resolvedWorkType
+    ) {
+        if (resolvedWorkType == ProposalWorkType.REMOTE) {
+            return null;
+        }
+
+        if (StringUtils.hasText(result.getWorkPlace())) {
+            return result.getWorkPlace().trim();
+        }
+
+        if (StringUtils.hasText(proposalPosition.getWorkPlace())) {
+            return proposalPosition.getWorkPlace();
+        }
+
+        if (result.getWorkType() == ProposalWorkType.SITE || result.getWorkType() == ProposalWorkType.HYBRID) {
+            return DEFAULT_WORK_PLACE;
+        }
+
+        return null;
+    }
+
+    private Long resolveInterviewHeadCount(ProposalPosition proposalPosition, AiBriefPositionResult result) {
+        if (result.getHeadCount() != null && result.getHeadCount() >= 1) {
+            return result.getHeadCount();
+        }
+        return proposalPosition.getHeadCount();
+    }
+
+    private Long resolveInterviewUnitBudgetMin(ProposalPosition proposalPosition, AiBriefPositionResult result) {
+        if (result.getUnitBudgetMin() != null) {
+            return result.getUnitBudgetMin();
+        }
+        return proposalPosition.getUnitBudgetMin();
+    }
+
+    private Long resolveInterviewUnitBudgetMax(ProposalPosition proposalPosition, AiBriefPositionResult result) {
+        if (result.getUnitBudgetMax() != null) {
+            return result.getUnitBudgetMax();
+        }
+        return proposalPosition.getUnitBudgetMax();
+    }
+
+    private Long resolveInterviewExpectedPeriod(
+            Proposal proposal,
+            ProposalPosition proposalPosition,
+            AiBriefPositionResult result
+    ) {
+        Long expectedPeriod = result.getExpectedPeriod() != null
+                ? result.getExpectedPeriod()
+                : proposalPosition.getExpectedPeriod();
+
+        if (proposal.getExpectedPeriod() != null
+                && expectedPeriod != null
+                && expectedPeriod > proposal.getExpectedPeriod()) {
+            return proposal.getExpectedPeriod();
+        }
+
+        return expectedPeriod;
+    }
+
+    private Integer resolveInterviewCareerMinYears(ProposalPosition proposalPosition, AiBriefPositionResult result) {
+        if (result.getCareerMinYears() != null) {
+            return result.getCareerMinYears();
+        }
+        return proposalPosition.getCareerMinYears();
+    }
+
+    private Integer resolveInterviewCareerMaxYears(ProposalPosition proposalPosition, AiBriefPositionResult result) {
+        if (result.getCareerMaxYears() != null) {
+            return result.getCareerMaxYears();
+        }
+        return proposalPosition.getCareerMaxYears();
     }
 
     private DeletedPositionKeys removeExplicitlyDeletedPositions(Proposal proposal, String userMessage) {
@@ -231,7 +368,7 @@ public class AiBriefProposalMapper {
         if (value == null) {
             return "";
         }
-        return value.toLowerCase()
+        return value.toLowerCase(Locale.ROOT)
                 .replaceAll("\\s+", "")
                 .trim();
     }
@@ -345,6 +482,26 @@ public class AiBriefProposalMapper {
         return StringUtils.hasText(workPlace) ? workPlace.trim() : null;
     }
 
+    private void mergeSkillsForInterview(ProposalPosition proposalPosition, List<AiBriefSkillResult> skills) {
+        Map<String, SkillApplication> desiredSkills = buildDesiredSkills(skills);
+        if (desiredSkills.isEmpty()) {
+            return;
+        }
+
+        for (ProposalPositionSkill existingSkill : proposalPosition.getSkills()) {
+            String key = normalizeKey(existingSkill.getSkill().getName());
+            SkillApplication desiredSkill = desiredSkills.remove(key);
+
+            if (desiredSkill != null) {
+                existingSkill.changeImportance(desiredSkill.importance());
+            }
+        }
+
+        for (SkillApplication desiredSkill : desiredSkills.values()) {
+            proposalPosition.addSkill(desiredSkill.skill(), desiredSkill.importance());
+        }
+    }
+
     private void replaceSkills(ProposalPosition proposalPosition, List<AiBriefSkillResult> skills) {
         Map<String, SkillApplication> desiredSkills = buildDesiredSkills(skills);
 
@@ -456,6 +613,11 @@ public class AiBriefProposalMapper {
         return value.toLowerCase(Locale.ROOT)
                 .replaceAll("\\s+", "")
                 .trim();
+    }
+
+    private enum PositionMergeMode {
+        AI_BRIEF,
+        AI_INTERVIEW
     }
 
     private record PositionApplication(Position position, AiBriefPositionResult result) {
