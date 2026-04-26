@@ -148,6 +148,140 @@ class ProposalServiceTest {
     }
 
     @Test
+    @DisplayName("같은 직무 category라도 title이 다르면 여러 모집 단위를 함께 저장한다")
+    void saveDraft_keepsMultiplePositionsWithSamePositionIdAndDifferentTitles() {
+        Position backend = Position.create("백엔드 개발자");
+        ReflectionTestUtils.setField(backend, "id", 1L);
+
+        ProposalPositionForm paymentBackendForm = new ProposalPositionForm();
+        paymentBackendForm.setPositionId(1L);
+        paymentBackendForm.setTitle("결제 서버 백엔드 개발자");
+        paymentBackendForm.setWorkType(ProposalWorkType.REMOTE);
+        paymentBackendForm.setHeadCount(1L);
+        paymentBackendForm.setUnitBudgetMin(3_000_000L);
+        paymentBackendForm.setUnitBudgetMax(4_000_000L);
+        paymentBackendForm.setExpectedPeriod(4L);
+
+        ProposalPositionForm settlementBackendForm = new ProposalPositionForm();
+        settlementBackendForm.setPositionId(1L);
+        settlementBackendForm.setTitle("정산 서버 백엔드 개발자");
+        settlementBackendForm.setWorkType(ProposalWorkType.REMOTE);
+        settlementBackendForm.setHeadCount(1L);
+        settlementBackendForm.setUnitBudgetMin(3_500_000L);
+        settlementBackendForm.setUnitBudgetMax(4_500_000L);
+        settlementBackendForm.setExpectedPeriod(4L);
+
+        ProposalForm form = new ProposalForm();
+        form.setTitle("커머스 백엔드 개발");
+        form.setRawInputText("");
+        form.setExpectedPeriod(8L);
+        form.getPositions().add(paymentBackendForm);
+        form.getPositions().add(settlementBackendForm);
+
+        when(positionRepository.findById(1L)).thenReturn(Optional.of(backend));
+
+        Proposal proposal = proposalService.saveDraft(EMAIL, form);
+
+        List<String> titles = proposal.getPositions().stream()
+                .map(ProposalPosition::getTitle)
+                .toList();
+
+        assertThat(titles).hasSize(2);
+        assertThat(titles).containsExactly("결제 서버 백엔드 개발자", "정산 서버 백엔드 개발자");
+    }
+
+    @Test
+    @DisplayName("제안서 수정은 proposalPositionId가 있는 모집 단위만 갱신하고 같은 positionId 신규 row는 새로 추가한다")
+    void saveDraft_updatesExistingPositionByProposalPositionIdAndAddsNewSamePositionIdRow() {
+        Proposal proposal = Proposal.create(
+                member,
+                "기존 프로젝트",
+                "기존 원본 입력",
+                "기존 설명",
+                null,
+                null,
+                8L
+        );
+        ReflectionTestUtils.setField(proposal, "id", 1L);
+
+        Position backend = Position.create("백엔드 개발자");
+        ReflectionTestUtils.setField(backend, "id", 1L);
+
+        ProposalPosition existingPaymentBackend = proposal.addPosition(
+                backend,
+                "기존 결제 서버 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                2_000_000L,
+                3_000_000L,
+                4L,
+                2,
+                5,
+                null
+        );
+        ReflectionTestUtils.setField(existingPaymentBackend, "id", 10L);
+
+        ProposalPosition existingSettlementBackend = proposal.addPosition(
+                backend,
+                "기존 정산 서버 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                2_500_000L,
+                3_500_000L,
+                4L,
+                2,
+                5,
+                null
+        );
+        ReflectionTestUtils.setField(existingSettlementBackend, "id", 11L);
+
+        ProposalPositionForm updatedPaymentBackendForm = new ProposalPositionForm();
+        updatedPaymentBackendForm.setId(10L);
+        updatedPaymentBackendForm.setPositionId(1L);
+        updatedPaymentBackendForm.setTitle("수정된 결제 서버 백엔드 개발자");
+        updatedPaymentBackendForm.setWorkType(ProposalWorkType.REMOTE);
+        updatedPaymentBackendForm.setHeadCount(2L);
+        updatedPaymentBackendForm.setUnitBudgetMin(3_000_000L);
+        updatedPaymentBackendForm.setUnitBudgetMax(4_000_000L);
+        updatedPaymentBackendForm.setExpectedPeriod(5L);
+
+        ProposalPositionForm searchBackendForm = new ProposalPositionForm();
+        searchBackendForm.setPositionId(1L);
+        searchBackendForm.setTitle("검색 서버 백엔드 개발자");
+        searchBackendForm.setWorkType(ProposalWorkType.REMOTE);
+        searchBackendForm.setHeadCount(1L);
+        searchBackendForm.setUnitBudgetMin(3_500_000L);
+        searchBackendForm.setUnitBudgetMax(4_500_000L);
+        searchBackendForm.setExpectedPeriod(4L);
+
+        ProposalForm form = new ProposalForm();
+        form.setTitle("수정된 프로젝트");
+        form.setRawInputText("수정된 원본 입력");
+        form.setDescription("수정된 설명");
+        form.setExpectedPeriod(8L);
+        form.getPositions().add(updatedPaymentBackendForm);
+        form.getPositions().add(searchBackendForm);
+
+        when(proposalRepository.findById(1L)).thenReturn(Optional.of(proposal));
+        when(positionRepository.findById(1L)).thenReturn(Optional.of(backend));
+
+        Proposal saved = proposalService.saveDraft(1L, EMAIL, form);
+
+        List<String> titles = saved.getPositions().stream()
+                .map(ProposalPosition::getTitle)
+                .toList();
+        Long updatedPaymentBackendId = saved.getPositions().stream()
+                .filter(position -> "수정된 결제 서버 백엔드 개발자".equals(position.getTitle()))
+                .map(ProposalPosition::getId)
+                .findFirst()
+                .orElse(null);
+
+        assertThat(titles).hasSize(2);
+        assertThat(titles).containsExactly("수정된 결제 서버 백엔드 개발자", "검색 서버 백엔드 개발자");
+        assertThat(updatedPaymentBackendId).isEqualTo(10L);
+    }
+
+    @Test
     @DisplayName("MATCHING 상태 원본 제안서는 직접 임시저장할 수 없다")
     void saveDraft_blocksDirectUpdateForMatchingProposal() {
         Proposal proposal = Proposal.create(
@@ -677,15 +811,22 @@ class ProposalServiceTest {
                 .isInstanceOf(ProposalNotFoundException.class);
     }
 
-    // ── closePosition 테스트 ──
-
     @Test
     @DisplayName("MATCHING 상태 제안서의 OPEN 포지션을 소유자가 종료하면 CLOSED로 전환된다")
     void closePosition_closesOpenPosition() {
         Proposal proposal = createMatchingProposal(member);
         ProposalPosition position = proposal.addPosition(
-                Position.create("백엔드"), "백엔드 개발자",
-                ProposalWorkType.REMOTE, 2L, 1_000_000L, 2_000_000L, 4L, 1, 5, null);
+                Position.create("백엔드"),
+                "백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                2L,
+                1_000_000L,
+                2_000_000L,
+                4L,
+                1,
+                5,
+                null
+        );
         ReflectionTestUtils.setField(position, "id", 10L);
 
         when(proposalPositionRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(position));
@@ -700,8 +841,17 @@ class ProposalServiceTest {
     void closePosition_closesFullPosition() {
         Proposal proposal = createMatchingProposal(member);
         ProposalPosition position = proposal.addPosition(
-                Position.create("백엔드"), "백엔드 개발자",
-                ProposalWorkType.REMOTE, 2L, 1_000_000L, 2_000_000L, 4L, 1, 5, null);
+                Position.create("백엔드"),
+                "백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                2L,
+                1_000_000L,
+                2_000_000L,
+                4L,
+                1,
+                5,
+                null
+        );
         ReflectionTestUtils.setField(position, "id", 10L);
         position.changeStatus(ProposalPositionStatus.FULL);
 
@@ -717,8 +867,17 @@ class ProposalServiceTest {
     void closePosition_rejectsPendingMatchingsOnly() {
         Proposal proposal = createMatchingProposal(member);
         ProposalPosition position = proposal.addPosition(
-                Position.create("백엔드"), "백엔드 개발자",
-                ProposalWorkType.REMOTE, 2L, 1_000_000L, 2_000_000L, 4L, 1, 5, null);
+                Position.create("백엔드"),
+                "백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                2L,
+                1_000_000L,
+                2_000_000L,
+                4L,
+                1,
+                5,
+                null
+        );
         ReflectionTestUtils.setField(position, "id", 10L);
 
         Member freelancerA = createMember("freelancer-a@example.com", "hashed-password", "프리랜서A", "010-1111-1111");
@@ -745,8 +904,17 @@ class ProposalServiceTest {
     void closePosition_throws_whenAlreadyClosed() {
         Proposal proposal = createMatchingProposal(member);
         ProposalPosition position = proposal.addPosition(
-                Position.create("백엔드"), "백엔드 개발자",
-                ProposalWorkType.REMOTE, 2L, 1_000_000L, 2_000_000L, 4L, 1, 5, null);
+                Position.create("백엔드"),
+                "백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                2L,
+                1_000_000L,
+                2_000_000L,
+                4L,
+                1,
+                5,
+                null
+        );
         ReflectionTestUtils.setField(position, "id", 10L);
         position.changeStatus(ProposalPositionStatus.CLOSED);
 
@@ -761,11 +929,27 @@ class ProposalServiceTest {
     @DisplayName("MATCHING이 아닌 제안서의 포지션을 종료하면 예외가 발생한다")
     void closePosition_throws_whenProposalNotMatching() {
         Proposal proposal = Proposal.create(
-                member, "프로젝트", "", "설명", null, null, 6L);
+                member,
+                "프로젝트",
+                "",
+                "설명",
+                null,
+                null,
+                6L
+        );
         ReflectionTestUtils.setField(proposal, "id", 1L);
         ProposalPosition position = proposal.addPosition(
-                Position.create("백엔드"), "백엔드 개발자",
-                ProposalWorkType.REMOTE, 2L, 1_000_000L, 2_000_000L, 4L, 1, 5, null);
+                Position.create("백엔드"),
+                "백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                2L,
+                1_000_000L,
+                2_000_000L,
+                4L,
+                1,
+                5,
+                null
+        );
         ReflectionTestUtils.setField(position, "id", 10L);
 
         when(proposalPositionRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(position));
@@ -780,8 +964,17 @@ class ProposalServiceTest {
     void closePosition_throws_whenNotOwner() {
         Proposal proposal = createMatchingProposal(member);
         ProposalPosition position = proposal.addPosition(
-                Position.create("백엔드"), "백엔드 개발자",
-                ProposalWorkType.REMOTE, 2L, 1_000_000L, 2_000_000L, 4L, 1, 5, null);
+                Position.create("백엔드"),
+                "백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                2L,
+                1_000_000L,
+                2_000_000L,
+                4L,
+                1,
+                5,
+                null
+        );
         ReflectionTestUtils.setField(position, "id", 10L);
 
         when(proposalPositionRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(position));
@@ -805,8 +998,17 @@ class ProposalServiceTest {
         Proposal proposal = createMatchingProposal(member);
         ReflectionTestUtils.setField(proposal, "id", 2L);
         ProposalPosition position = proposal.addPosition(
-                Position.create("백엔드"), "백엔드 개발자",
-                ProposalWorkType.REMOTE, 2L, 1_000_000L, 2_000_000L, 4L, 1, 5, null);
+                Position.create("백엔드"),
+                "백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                2L,
+                1_000_000L,
+                2_000_000L,
+                4L,
+                1,
+                5,
+                null
+        );
         ReflectionTestUtils.setField(position, "id", 10L);
 
         when(proposalPositionRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(position));
@@ -820,7 +1022,14 @@ class ProposalServiceTest {
 
     private Proposal createMatchingProposal(Member owner) {
         Proposal proposal = Proposal.create(
-                owner, "프로젝트", "", "설명", null, null, 6L);
+                owner,
+                "프로젝트",
+                "",
+                "설명",
+                null,
+                null,
+                6L
+        );
         ReflectionTestUtils.setField(proposal, "id", 1L);
         proposal.startMatching();
         return proposal;
