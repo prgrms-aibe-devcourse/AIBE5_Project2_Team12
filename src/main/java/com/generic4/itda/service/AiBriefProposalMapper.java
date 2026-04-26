@@ -178,7 +178,7 @@ public class AiBriefProposalMapper {
 
         proposalPosition.update(
                 application.position(),
-                resolveInterviewTitle(proposalPosition, result),
+                resolveInterviewTitle(proposal, proposalPosition, application),
                 workType,
                 resolveInterviewHeadCount(proposalPosition, result),
                 resolveInterviewUnitBudgetMin(proposalPosition, result),
@@ -190,11 +190,42 @@ public class AiBriefProposalMapper {
         );
     }
 
-    private String resolveInterviewTitle(ProposalPosition proposalPosition, AiBriefPositionResult result) {
-        if (StringUtils.hasText(result.getTitle())) {
-            return result.getTitle();
+    private String resolveInterviewTitle(
+            Proposal proposal,
+            ProposalPosition proposalPosition,
+            PositionApplication application
+    ) {
+        AiBriefPositionResult result = application.result();
+        if (!StringUtils.hasText(result.getTitle())) {
+            return proposalPosition.getTitle();
         }
-        return proposalPosition.getTitle();
+
+        if (hasTitleConflict(proposal, proposalPosition, application.position(), result.getTitle())) {
+            return proposalPosition.getTitle();
+        }
+
+        return result.getTitle();
+    }
+
+    private boolean hasTitleConflict(
+            Proposal proposal,
+            ProposalPosition targetPosition,
+            Position nextPosition,
+            String nextTitle
+    ) {
+        String nextPositionKey = positionKey(nextPosition, nextTitle);
+
+        for (ProposalPosition existingPosition : proposal.getPositions()) {
+            if (existingPosition == targetPosition) {
+                continue;
+            }
+
+            if (nextPositionKey.equals(positionKey(existingPosition))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private ProposalWorkType resolveInterviewWorkType(ProposalPosition proposalPosition, AiBriefPositionResult result) {

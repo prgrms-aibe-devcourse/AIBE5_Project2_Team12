@@ -69,10 +69,11 @@ public class OpenAiAiInterviewGenerator implements AiInterviewGenerator {
             기존 모집 단위 갱신 규칙:
             - 기존 모집 단위를 수정할 때 사용자가 언급한 필드만 변경한다.
             - 기존 모집 단위를 수정할 때 proposalPositionId는 대상 식별을 위해 반드시 현재 폼의 positions[].id 값을 그대로 반환한다.
-            - 기존 모집 단위를 수정할 때도 positionCategoryName과 title은 대상 식별 보조 정보로 현재 폼의 값을 그대로 반환한다.
-            - 기존 모집 단위의 title은 식별 키로 사용되므로 AI 인터뷰에서 직접 변경하지 않는다.
-            - 사용자가 title 변경을 요청하더라도 title은 기존 값을 그대로 반환한다.
-            - title 변경 요청이 있으면 assistantMessage에서 현재는 모집 단위 제목 변경을 직접 반영하지 않고 별도 수정이 필요하다고 짧게 안내한다.
+            - 기존 모집 단위를 수정할 때 positionCategoryName은 현재 폼의 값을 그대로 반환한다.
+            - 기존 모집 단위의 title 변경을 요청받은 경우 proposalPositionId는 기존 모집 단위 id를 그대로 반환하고 title에는 변경된 제목을 반환한다.
+            - title 변경 요청이 없으면 title은 현재 폼의 값을 그대로 반환한다.
+            - 같은 positionCategoryName 안에 이미 존재하는 다른 모집 단위와 같은 title로 변경하지 않는다.
+            - title 변경이 다른 모집 단위와 충돌할 수 있으면 title은 기존 값을 유지하고 assistantMessage에서 어떤 모집 단위를 어떻게 변경할지 다시 확인한다.
             - 기존 모집 단위의 workType, workPlace, headCount, unitBudgetMin, unitBudgetMax, expectedPeriod, careerMinYears, careerMaxYears는 사용자가 변경 의도를 밝힌 경우에만 값을 반환한다.
             - 기존 모집 단위에서 사용자가 언급하지 않은 수정 필드는 null로 반환한다.
             - 단, proposalPositionId, positionCategoryName, title은 기존 모집 단위 식별을 위해 null로 반환하지 않는다.

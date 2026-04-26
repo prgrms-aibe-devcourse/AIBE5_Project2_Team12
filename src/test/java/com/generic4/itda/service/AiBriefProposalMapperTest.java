@@ -384,6 +384,149 @@ class AiBriefProposalMapperTest {
     }
 
     @Test
+    @DisplayName("AI 인터뷰 적용은 proposalPositionId가 있으면 기존 모집 단위 title 변경을 신규 생성 없이 반영한다")
+    void applyForInterview_updatesExistingPositionTitleByProposalPositionId() {
+        Proposal proposal = createProposal();
+        Position backend = Position.create("백엔드 개발자");
+
+        ProposalPosition paymentBackendPosition = proposal.addPosition(
+                backend,
+                "결제 서버 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                3_000_000L,
+                4_000_000L,
+                3L,
+                3,
+                6,
+                null
+        );
+        ProposalPosition settlementBackendPosition = proposal.addPosition(
+                backend,
+                "정산 서버 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                3_500_000L,
+                4_500_000L,
+                3L,
+                3,
+                6,
+                null
+        );
+        setProposalPositionId(paymentBackendPosition, 101L);
+        setProposalPositionId(settlementBackendPosition, 102L);
+
+        given(positionResolver.resolve("백엔드 개발자")).willReturn(Optional.of(backend));
+
+        AiBriefResult aiBriefResult = AiBriefResult.of(
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(
+                        AiBriefPositionResult.of(
+                                101L,
+                                "백엔드 개발자",
+                                "결제 플랫폼 백엔드 개발자",
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                List.of()
+                        )
+                )
+        );
+
+        aiBriefProposalMapper.applyForInterview(
+                proposal,
+                aiBriefResult,
+                "결제 서버 백엔드 개발자 제목을 결제 플랫폼 백엔드 개발자로 바꿔줘."
+        );
+
+        assertThat(proposal.getPositions()).hasSize(2);
+        assertThat(paymentBackendPosition.getTitle()).isEqualTo("결제 플랫폼 백엔드 개발자");
+        assertThat(paymentBackendPosition.getHeadCount()).isEqualTo(1L);
+        assertThat(settlementBackendPosition.getTitle()).isEqualTo("정산 서버 백엔드 개발자");
+    }
+
+    @Test
+    @DisplayName("AI 인터뷰 적용은 title 변경 결과가 같은 category의 다른 모집 단위와 충돌하면 기존 title을 유지한다")
+    void applyForInterview_keepsExistingTitleWhenTitleChangeConflictsWithSibling() {
+        Proposal proposal = createProposal();
+        Position backend = Position.create("백엔드 개발자");
+
+        ProposalPosition paymentBackendPosition = proposal.addPosition(
+                backend,
+                "결제 서버 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                3_000_000L,
+                4_000_000L,
+                3L,
+                3,
+                6,
+                null
+        );
+        ProposalPosition settlementBackendPosition = proposal.addPosition(
+                backend,
+                "정산 서버 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                2L,
+                3_500_000L,
+                4_500_000L,
+                3L,
+                3,
+                6,
+                null
+        );
+        setProposalPositionId(paymentBackendPosition, 101L);
+        setProposalPositionId(settlementBackendPosition, 102L);
+
+        given(positionResolver.resolve("백엔드 개발자")).willReturn(Optional.of(backend));
+
+        AiBriefResult aiBriefResult = AiBriefResult.of(
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(
+                        AiBriefPositionResult.of(
+                                101L,
+                                "백엔드 개발자",
+                                "정산서버백엔드개발자",
+                                null,
+                                3L,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                List.of()
+                        )
+                )
+        );
+
+        aiBriefProposalMapper.applyForInterview(
+                proposal,
+                aiBriefResult,
+                "결제 서버 백엔드 개발자 제목을 정산 서버 백엔드 개발자로 바꾸고 인원은 3명으로 해줘."
+        );
+
+        assertThat(proposal.getPositions()).hasSize(2);
+        assertThat(paymentBackendPosition.getTitle()).isEqualTo("결제 서버 백엔드 개발자");
+        assertThat(paymentBackendPosition.getHeadCount()).isEqualTo(3L);
+        assertThat(settlementBackendPosition.getTitle()).isEqualTo("정산 서버 백엔드 개발자");
+        assertThat(settlementBackendPosition.getHeadCount()).isEqualTo(2L);
+    }
+
+    @Test
     @DisplayName("AI 인터뷰 적용은 잘못된 proposalPositionId가 있으면 신규 모집 단위로 생성하지 않는다")
     void applyForInterview_skipsInvalidProposalPositionIdWithoutCreatingNewPosition() {
         Proposal proposal = createProposal();
