@@ -250,14 +250,16 @@ public class ProposalService {
     }
 
     private void replacePositions(Proposal proposal, List<ProposalPositionForm> positionForms) {
-        List<ProposalPositionForm> mergedPositionForms = mergePositionFormsByPositionId(positionForms);
         Map<Long, ProposalPosition> existingById = existingPositionsById(proposal);
-        Map<Long, ProposalPosition> existingByPositionId = existingPositionsByPositionId(proposal);
         Set<ProposalPosition> appliedPositions = new HashSet<>();
 
-        for (ProposalPositionForm positionForm : mergedPositionForms) {
+        for (ProposalPositionForm positionForm : positionForms) {
+            if (positionForm.getPositionId() == null) {
+                continue;
+            }
+
             Position position = getPosition(positionForm.getPositionId());
-            ProposalPosition proposalPosition = findExistingPosition(positionForm, position, existingById, existingByPositionId);
+            ProposalPosition proposalPosition = findExistingPosition(positionForm, existingById);
 
             if (proposalPosition == null) {
                 proposalPosition = proposal.addPosition(
@@ -298,17 +300,6 @@ public class ProposalService {
         removeMissingPositions(proposal, appliedPositions);
     }
 
-    private List<ProposalPositionForm> mergePositionFormsByPositionId(List<ProposalPositionForm> positionForms) {
-        Map<Long, ProposalPositionForm> merged = new LinkedHashMap<>();
-        for (ProposalPositionForm positionForm : positionForms) {
-            if (positionForm.getPositionId() == null) {
-                continue;
-            }
-            merged.put(positionForm.getPositionId(), positionForm);
-        }
-        return new ArrayList<>(merged.values());
-    }
-
     private Map<Long, ProposalPosition> existingPositionsById(Proposal proposal) {
         Map<Long, ProposalPosition> existingPositions = new LinkedHashMap<>();
         for (ProposalPosition proposalPosition : proposal.getPositions()) {
@@ -319,26 +310,14 @@ public class ProposalService {
         return existingPositions;
     }
 
-    private Map<Long, ProposalPosition> existingPositionsByPositionId(Proposal proposal) {
-        Map<Long, ProposalPosition> existingPositions = new LinkedHashMap<>();
-        for (ProposalPosition proposalPosition : proposal.getPositions()) {
-            if (proposalPosition.getPosition() != null && proposalPosition.getPosition().getId() != null) {
-                existingPositions.put(proposalPosition.getPosition().getId(), proposalPosition);
-            }
-        }
-        return existingPositions;
-    }
-
     private ProposalPosition findExistingPosition(
             ProposalPositionForm positionForm,
-            Position position,
-            Map<Long, ProposalPosition> existingById,
-            Map<Long, ProposalPosition> existingByPositionId
+            Map<Long, ProposalPosition> existingById
     ) {
-        if (positionForm.getId() != null && existingById.containsKey(positionForm.getId())) {
-            return existingById.get(positionForm.getId());
+        if (positionForm.getId() == null) {
+            return null;
         }
-        return existingByPositionId.get(position.getId());
+        return existingById.get(positionForm.getId());
     }
 
     private void removeMissingPositions(Proposal proposal, Set<ProposalPosition> appliedPositions) {
