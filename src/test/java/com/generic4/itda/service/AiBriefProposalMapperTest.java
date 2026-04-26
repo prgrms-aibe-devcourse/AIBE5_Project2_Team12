@@ -566,6 +566,196 @@ class AiBriefProposalMapperTest {
     }
 
     @Test
+    @DisplayName("AI 인터뷰 응답 skills가 비어 있으면 기존 스킬을 유지한다")
+    void applyForInterview_preservesExistingSkillsWhenAiReturnsEmptySkills() {
+        Proposal proposal = createProposalWithExpectedPeriod(8L);
+        Position backend = Position.create("백엔드 개발자");
+        Skill java = Skill.create("Java", null);
+        Skill springBoot = Skill.create("Spring Boot", null);
+
+        ProposalPosition backendPosition = proposal.addPosition(
+                backend,
+                "결제 서버 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                3_000_000L,
+                4_000_000L,
+                8L,
+                3,
+                6,
+                null
+        );
+        backendPosition.addSkill(java, ProposalPositionSkillImportance.ESSENTIAL);
+        backendPosition.addSkill(springBoot, ProposalPositionSkillImportance.PREFERENCE);
+
+        given(positionResolver.resolve("백엔드 개발자")).willReturn(Optional.of(backend));
+
+        AiBriefResult aiBriefResult = AiBriefResult.of(
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(
+                        AiBriefPositionResult.of(
+                                "백엔드 개발자",
+                                "결제 서버 백엔드 개발자",
+                                null,
+                                2L,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                List.of()
+                        )
+                )
+        );
+
+        aiBriefProposalMapper.applyForInterview(
+                proposal,
+                aiBriefResult,
+                "결제 서버 백엔드 개발자 인원만 2명으로 바꿔줘."
+        );
+
+        assertThat(backendPosition.getSkills())
+                .extracting(skill -> skill.getSkill().getName(), skill -> skill.getImportance())
+                .containsExactly(
+                        tuple("Java", ProposalPositionSkillImportance.ESSENTIAL),
+                        tuple("Spring Boot", ProposalPositionSkillImportance.PREFERENCE)
+                );
+    }
+
+    @Test
+    @DisplayName("AI 인터뷰 응답 skills가 있으면 기존 스킬을 삭제하지 않고 새 스킬을 추가한다")
+    void applyForInterview_addsNewSkillsWithoutRemovingExistingSkills() {
+        Proposal proposal = createProposalWithExpectedPeriod(8L);
+        Position backend = Position.create("백엔드 개발자");
+        Skill java = Skill.create("Java", null);
+        Skill springBoot = Skill.create("Spring Boot", null);
+        Skill redis = Skill.create("Redis", null);
+
+        ProposalPosition backendPosition = proposal.addPosition(
+                backend,
+                "결제 서버 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                3_000_000L,
+                4_000_000L,
+                8L,
+                3,
+                6,
+                null
+        );
+        backendPosition.addSkill(java, ProposalPositionSkillImportance.ESSENTIAL);
+        backendPosition.addSkill(springBoot, ProposalPositionSkillImportance.PREFERENCE);
+
+        given(positionResolver.resolve("백엔드 개발자")).willReturn(Optional.of(backend));
+        given(skillResolver.resolve("Redis")).willReturn(Optional.of(redis));
+
+        AiBriefResult aiBriefResult = AiBriefResult.of(
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(
+                        AiBriefPositionResult.of(
+                                "백엔드 개발자",
+                                "결제 서버 백엔드 개발자",
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                List.of(AiBriefSkillResult.of("Redis", ProposalPositionSkillImportance.PREFERENCE))
+                        )
+                )
+        );
+
+        aiBriefProposalMapper.applyForInterview(
+                proposal,
+                aiBriefResult,
+                "결제 서버 백엔드 개발자에 Redis도 추가해줘."
+        );
+
+        assertThat(backendPosition.getSkills())
+                .extracting(skill -> skill.getSkill().getName(), skill -> skill.getImportance())
+                .containsExactly(
+                        tuple("Java", ProposalPositionSkillImportance.ESSENTIAL),
+                        tuple("Spring Boot", ProposalPositionSkillImportance.PREFERENCE),
+                        tuple("Redis", ProposalPositionSkillImportance.PREFERENCE)
+                );
+    }
+
+    @Test
+    @DisplayName("AI 인터뷰 응답 skills가 기존 스킬을 포함하면 기존 스킬을 삭제하지 않고 중요도만 갱신한다")
+    void applyForInterview_updatesExistingSkillImportanceWithoutRemovingOmittedSkills() {
+        Proposal proposal = createProposalWithExpectedPeriod(8L);
+        Position backend = Position.create("백엔드 개발자");
+        Skill java = Skill.create("Java", null);
+        Skill springBoot = Skill.create("Spring Boot", null);
+
+        ProposalPosition backendPosition = proposal.addPosition(
+                backend,
+                "결제 서버 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                3_000_000L,
+                4_000_000L,
+                8L,
+                3,
+                6,
+                null
+        );
+        backendPosition.addSkill(java, ProposalPositionSkillImportance.PREFERENCE);
+        backendPosition.addSkill(springBoot, ProposalPositionSkillImportance.PREFERENCE);
+
+        given(positionResolver.resolve("백엔드 개발자")).willReturn(Optional.of(backend));
+        given(skillResolver.resolve("Java")).willReturn(Optional.of(java));
+
+        AiBriefResult aiBriefResult = AiBriefResult.of(
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(
+                        AiBriefPositionResult.of(
+                                "백엔드 개발자",
+                                "결제 서버 백엔드 개발자",
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                List.of(AiBriefSkillResult.of("Java", ProposalPositionSkillImportance.ESSENTIAL))
+                        )
+                )
+        );
+
+        aiBriefProposalMapper.applyForInterview(
+                proposal,
+                aiBriefResult,
+                "결제 서버 백엔드 개발자에서 Java는 필수로 바꿔줘."
+        );
+
+        assertThat(backendPosition.getSkills())
+                .extracting(skill -> skill.getSkill().getName(), skill -> skill.getImportance())
+                .containsExactly(
+                        tuple("Java", ProposalPositionSkillImportance.ESSENTIAL),
+                        tuple("Spring Boot", ProposalPositionSkillImportance.PREFERENCE)
+                );
+    }
+
+    @Test
     @DisplayName("AI 브리프가 기존 스킬을 다시 제안하면 중복 추가하지 않고 중요도만 갱신한다")
     void apply_updatesExistingSkillImportanceWithoutDuplicatingSkill() {
         Proposal proposal = createProposal();
