@@ -75,7 +75,7 @@ public class AiBriefProposalMapper {
             return;
         }
 
-        List<PositionApplication> applications = mergePositionApplicationsByPositionKey(positionResults);
+        List<PositionApplication> applications = mergePositionApplications(positionResults, mergeMode);
         if (applications.isEmpty()) {
             if (mergeMode == PositionMergeMode.AI_BRIEF) {
                 removePositionsNotInAiResult(proposal, Set.of());
@@ -83,6 +83,7 @@ public class AiBriefProposalMapper {
             return;
         }
 
+        Map<Long, ProposalPosition> existingById = existingPositionsById(proposal);
         Map<String, ProposalPosition> existingByPositionKey = existingPositionsByPositionKey(proposal);
         Map<String, List<ProposalPosition>> existingByCategoryKey = existingPositionsByCategoryKey(proposal);
         Map<String, Long> applicationCountByCategoryKey = applicationCountByCategoryKey(applications);
@@ -98,10 +99,16 @@ public class AiBriefProposalMapper {
 
             ProposalPosition proposalPosition = findExistingPosition(
                     application,
+                    mergeMode,
+                    existingById,
                     existingByPositionKey,
                     existingByCategoryKey,
                     applicationCountByCategoryKey
             );
+
+            if (proposalPosition == null && hasProposalPositionId(application)) {
+                continue;
+            }
 
             if (proposalPosition == null) {
                 proposalPosition = addNewPosition(proposal, application);
@@ -382,6 +389,16 @@ public class AiBriefProposalMapper {
         }
     }
 
+    private Map<Long, ProposalPosition> existingPositionsById(Proposal proposal) {
+        Map<Long, ProposalPosition> existingPositions = new LinkedHashMap<>();
+        for (ProposalPosition proposalPosition : proposal.getPositions()) {
+            if (proposalPosition.getId() != null) {
+                existingPositions.put(proposalPosition.getId(), proposalPosition);
+            }
+        }
+        return existingPositions;
+    }
+
     private Map<String, ProposalPosition> existingPositionsByPositionKey(Proposal proposal) {
         Map<String, ProposalPosition> existingPositions = new LinkedHashMap<>();
         for (ProposalPosition proposalPosition : proposal.getPositions()) {
@@ -405,7 +422,10 @@ public class AiBriefProposalMapper {
         return existingPositions;
     }
 
-    private List<PositionApplication> mergePositionApplicationsByPositionKey(List<AiBriefPositionResult> positionResults) {
+    private List<PositionApplication> mergePositionApplications(
+            List<AiBriefPositionResult> positionResults,
+            PositionMergeMode mergeMode
+    ) {
         Map<String, PositionApplication> merged = new LinkedHashMap<>();
 
         for (AiBriefPositionResult positionResult : positionResults) {
@@ -415,10 +435,17 @@ public class AiBriefProposalMapper {
             }
 
             Position position = resolvedPosition.get();
-            merged.put(positionKey(position, positionResult.getTitle()), new PositionApplication(position, positionResult));
+            merged.put(applicationKey(position, positionResult, mergeMode), new PositionApplication(position, positionResult));
         }
 
         return new ArrayList<>(merged.values());
+    }
+
+    private String applicationKey(Position position, AiBriefPositionResult result, PositionMergeMode mergeMode) {
+        if (mergeMode == PositionMergeMode.AI_INTERVIEW && result.getProposalPositionId() != null) {
+            return "id::" + result.getProposalPositionId();
+        }
+        return "position::" + positionKey(position, result.getTitle());
     }
 
     private Map<String, Long> applicationCountByCategoryKey(List<PositionApplication> applications) {
@@ -434,10 +461,16 @@ public class AiBriefProposalMapper {
 
     private ProposalPosition findExistingPosition(
             PositionApplication application,
+            PositionMergeMode mergeMode,
+            Map<Long, ProposalPosition> existingById,
             Map<String, ProposalPosition> existingByPositionKey,
             Map<String, List<ProposalPosition>> existingByCategoryKey,
             Map<String, Long> applicationCountByCategoryKey
     ) {
+        if (mergeMode == PositionMergeMode.AI_INTERVIEW && hasProposalPositionId(application)) {
+            return existingById.get(application.result().getProposalPositionId());
+        }
+
         String positionKey = positionKey(application.position(), application.result().getTitle());
         ProposalPosition exactMatch = existingByPositionKey.get(positionKey);
         if (exactMatch != null) {
@@ -453,6 +486,10 @@ public class AiBriefProposalMapper {
         }
 
         return null;
+    }
+
+    private boolean hasProposalPositionId(PositionApplication application) {
+        return application.result().getProposalPositionId() != null;
     }
 
     private Long resolveHeadCount(AiBriefPositionResult result) {
