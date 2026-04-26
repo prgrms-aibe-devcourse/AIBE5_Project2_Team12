@@ -69,11 +69,17 @@ public class AiBriefProposalMapper {
             DeletedPositionKeys ignoredPositionKeys
     ) {
         if (positionResults == null || positionResults.isEmpty()) {
+            if (mergeMode == PositionMergeMode.AI_BRIEF) {
+                removePositionsNotInAiResult(proposal, Set.of());
+            }
             return;
         }
 
         List<PositionApplication> applications = mergePositionApplicationsByPositionKey(positionResults);
         if (applications.isEmpty()) {
+            if (mergeMode == PositionMergeMode.AI_BRIEF) {
+                removePositionsNotInAiResult(proposal, Set.of());
+            }
             return;
         }
 
@@ -101,7 +107,7 @@ public class AiBriefProposalMapper {
                 proposalPosition = addNewPosition(proposal, application);
                 replaceSkills(proposalPosition, application.result().getSkills());
             } else if (mergeMode == PositionMergeMode.AI_INTERVIEW) {
-                updateExistingPositionForInterview(proposalPosition, application);
+                updateExistingPositionForInterview(proposal, proposalPosition, application);
                 mergeSkillsForInterview(proposalPosition, application.result().getSkills());
             } else {
                 updateExistingPositionForAiBrief(proposalPosition, application);
@@ -154,7 +160,11 @@ public class AiBriefProposalMapper {
         );
     }
 
-    private void updateExistingPositionForInterview(ProposalPosition proposalPosition, PositionApplication application) {
+    private void updateExistingPositionForInterview(
+            Proposal proposal,
+            ProposalPosition proposalPosition,
+            PositionApplication application
+    ) {
         AiBriefPositionResult result = application.result();
         ProposalWorkType workType = resolveInterviewWorkType(proposalPosition, result);
         String workPlace = resolveInterviewWorkPlace(proposalPosition, result, workType);
@@ -166,7 +176,7 @@ public class AiBriefProposalMapper {
                 resolveInterviewHeadCount(proposalPosition, result),
                 resolveInterviewUnitBudgetMin(proposalPosition, result),
                 resolveInterviewUnitBudgetMax(proposalPosition, result),
-                resolveInterviewExpectedPeriod(proposalPosition, result),
+                resolveInterviewExpectedPeriod(proposal, proposalPosition, result),
                 resolveInterviewCareerMinYears(proposalPosition, result),
                 resolveInterviewCareerMaxYears(proposalPosition, result),
                 workPlace
@@ -232,11 +242,22 @@ public class AiBriefProposalMapper {
         return proposalPosition.getUnitBudgetMax();
     }
 
-    private Long resolveInterviewExpectedPeriod(ProposalPosition proposalPosition, AiBriefPositionResult result) {
-        if (result.getExpectedPeriod() != null) {
-            return result.getExpectedPeriod();
+    private Long resolveInterviewExpectedPeriod(
+            Proposal proposal,
+            ProposalPosition proposalPosition,
+            AiBriefPositionResult result
+    ) {
+        Long expectedPeriod = result.getExpectedPeriod() != null
+                ? result.getExpectedPeriod()
+                : proposalPosition.getExpectedPeriod();
+
+        if (proposal.getExpectedPeriod() != null
+                && expectedPeriod != null
+                && expectedPeriod > proposal.getExpectedPeriod()) {
+            return proposal.getExpectedPeriod();
         }
-        return proposalPosition.getExpectedPeriod();
+
+        return expectedPeriod;
     }
 
     private Integer resolveInterviewCareerMinYears(ProposalPosition proposalPosition, AiBriefPositionResult result) {

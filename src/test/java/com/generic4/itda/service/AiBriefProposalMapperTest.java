@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
-import static org.mockito.Mockito.never;
 
 import com.generic4.itda.domain.position.Position;
 import com.generic4.itda.domain.proposal.Proposal;
@@ -172,6 +171,92 @@ class AiBriefProposalMapperTest {
         assertThat(updatedPosition.getSkills())
                 .extracting(skill -> skill.getSkill().getName(), skill -> skill.getImportance())
                 .containsExactly(tuple("Java", ProposalPositionSkillImportance.ESSENTIAL));
+    }
+
+    @Test
+    @DisplayName("AI 브리프가 positions 빈 배열을 반환하면 기존 모집 단위를 제거한다")
+    void apply_removesExistingPositionsWhenAiBriefReturnsEmptyPositions() {
+        Proposal proposal = createProposal();
+        Position backend = Position.create("백엔드 개발자");
+
+        proposal.addPosition(
+                backend,
+                "기존 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                1_000_000L,
+                2_000_000L,
+                3L,
+                null,
+                null,
+                null
+        );
+
+        AiBriefResult aiBriefResult = AiBriefResult.of(
+                "새 제목",
+                "새 설명",
+                null,
+                null,
+                null,
+                List.of()
+        );
+
+        aiBriefProposalMapper.apply(proposal, aiBriefResult);
+
+        assertThat(proposal.getTitle()).isEqualTo("새 제목");
+        assertThat(proposal.getDescription()).isEqualTo("새 설명");
+        assertThat(proposal.getPositions()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("AI 브리프가 모두 매핑 불가능한 category만 반환하면 기존 모집 단위를 제거한다")
+    void apply_removesExistingPositionsWhenAllAiPositionsAreUnresolved() {
+        Proposal proposal = createProposal();
+        Position backend = Position.create("백엔드 개발자");
+
+        proposal.addPosition(
+                backend,
+                "기존 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                1_000_000L,
+                2_000_000L,
+                3L,
+                null,
+                null,
+                null
+        );
+
+        given(positionResolver.resolve("플랫폼 개발자")).willReturn(Optional.empty());
+
+        AiBriefResult aiBriefResult = AiBriefResult.of(
+                "AI가 정리한 제목",
+                "AI가 정리한 설명",
+                null,
+                null,
+                null,
+                List.of(
+                        AiBriefPositionResult.of(
+                                "플랫폼 개발자",
+                                "플랫폼 엔지니어",
+                                ProposalWorkType.REMOTE,
+                                1L,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                List.of()
+                        )
+                )
+        );
+
+        aiBriefProposalMapper.apply(proposal, aiBriefResult);
+
+        assertThat(proposal.getTitle()).isEqualTo("AI가 정리한 제목");
+        assertThat(proposal.getDescription()).isEqualTo("AI가 정리한 설명");
+        assertThat(proposal.getPositions()).isEmpty();
     }
 
     @Test
@@ -365,6 +450,67 @@ class AiBriefProposalMapperTest {
         assertThat(paymentBackendPosition.getHeadCount()).isEqualTo(2L);
         assertThat(findProposalPositionByTitle(proposal, "결제서버백엔드개발자")).isSameAs(paymentBackendPosition);
         assertThat(findProposalPositionByTitle(proposal, "정산 서버 백엔드 개발자")).isSameAs(settlementBackendPosition);
+    }
+
+    @Test
+    @DisplayName("AI 인터뷰에서 제안서 기간만 줄이면 기존 모집 단위 기간도 새 제안서 기간 이하로 보정한다")
+    void applyForInterview_clampsExistingPositionPeriodWhenProposalPeriodIsReduced() {
+        Proposal proposal = createProposalWithExpectedPeriod(12L);
+        Position backend = Position.create("백엔드 개발자");
+
+        ProposalPosition backendPosition = proposal.addPosition(
+                backend,
+                "결제 서버 백엔드 개발자",
+                ProposalWorkType.HYBRID,
+                1L,
+                3_000_000L,
+                4_000_000L,
+                12L,
+                3,
+                6,
+                "판교"
+        );
+
+        given(positionResolver.resolve("백엔드 개발자")).willReturn(Optional.of(backend));
+
+        AiBriefResult aiBriefResult = AiBriefResult.of(
+                null,
+                null,
+                null,
+                null,
+                8L,
+                List.of(
+                        AiBriefPositionResult.of(
+                                "백엔드 개발자",
+                                "결제 서버 백엔드 개발자",
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                List.of()
+                        )
+                )
+        );
+
+        aiBriefProposalMapper.applyForInterview(
+                proposal,
+                aiBriefResult,
+                "전체 기간만 8주로 줄여줘."
+        );
+
+        assertThat(proposal.getExpectedPeriod()).isEqualTo(8L);
+        assertThat(backendPosition.getExpectedPeriod()).isEqualTo(8L);
+        assertThat(backendPosition.getHeadCount()).isEqualTo(1L);
+        assertThat(backendPosition.getWorkType()).isEqualTo(ProposalWorkType.HYBRID);
+        assertThat(backendPosition.getWorkPlace()).isEqualTo("판교");
+        assertThat(backendPosition.getUnitBudgetMin()).isEqualTo(3_000_000L);
+        assertThat(backendPosition.getUnitBudgetMax()).isEqualTo(4_000_000L);
+        assertThat(backendPosition.getCareerMinYears()).isEqualTo(3);
+        assertThat(backendPosition.getCareerMaxYears()).isEqualTo(6);
     }
 
     @Test
@@ -874,8 +1020,8 @@ class AiBriefProposalMapperTest {
     }
 
     @Test
-    @DisplayName("AI 응답에 값이 없으면 기존 제안서 정보와 모집 단위를 유지한다")
-    void apply_keepsExistingFieldsWhenAiReturnsNullOrEmpty() {
+    @DisplayName("AI 응답에 값이 없으면 기존 제안서 정보는 유지하고 AI 브리프 positions 빈 결과 기준으로 모집 단위는 제거한다")
+    void apply_keepsExistingFieldsWhenAiReturnsNullAndSynchronizesEmptyPositions() {
         Proposal proposal = createProposal();
         Position oldPosition = Position.create("디자이너");
         Skill oldSkill = Skill.create("Figma", null);
@@ -909,11 +1055,7 @@ class AiBriefProposalMapperTest {
         assertThat(proposal.getTotalBudgetMin()).isEqualTo(1_000_000L);
         assertThat(proposal.getTotalBudgetMax()).isEqualTo(2_000_000L);
         assertThat(proposal.getExpectedPeriod()).isEqualTo(3L);
-        assertThat(proposal.getPositions()).hasSize(1);
-        assertThat(proposal.getPositions().get(0).getPosition().getName()).isEqualTo("디자이너");
-        assertThat(proposal.getPositions().get(0).getSkills())
-                .extracting(skill -> skill.getSkill().getName(), skill -> skill.getImportance())
-                .containsExactly(tuple("Figma", ProposalPositionSkillImportance.ESSENTIAL));
+        assertThat(proposal.getPositions()).isEmpty();
     }
 
     @Test
@@ -1269,58 +1411,6 @@ class AiBriefProposalMapperTest {
         assertThat(titles).containsExactly("결제 서버 백엔드 개발자", "정산 서버 백엔드 개발자");
         assertThat(findProposalPositionByTitle(proposal, "결제 서버 백엔드 개발자")).isSameAs(paymentBackendPosition);
         assertThat(findProposalPositionByTitle(proposal, "정산 서버 백엔드 개발자")).isSameAs(settlementBackendPosition);
-    }
-
-    @Test
-    @DisplayName("AI가 기존 Position 마스터에 없는 카테고리를 반환하면 저장하지 않고 기존 모집 단위를 유지한다")
-    void apply_skipsUnknownPositionCategoryWithoutRemovingExistingPositions() {
-        Proposal proposal = createProposal();
-        Position existingPosition = Position.create("백엔드 개발자");
-        proposal.addPosition(
-                existingPosition,
-                "기존 백엔드 개발자",
-                ProposalWorkType.REMOTE,
-                1L,
-                1_000_000L,
-                2_000_000L,
-                3L,
-                null,
-                null,
-                null
-        );
-
-        given(positionResolver.resolve("플랫폼 개발자")).willReturn(Optional.empty());
-
-        AiBriefResult aiBriefResult = AiBriefResult.of(
-                "AI가 정리한 제목",
-                "AI가 정리한 설명",
-                null,
-                null,
-                null,
-                List.of(
-                        AiBriefPositionResult.of(
-                                "플랫폼 개발자",
-                                "플랫폼 엔지니어",
-                                ProposalWorkType.REMOTE,
-                                1L,
-                                null,
-                                null,
-                                null,
-                                null,
-                                null,
-                                null,
-                                List.of()
-                        )
-                )
-        );
-
-        aiBriefProposalMapper.apply(proposal, aiBriefResult);
-
-        assertThat(proposal.getPositions()).hasSize(1);
-        assertThat(proposal.getPositions().get(0).getPosition()).isSameAs(existingPosition);
-        assertThat(proposal.getPositions().get(0).getTitle()).isEqualTo("기존 백엔드 개발자");
-        assertThat(proposal.getTitle()).isEqualTo("AI가 정리한 제목");
-        assertThat(proposal.getDescription()).isEqualTo("AI가 정리한 설명");
     }
 
     private ProposalPosition findProposalPosition(Proposal proposal, String positionName) {
