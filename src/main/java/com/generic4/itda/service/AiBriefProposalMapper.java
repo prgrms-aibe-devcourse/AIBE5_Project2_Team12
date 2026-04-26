@@ -10,6 +10,8 @@ import com.generic4.itda.domain.skill.Skill;
 import com.generic4.itda.dto.proposal.AiBriefPositionResult;
 import com.generic4.itda.dto.proposal.AiBriefResult;
 import com.generic4.itda.dto.proposal.AiBriefSkillResult;
+import com.generic4.itda.dto.proposal.AiInterviewSkillChangeAction;
+import com.generic4.itda.dto.proposal.AiInterviewSkillChangeResult;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -116,6 +118,7 @@ public class AiBriefProposalMapper {
             } else if (mergeMode == PositionMergeMode.AI_INTERVIEW) {
                 updateExistingPositionForInterview(proposal, proposalPosition, application);
                 mergeSkillsForInterview(proposalPosition, application.result().getSkills());
+                applySkillChangesForInterview(proposalPosition, application.result().getSkillChanges());
             } else {
                 updateExistingPositionForAiBrief(proposalPosition, application);
                 replaceSkills(proposalPosition, application.result().getSkills());
@@ -353,14 +356,14 @@ public class AiBriefProposalMapper {
             }
 
             String normalizedMessagePart = normalizeForContains(messagePart);
-            boolean titleMatched = containsNormalized(normalizedMessagePart, title);
-            boolean positionNameMatched = containsNormalized(normalizedMessagePart, positionName);
+            boolean titleDeleteMatched = hasTargetedDeleteIntent(normalizedMessagePart, title);
+            boolean positionNameDeleteMatched = hasTargetedDeleteIntent(normalizedMessagePart, positionName);
 
-            if (titleMatched) {
+            if (titleDeleteMatched) {
                 return new DeleteDecision(true, false);
             }
 
-            if (positionNameMatched) {
+            if (positionNameDeleteMatched) {
                 if (sameCategoryCount == 1) {
                     return new DeleteDecision(true, true);
                 }
@@ -395,11 +398,55 @@ public class AiBriefProposalMapper {
                 || normalized.contains("없애");
     }
 
-    private boolean containsNormalized(String normalizedSource, String target) {
+    private boolean hasTargetedDeleteIntent(String normalizedSource, String target) {
         if (!StringUtils.hasText(normalizedSource) || !StringUtils.hasText(target)) {
             return false;
         }
-        return normalizedSource.contains(normalizeForContains(target));
+
+        String normalizedTarget = normalizeForContains(target);
+        int targetIndex = normalizedSource.indexOf(normalizedTarget);
+        if (targetIndex < 0) {
+            return false;
+        }
+
+        return hasNearbyDeleteToken(normalizedSource, targetIndex, normalizedTarget.length());
+    }
+
+    private boolean hasNearbyDeleteToken(String normalizedSource, int targetIndex, int targetLength) {
+        int targetEndIndex = targetIndex + targetLength;
+
+        return isDeleteTokenNearTarget(normalizedSource, "빼", targetIndex, targetEndIndex)
+                || isDeleteTokenNearTarget(normalizedSource, "제외", targetIndex, targetEndIndex)
+                || isDeleteTokenNearTarget(normalizedSource, "삭제", targetIndex, targetEndIndex)
+                || isDeleteTokenNearTarget(normalizedSource, "제거", targetIndex, targetEndIndex)
+                || isDeleteTokenNearTarget(normalizedSource, "필요없", targetIndex, targetEndIndex)
+                || isDeleteTokenNearTarget(normalizedSource, "안뽑", targetIndex, targetEndIndex)
+                || isDeleteTokenNearTarget(normalizedSource, "안구", targetIndex, targetEndIndex)
+                || isDeleteTokenNearTarget(normalizedSource, "없애", targetIndex, targetEndIndex);
+    }
+
+    private boolean isDeleteTokenNearTarget(
+            String normalizedSource,
+            String deleteToken,
+            int targetIndex,
+            int targetEndIndex
+    ) {
+        int deleteTokenIndex = normalizedSource.indexOf(deleteToken);
+        while (deleteTokenIndex >= 0) {
+            int deleteTokenEndIndex = deleteTokenIndex + deleteToken.length();
+
+            if (deleteTokenIndex >= targetEndIndex && deleteTokenIndex - targetEndIndex <= 4) {
+                return true;
+            }
+
+            if (targetIndex >= deleteTokenEndIndex && targetIndex - deleteTokenEndIndex <= 4) {
+                return true;
+            }
+
+            deleteTokenIndex = normalizedSource.indexOf(deleteToken, deleteTokenIndex + 1);
+        }
+
+        return false;
     }
 
     private String normalizeForContains(String value) {
@@ -568,6 +615,104 @@ public class AiBriefProposalMapper {
         for (SkillApplication desiredSkill : desiredSkills.values()) {
             proposalPosition.addSkill(desiredSkill.skill(), desiredSkill.importance());
         }
+    }
+
+    private void applySkillChangesForInterview(
+            ProposalPosition proposalPosition,
+            List<AiInterviewSkillChangeResult> skillChanges
+    ) {
+        if (skillChanges == null || skillChanges.isEmpty()) {
+            return;
+        }
+
+        for (AiInterviewSkillChangeResult skillChange : skillChanges) {
+            if (skillChange == null || !StringUtils.hasText(skillChange.getSkillName())) {
+                continue;
+            }
+
+            Optional<Skill> resolvedSkill = skillResolver.resolve(skillChange.getSkillName());
+            if (resolvedSkill.isEmpty()) {
+                continue;
+            }
+
+            applySkillChangeForInterview(proposalPosition, resolvedSkill.get(), skillChange);
+        }
+    }
+
+    private void applySkillChangeForInterview(
+            ProposalPosition proposalPosition,
+            Skill skill,
+            AiInterviewSkillChangeResult skillChange
+    ) {
+        if (skillChange.getAction() == AiInterviewSkillChangeAction.ADD) {
+            addSkillForInterview(proposalPosition, skill, skillChange.getImportance());
+            return;
+        }
+
+        if (skillChange.getAction() == AiInterviewSkillChangeAction.REMOVE) {
+            removeSkillForInterview(proposalPosition, skill);
+            return;
+        }
+
+        if (skillChange.getAction() == AiInterviewSkillChangeAction.UPDATE_IMPORTANCE) {
+            updateSkillImportanceForInterview(proposalPosition, skill, skillChange.getImportance());
+        }
+    }
+
+    private void addSkillForInterview(
+            ProposalPosition proposalPosition,
+            Skill skill,
+            ProposalPositionSkillImportance importance
+    ) {
+        ProposalPositionSkill existingSkill = findExistingSkill(proposalPosition, skill);
+        ProposalPositionSkillImportance resolvedImportance = importance == null
+                ? ProposalPositionSkillImportance.PREFERENCE
+                : importance;
+
+        if (existingSkill != null) {
+            existingSkill.changeImportance(resolvedImportance);
+            return;
+        }
+
+        proposalPosition.addSkill(skill, resolvedImportance);
+    }
+
+    private void removeSkillForInterview(ProposalPosition proposalPosition, Skill skill) {
+        ProposalPositionSkill existingSkill = findExistingSkill(proposalPosition, skill);
+        if (existingSkill == null) {
+            return;
+        }
+
+        proposalPosition.removeSkill(existingSkill.getSkill());
+    }
+
+    private void updateSkillImportanceForInterview(
+            ProposalPosition proposalPosition,
+            Skill skill,
+            ProposalPositionSkillImportance importance
+    ) {
+        if (importance == null) {
+            return;
+        }
+
+        ProposalPositionSkill existingSkill = findExistingSkill(proposalPosition, skill);
+        if (existingSkill == null) {
+            return;
+        }
+
+        existingSkill.changeImportance(importance);
+    }
+
+    private ProposalPositionSkill findExistingSkill(ProposalPosition proposalPosition, Skill skill) {
+        String skillKey = normalizeKey(skill.getName());
+
+        for (ProposalPositionSkill existingSkill : proposalPosition.getSkills()) {
+            if (skillKey.equals(normalizeKey(existingSkill.getSkill().getName()))) {
+                return existingSkill;
+            }
+        }
+
+        return null;
     }
 
     private void replaceSkills(ProposalPosition proposalPosition, List<AiBriefSkillResult> skills) {
