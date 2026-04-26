@@ -29,10 +29,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
-import org.mockito.Mockito;
 
 class OpenAiAiInterviewGeneratorTest {
 
@@ -121,7 +121,14 @@ class OpenAiAiInterviewGeneratorTest {
                 .andExpect(jsonPath("$.input").value(containsString("이전 대화입니다.")))
                 .andExpect(jsonPath("$.input").value(containsString("[방금 사용자 메시지]")))
                 .andExpect(jsonPath("$.input").value(containsString("백엔드 개발자가 필요해요.")))
-                .andExpect(jsonPath("$.instructions").value(containsString("기존 폼에 이미 있는 값은 사용자가 바꾸거나 삭제하라고 하지 않았다면 최대한 유지한다.")))
+                .andExpect(jsonPath("$.instructions").value(containsString("AI 인터뷰는 제안서를 새로 생성하는 기능이 아니라 기존 제안서 폼을 부분 수정하는 기능이다.")))
+                .andExpect(jsonPath("$.instructions").value(containsString("기존 폼에 이미 있는 값은 사용자가 명시적으로 바꾸거나 삭제하라고 하지 않았다면 유지한다.")))
+                .andExpect(jsonPath("$.instructions").value(containsString("null, blank, 빈 배열은 기존 값을 삭제하라는 뜻이 아니다.")))
+                .andExpect(jsonPath("$.instructions").value(containsString("기존 모집 단위를 수정할 때도 positionCategoryName과 title은 대상 식별을 위해 반드시 현재 폼의 값을 그대로 반환한다.")))
+                .andExpect(jsonPath("$.instructions").value(containsString("사용자가 title 변경을 요청하지 않았다면 title은 기존 값을 그대로 반환한다.")))
+                .andExpect(jsonPath("$.instructions").value(containsString("기존 모집 단위에서 사용자가 언급하지 않은 수정 필드는 null로 반환한다.")))
+                .andExpect(jsonPath("$.instructions").value(containsString("단, positionCategoryName과 title은 기존 모집 단위 식별을 위해 null로 반환하지 않는다.")))
+                .andExpect(jsonPath("$.instructions").value(containsString("기존 모집 단위에서 skills에 포함되지 않은 기존 스킬은 서버에서 삭제하지 않는다.")))
                 .andExpect(jsonPath("$.instructions").value(containsString("assistantMessage에는 사용자에게 보여줄 다음 AI 메시지를 한국어로 자연스럽게 작성한다.")))
                 .andExpect(jsonPath("$.instructions").value(containsString("skills.skillName은 반드시 아래 정규 Skill 목록 중 하나만 사용한다.")))
                 .andExpect(jsonPath("$.instructions").value(containsString("정규 Skill 목록에 없는 스킬은 절대 생성, 제안, 추가, 반환하지 않는다.")))

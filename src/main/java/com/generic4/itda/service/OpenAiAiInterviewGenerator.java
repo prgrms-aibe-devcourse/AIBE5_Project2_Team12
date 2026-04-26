@@ -42,20 +42,19 @@ public class OpenAiAiInterviewGenerator implements AiInterviewGenerator {
             - 마크다운 코드블록, 설명문, 주석, 추가 텍스트를 절대 포함하지 않는다.
             - aiBriefResult에는 현재까지 확인된 정보를 반영한 제안서 초안을 반환한다.
             - assistantMessage에는 사용자에게 보여줄 다음 AI 메시지를 한국어로 자연스럽게 작성한다.
+            - AI 인터뷰는 제안서를 새로 생성하는 기능이 아니라 기존 제안서 폼을 부분 수정하는 기능이다.
+            - 기존 폼에 이미 있는 값은 사용자가 명시적으로 바꾸거나 삭제하라고 하지 않았다면 유지한다.
             - 근거가 부족한 값은 추측하지 말고 null로 반환한다.
-            - 기존 폼에 이미 있는 값은 사용자가 바꾸거나 삭제하라고 하지 않았다면 최대한 유지한다.
+            - null, blank, 빈 배열은 기존 값을 삭제하라는 뜻이 아니다.
             - 사용자가 정정한 값은 최신 사용자 메시지를 우선한다.
-            - 사용자가 제거/삭제/빼달라고 한 포지션은 positions에서 제외한다.
+            - 사용자가 명시적으로 제거/삭제/빼달라고 한 포지션만 삭제 대상으로 본다.
+            - 사용자가 제거/삭제/빼달라고 명시하지 않은 기존 포지션은 aiBriefResult.positions에 없더라도 삭제하지 않는다.
             - 같은 positionCategoryName에 여러 title이 있는데 사용자가 category만 언급하며 제거/삭제/빼달라고 하면 바로 삭제하지 않는다.
             - 이 경우 assistantMessage로 어떤 title의 모집 단위를 삭제할지 되묻고, aiBriefResult.positions에는 기존 모집 단위를 유지한다.
             - 모호한 category 삭제 요청이 있을 때 같은 category의 새 title을 임의로 만들어 기존 모집 단위를 대체하지 않는다.
             - totalBudgetMin, totalBudgetMax, unitBudgetMin, unitBudgetMax는 원화 기준 정수로 반환한다.
             - expectedPeriod는 주 단위 기준 정수로 반환한다.
             - positions는 실제 모집 단위 배열이다.
-            - position별 workType은 SITE, REMOTE, HYBRID 중 하나만 사용한다.
-            - REMOTE인 경우 workPlace는 null로 둔다.
-            - SITE 또는 HYBRID인데 근무지를 알 수 없으면 workPlace는 "협의"로 둔다.
-            - headCount가 명확하지 않으면 1로 둔다.
             - positionCategoryName은 공용 직무 마스터에 대응하는 큰 분류명이다. 예: 백엔드 개발자, 모바일 앱 개발자, QA 엔지니어
             - title은 사용자가 화면에서 보게 될 구체 포지션 제목이다. 예: Java Spring 백엔드 개발자, React 프론트엔드 개발자
             - 같은 positionCategoryName이라도 title이 다르고 역할이 명확히 다르면 별도 position으로 분리할 수 있다.
@@ -63,6 +62,30 @@ public class OpenAiAiInterviewGenerator implements AiInterviewGenerator {
             - 같은 positionCategoryName 안에서 역할 차이가 명확하지 않으면 하나의 모집 단위 title/description에 통합해서 표현한다.
             - 정보가 부족하면 positions는 1~3개 이내로 생성한다.
             - 사용자가 명시하지 않은 포지션은 과도하게 늘리지 않는다.
+
+            기존 모집 단위 갱신 규칙:
+            - 기존 모집 단위를 수정할 때 사용자가 언급한 필드만 변경한다.
+            - 기존 모집 단위를 수정할 때도 positionCategoryName과 title은 대상 식별을 위해 반드시 현재 폼의 값을 그대로 반환한다.
+            - 사용자가 title 변경을 요청하지 않았다면 title은 기존 값을 그대로 반환한다.
+            - 사용자가 title 변경을 요청했다면 title은 변경된 값을 반환한다.
+            - 기존 모집 단위의 workType, workPlace, headCount, unitBudgetMin, unitBudgetMax, expectedPeriod, careerMinYears, careerMaxYears는 사용자가 변경 의도를 밝힌 경우에만 값을 반환한다.
+            - 기존 모집 단위에서 사용자가 언급하지 않은 수정 필드는 null로 반환한다.
+            - 단, positionCategoryName과 title은 기존 모집 단위 식별을 위해 null로 반환하지 않는다.
+            - 기존 모집 단위에서 headCount가 명확하지 않다고 해서 1로 채우지 않는다.
+            - 기존 모집 단위에서 workType이 명확하지 않다고 해서 REMOTE로 채우지 않는다.
+            - 기존 모집 단위에서 workPlace가 명확하지 않다고 해서 "협의"로 채우지 않는다.
+            - 기존 모집 단위에서 workType이 REMOTE로 명시 변경된 경우에만 workPlace를 null로 반환한다.
+            - 기존 모집 단위에서 workType이 SITE 또는 HYBRID로 명시 변경됐고 workPlace도 명확히 말한 경우에만 workPlace를 반환한다.
+            - 기존 모집 단위에서 workType이 SITE 또는 HYBRID로 명시 변경됐지만 근무지를 알 수 없으면 workPlace는 null로 반환한다.
+            - 서버는 기존 모집 단위의 null 필드를 기존 값 유지로 처리한다.
+
+            신규 모집 단위 생성 규칙:
+            - 신규 모집 단위를 생성할 때는 필수값 보정을 허용한다.
+            - 신규 모집 단위의 workType은 SITE, REMOTE, HYBRID 중 하나만 사용한다.
+            - 신규 모집 단위에서 workType이 명확하지 않으면 REMOTE로 둔다.
+            - 신규 모집 단위에서 REMOTE인 경우 workPlace는 null로 둔다.
+            - 신규 모집 단위에서 SITE 또는 HYBRID인데 근무지를 알 수 없으면 workPlace는 "협의"로 둔다.
+            - 신규 모집 단위에서 headCount가 명확하지 않으면 1로 둔다.
 
             스킬 규칙:
             - skills.importance는 ESSENTIAL 또는 PREFERENCE만 사용한다.
@@ -75,6 +98,13 @@ public class OpenAiAiInterviewGenerator implements AiInterviewGenerator {
             - 비슷한 표현은 가장 가까운 정규 Skill 이름으로 변환한다. 예: 리액트, React.js, reactjs는 React로 반환한다.
             - assistantMessage에서도 정규 Skill 목록에 없는 스킬을 먼저 제안하거나 추가해드릴지 묻지 않는다.
             - 사용자가 정규 Skill 목록에 없는 스킬 추가를 요청한 경우, assistantMessage에는 등록된 스킬 목록에 없어 추가하지 않았다고 짧게 안내한다.
+            - 기존 모집 단위에서 사용자가 스킬을 언급하지 않았다면 skills는 빈 배열로 반환한다.
+            - 기존 모집 단위에서 skills 빈 배열은 기존 스킬 삭제가 아니라 기존 스킬 유지 의미로 처리된다.
+            - 기존 모집 단위에서 사용자가 새 스킬 추가를 요청한 경우 추가할 스킬만 skills에 담아 반환한다.
+            - 기존 모집 단위에서 사용자가 기존 스킬 중요도 변경을 요청한 경우 해당 스킬만 skills에 담아 반환한다.
+            - 기존 모집 단위에서 skills에 포함되지 않은 기존 스킬은 서버에서 삭제하지 않는다.
+            - 스킬 개별 삭제, 전체 삭제, 전체 교체는 현재 응답 스키마에서 구조적으로 표현하지 않는다.
+            - 사용자가 스킬 삭제나 전체 교체를 요청하면 assistantMessage에서 현재는 삭제/교체 대상 확인이 필요하다고 짧게 안내하고, 기존 스킬을 임의로 제거하지 않는다.
 
             정규 Skill 목록:
             - React
