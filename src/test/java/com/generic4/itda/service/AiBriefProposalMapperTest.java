@@ -238,7 +238,7 @@ class AiBriefProposalMapperTest {
                 1L,
                 3_000_000L,
                 4_000_000L,
-                4L,
+                3L,
                 3,
                 6,
                 null
@@ -250,7 +250,7 @@ class AiBriefProposalMapperTest {
                 1L,
                 3_500_000L,
                 4_500_000L,
-                4L,
+                3L,
                 3,
                 6,
                 null
@@ -263,7 +263,7 @@ class AiBriefProposalMapperTest {
                 "결제 서버 인원을 늘립니다.",
                 null,
                 null,
-                8L,
+                3L,
                 List.of(
                         AiBriefPositionResult.of(
                                 "백엔드 개발자",
@@ -272,7 +272,7 @@ class AiBriefProposalMapperTest {
                                 2L,
                                 3_000_000L,
                                 4_000_000L,
-                                4L,
+                                3L,
                                 3,
                                 6,
                                 null,
