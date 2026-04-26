@@ -102,7 +102,7 @@ public class AiBriefProposalMapper {
                 replaceSkills(proposalPosition, application.result().getSkills());
             } else if (mergeMode == PositionMergeMode.AI_INTERVIEW) {
                 updateExistingPositionForInterview(proposalPosition, application);
-                replaceSkillsForInterview(proposalPosition, application.result().getSkills());
+                mergeSkillsForInterview(proposalPosition, application.result().getSkills());
             } else {
                 updateExistingPositionForAiBrief(proposalPosition, application);
                 replaceSkills(proposalPosition, application.result().getSkills());
@@ -461,11 +461,24 @@ public class AiBriefProposalMapper {
         return StringUtils.hasText(workPlace) ? workPlace.trim() : null;
     }
 
-    private void replaceSkillsForInterview(ProposalPosition proposalPosition, List<AiBriefSkillResult> skills) {
-        if (skills == null || skills.isEmpty()) {
+    private void mergeSkillsForInterview(ProposalPosition proposalPosition, List<AiBriefSkillResult> skills) {
+        Map<String, SkillApplication> desiredSkills = buildDesiredSkills(skills);
+        if (desiredSkills.isEmpty()) {
             return;
         }
-        replaceSkills(proposalPosition, skills);
+
+        for (ProposalPositionSkill existingSkill : proposalPosition.getSkills()) {
+            String key = normalizeKey(existingSkill.getSkill().getName());
+            SkillApplication desiredSkill = desiredSkills.remove(key);
+
+            if (desiredSkill != null) {
+                existingSkill.changeImportance(desiredSkill.importance());
+            }
+        }
+
+        for (SkillApplication desiredSkill : desiredSkills.values()) {
+            proposalPosition.addSkill(desiredSkill.skill(), desiredSkill.importance());
+        }
     }
 
     private void replaceSkills(ProposalPosition proposalPosition, List<AiBriefSkillResult> skills) {
