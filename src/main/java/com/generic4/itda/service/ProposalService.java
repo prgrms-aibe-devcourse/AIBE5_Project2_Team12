@@ -10,13 +10,13 @@ import com.generic4.itda.domain.proposal.ProposalAiInterviewMessage;
 import com.generic4.itda.domain.proposal.ProposalPosition;
 import com.generic4.itda.domain.proposal.ProposalPositionSkill;
 import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
+import com.generic4.itda.domain.proposal.ProposalPositionStatus;
 import com.generic4.itda.domain.proposal.ProposalStatus;
 import com.generic4.itda.domain.skill.Skill;
 import com.generic4.itda.dto.proposal.AiInterviewDraftSaveRequest;
 import com.generic4.itda.dto.proposal.ProposalForm;
 import com.generic4.itda.dto.proposal.ProposalPositionForm;
 import com.generic4.itda.exception.ProposalNotFoundException;
-import com.generic4.itda.domain.proposal.ProposalPositionStatus;
 import com.generic4.itda.repository.MatchingRepository;
 import com.generic4.itda.repository.MemberRepository;
 import com.generic4.itda.repository.PositionRepository;
@@ -44,6 +44,7 @@ import org.springframework.util.StringUtils;
 public class ProposalService {
 
     private static final String POSITION_CLOSED_REJECTION_REASON = "클라이언트가 모집을 종료했습니다.";
+    private static final String PROPOSAL_CLOSED_REJECTION_REASON = "클라이언트가 제안서 모집을 종료했습니다.";
 
     private static final EnumSet<MatchingStatus> BLOCKING_MATCHING_STATUSES = EnumSet.of(
             MatchingStatus.PROPOSED,
@@ -225,9 +226,37 @@ public class ProposalService {
             throw new IllegalStateException("이미 종료된 모집 포지션입니다.");
         }
 
-        rejectPendingMatchings(positionId, memberEmail);
+        rejectClosableMatchings(positionId, memberEmail, POSITION_CLOSED_REJECTION_REASON);
         position.changeStatus(ProposalPositionStatus.CLOSED);
+
+        boolean allClosed = proposal.getPositions().stream()
+                .allMatch(p -> p.getStatus() == ProposalPositionStatus.CLOSED);
+        if (allClosed) {
+            proposal.complete();
+        }
+
         return position;
+    }
+
+    public Proposal completeProposal(Long proposalId, String memberEmail) {
+        Proposal proposal = getOwnedProposal(proposalId, memberEmail);
+
+        if (proposal.getStatus() != ProposalStatus.MATCHING) {
+            throw new IllegalStateException("매칭 중인 제안서만 종료할 수 있습니다.");
+        }
+
+        Proposal proposalWithPositions = proposalRepository.findWithPositionsById(proposalId)
+                .orElseThrow(() -> new ProposalNotFoundException("제안서를 찾을 수 없습니다. id=" + proposalId));
+
+        for (ProposalPosition position : proposalWithPositions.getPositions()) {
+            rejectClosableMatchings(position.getId(), memberEmail, PROPOSAL_CLOSED_REJECTION_REASON);
+            if (position.getStatus() != ProposalPositionStatus.CLOSED) {
+                position.changeStatus(ProposalPositionStatus.CLOSED);
+            }
+        }
+
+        proposalWithPositions.complete();
+        return proposalWithPositions;
     }
 
     public Long calculateTotalBudgetMin(ProposalForm form) {
@@ -238,15 +267,16 @@ public class ProposalService {
         return calculateTotalBudgetMax(getPositionForms(form));
     }
 
-    private void rejectPendingMatchings(Long positionId, String memberEmail) {
+    private void rejectClosableMatchings(Long positionId, String memberEmail, String reason) {
         List<Matching> matchings = matchingRepository.findByProposalPosition_IdAndClientMember_Email_Value(
                 positionId,
                 memberEmail
         );
 
         matchings.stream()
-                .filter(matching -> matching.getStatus() == MatchingStatus.PROPOSED)
-                .forEach(matching -> matching.rejectByClientClosingPosition(POSITION_CLOSED_REJECTION_REASON));
+                .filter(matching -> matching.getStatus() == MatchingStatus.PROPOSED
+                        || matching.getStatus() == MatchingStatus.ACCEPTED)
+                .forEach(matching -> matching.rejectByClientClosingPosition(reason));
     }
 
     private void replacePositions(Proposal proposal, List<ProposalPositionForm> positionForms) {
@@ -293,7 +323,8 @@ public class ProposalService {
                 proposalPosition.changeStatus(positionForm.getStatus());
             }
 
-            replaceSkills(proposalPosition, positionForm.getEssentialSkillNames(), positionForm.getPreferredSkillNames());
+            replaceSkills(proposalPosition, positionForm.getEssentialSkillNames(),
+                    positionForm.getPreferredSkillNames());
             appliedPositions.add(proposalPosition);
         }
 
@@ -479,7 +510,8 @@ public class ProposalService {
         aiInterviewMessageRepository.saveAll(copiedMessages);
     }
 
-    private ProposalAiInterviewMessage copyAiInterviewMessage(Proposal draftCopy, ProposalAiInterviewMessage sourceMessage) {
+    private ProposalAiInterviewMessage copyAiInterviewMessage(Proposal draftCopy,
+            ProposalAiInterviewMessage sourceMessage) {
         if (sourceMessage.getRole() == AiInterviewMessageRole.USER) {
             return ProposalAiInterviewMessage.createUserMessage(
                     draftCopy,
@@ -534,7 +566,8 @@ public class ProposalService {
             return;
         }
 
-        if (matchingRepository.existsByProposalPosition_Proposal_IdAndStatusIn(proposalId, BLOCKING_MATCHING_STATUSES)) {
+        if (matchingRepository.existsByProposalPosition_Proposal_IdAndStatusIn(proposalId,
+                BLOCKING_MATCHING_STATUSES)) {
             throw new IllegalStateException("진행 중이거나 완료된 매칭이 있는 제안서는 수정할 수 없습니다.");
         }
     }
@@ -571,5 +604,6 @@ public class ProposalService {
     }
 
     private record SkillApplication(Skill skill, ProposalPositionSkillImportance importance) {
+
     }
 }
