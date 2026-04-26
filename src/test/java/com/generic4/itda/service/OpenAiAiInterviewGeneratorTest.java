@@ -21,8 +21,10 @@ import com.generic4.itda.domain.proposal.ProposalPositionSkillImportance;
 import com.generic4.itda.domain.proposal.ProposalWorkType;
 import com.generic4.itda.dto.proposal.AiInterviewGenerateRequest;
 import com.generic4.itda.dto.proposal.AiInterviewResult;
+import com.generic4.itda.dto.proposal.AiInterviewSkillChangeAction;
 import com.generic4.itda.dto.proposal.ProposalForm;
 import com.generic4.itda.exception.AiBriefGenerationException;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
@@ -105,6 +107,11 @@ class OpenAiAiInterviewGeneratorTest {
                                         Map.entry("skills", List.of(
                                                 Map.of("skillName", "Java", "importance", "ESSENTIAL"),
                                                 Map.of("skillName", "Spring Boot", "importance", "PREFERENCE")
+                                        )),
+                                        Map.entry("skillChanges", List.of(
+                                                Map.of("action", "ADD", "skillName", "Redis", "importance", "PREFERENCE"),
+                                                mapOfNullable("action", "REMOVE", "skillName", "JavaScript", "importance", null),
+                                                Map.of("action", "UPDATE_IMPORTANCE", "skillName", "Java", "importance", "ESSENTIAL")
                                         ))
                                 )
                         )
@@ -136,9 +143,15 @@ class OpenAiAiInterviewGeneratorTest {
                 .andExpect(jsonPath("$.instructions").value(containsString("title 변경이 다른 모집 단위와 충돌할 수 있으면 title은 기존 값을 유지하고 assistantMessage에서 어떤 모집 단위를 어떻게 변경할지 다시 확인한다.")))
                 .andExpect(jsonPath("$.instructions").value(containsString("기존 모집 단위에서 사용자가 언급하지 않은 수정 필드는 null로 반환한다.")))
                 .andExpect(jsonPath("$.instructions").value(containsString("단, proposalPositionId, positionCategoryName, title은 기존 모집 단위 식별을 위해 null로 반환하지 않는다.")))
-                .andExpect(jsonPath("$.instructions").value(containsString("기존 모집 단위에서 skills에 포함되지 않은 기존 스킬은 서버에서 삭제하지 않는다.")))
+                .andExpect(jsonPath("$.instructions").value(containsString("기존 모집 단위의 스킬 변경은 가능하면 skillChanges로 표현한다.")))
+                .andExpect(jsonPath("$.instructions").value(containsString("신규 모집 단위의 초기 스킬은 skills로 표현한다.")))
+                .andExpect(jsonPath("$.instructions").value(containsString("기존 모집 단위에서 skills 빈 배열과 skillChanges 빈 배열은 기존 스킬 삭제가 아니라 기존 스킬 유지 의미로 처리된다.")))
+                .andExpect(jsonPath("$.instructions").value(containsString("skillChanges.action은 ADD, REMOVE, UPDATE_IMPORTANCE 중 하나만 사용한다.")))
+                .andExpect(jsonPath("$.instructions").value(containsString("REMOVE는 사용자가 특정 기존 스킬을 명시적으로 제거/삭제/빼달라고 한 경우에만 사용한다.")))
+                .andExpect(jsonPath("$.instructions").value(containsString("action에 포함되지 않은 기존 스킬은 유지 대상으로 본다.")))
                 .andExpect(jsonPath("$.instructions").value(containsString("assistantMessage에는 사용자에게 보여줄 다음 AI 메시지를 한국어로 자연스럽게 작성한다.")))
                 .andExpect(jsonPath("$.instructions").value(containsString("skills.skillName은 반드시 아래 정규 Skill 목록 중 하나만 사용한다.")))
+                .andExpect(jsonPath("$.instructions").value(containsString("skillChanges.skillName은 반드시 아래 정규 Skill 목록 중 하나만 사용한다.")))
                 .andExpect(jsonPath("$.instructions").value(containsString("정규 Skill 목록에 없는 스킬은 절대 생성, 제안, 추가, 반환하지 않는다.")))
                 .andExpect(jsonPath("$.instructions").value(containsString("assistantMessage에서도 정규 Skill 목록에 없는 스킬을 먼저 제안하거나 추가해드릴지 묻지 않는다.")))
                 .andExpect(jsonPath("$.instructions").value(containsString("허용 가능한 Position 카테고리 목록:")))
@@ -176,7 +189,8 @@ class OpenAiAiInterviewGeneratorTest {
                                 "careerMinYears",
                                 "careerMaxYears",
                                 "workPlace",
-                                "skills"
+                                "skills",
+                                "skillChanges"
                         )))
                 .andExpect(jsonPath("$.text.format.schema.properties.aiBriefResult.properties.positions.items.properties.proposalPositionId.type[*]")
                         .value(containsInAnyOrder("integer", "null")))
@@ -184,6 +198,10 @@ class OpenAiAiInterviewGeneratorTest {
                         .value(containsInAnyOrder(ALLOWED_POSITIONS.toArray())))
                 .andExpect(jsonPath("$.text.format.schema.properties.aiBriefResult.properties.positions.items.properties.skills.items.required[*]")
                         .value(containsInAnyOrder("skillName", "importance")))
+                .andExpect(jsonPath("$.text.format.schema.properties.aiBriefResult.properties.positions.items.properties.skillChanges.items.required[*]")
+                        .value(containsInAnyOrder("action", "skillName", "importance")))
+                .andExpect(jsonPath("$.text.format.schema.properties.aiBriefResult.properties.positions.items.properties.skillChanges.items.properties.action.enum[*]")
+                        .value(containsInAnyOrder("ADD", "REMOVE", "UPDATE_IMPORTANCE")))
                 .andRespond(withSuccess(
                         objectMapper.writeValueAsString(Map.of("output_text", aiBriefJson)),
                         MediaType.APPLICATION_JSON
@@ -214,6 +232,71 @@ class OpenAiAiInterviewGeneratorTest {
         assertThat(result.getAiBriefResult().getPositions().get(0).getSkills().get(0).getSkillName()).isEqualTo("Java");
         assertThat(result.getAiBriefResult().getPositions().get(0).getSkills().get(0).getImportance())
                 .isEqualTo(ProposalPositionSkillImportance.ESSENTIAL);
+        assertThat(result.getAiBriefResult().getPositions().get(0).getSkillChanges()).hasSize(3);
+        assertThat(result.getAiBriefResult().getPositions().get(0).getSkillChanges().get(0).getAction())
+                .isEqualTo(AiInterviewSkillChangeAction.ADD);
+        assertThat(result.getAiBriefResult().getPositions().get(0).getSkillChanges().get(0).getSkillName())
+                .isEqualTo("Redis");
+        assertThat(result.getAiBriefResult().getPositions().get(0).getSkillChanges().get(0).getImportance())
+                .isEqualTo(ProposalPositionSkillImportance.PREFERENCE);
+        assertThat(result.getAiBriefResult().getPositions().get(0).getSkillChanges().get(1).getAction())
+                .isEqualTo(AiInterviewSkillChangeAction.REMOVE);
+        assertThat(result.getAiBriefResult().getPositions().get(0).getSkillChanges().get(1).getSkillName())
+                .isEqualTo("JavaScript");
+        assertThat(result.getAiBriefResult().getPositions().get(0).getSkillChanges().get(1).getImportance())
+                .isNull();
+        assertThat(result.getAiBriefResult().getPositions().get(0).getSkillChanges().get(2).getAction())
+                .isEqualTo(AiInterviewSkillChangeAction.UPDATE_IMPORTANCE);
+        assertThat(result.getAiBriefResult().getPositions().get(0).getSkillChanges().get(2).getSkillName())
+                .isEqualTo("Java");
+        assertThat(result.getAiBriefResult().getPositions().get(0).getSkillChanges().get(2).getImportance())
+                .isEqualTo(ProposalPositionSkillImportance.ESSENTIAL);
+    }
+
+    @Test
+    @DisplayName("지원하지 않는 스킬 변경 action이 오면 파싱에 실패한다")
+    void failWhenSkillChangeActionIsUnsupported() throws JsonProcessingException {
+        String aiBriefJson = objectMapper.writeValueAsString(Map.of(
+                "aiBriefResult", Map.of(
+                        "title", "제목",
+                        "description", "설명",
+                        "positions", List.of(
+                                Map.ofEntries(
+                                        Map.entry("proposalPositionId", 1),
+                                        Map.entry("positionCategoryName", "백엔드 개발자"),
+                                        Map.entry("title", "백엔드 개발자"),
+                                        Map.entry("workType", "REMOTE"),
+                                        Map.entry("headCount", 1),
+                                        Map.entry("unitBudgetMin", 1000000),
+                                        Map.entry("unitBudgetMax", 2000000),
+                                        Map.entry("expectedPeriod", 4),
+                                        Map.entry("careerMinYears", 1),
+                                        Map.entry("careerMaxYears", 3),
+                                        Map.entry("workPlace", "판교"),
+                                        Map.entry("skills", List.of()),
+                                        Map.entry("skillChanges", List.of(
+                                                mapOfNullable("action", "CLEAR", "skillName", "Java", "importance", null)
+                                        ))
+                                )
+                        )
+                ),
+                "assistantMessage", "확인했습니다."
+        ));
+
+        server.expect(requestTo(API_URL))
+                .andExpect(method(POST))
+                .andRespond(withSuccess(
+                        objectMapper.writeValueAsString(Map.of("output_text", aiBriefJson)),
+                        MediaType.APPLICATION_JSON
+                ));
+
+        assertThatThrownBy(() -> generator.generate(AiInterviewGenerateRequest.of(
+                new ProposalForm(),
+                "",
+                "사용자 메시지"
+        )))
+                .isInstanceOf(AiBriefGenerationException.class)
+                .hasMessage("지원하지 않는 스킬 변경 action입니다. value=CLEAR");
     }
 
     @Test
@@ -255,7 +338,8 @@ class OpenAiAiInterviewGeneratorTest {
                                         Map.entry("careerMinYears", 1),
                                         Map.entry("careerMaxYears", 3),
                                         Map.entry("workPlace", "판교"),
-                                        Map.entry("skills", List.of())
+                                        Map.entry("skills", List.of()),
+                                        Map.entry("skillChanges", List.of())
                                 )
                         )
                 ),
@@ -292,5 +376,13 @@ class OpenAiAiInterviewGeneratorTest {
         )))
                 .isInstanceOf(AiBriefGenerationException.class)
                 .hasMessage("OpenAI AI 인터뷰 호출에 실패했습니다.");
+    }
+
+    private Map<String, Object> mapOfNullable(Object... keyValues) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        for (int index = 0; index < keyValues.length; index += 2) {
+            map.put((String) keyValues[index], keyValues[index + 1]);
+        }
+        return map;
     }
 }

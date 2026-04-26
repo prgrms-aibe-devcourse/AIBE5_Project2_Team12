@@ -11,6 +11,8 @@ import com.generic4.itda.dto.proposal.AiBriefResult;
 import com.generic4.itda.dto.proposal.AiBriefSkillResult;
 import com.generic4.itda.dto.proposal.AiInterviewGenerateRequest;
 import com.generic4.itda.dto.proposal.AiInterviewResult;
+import com.generic4.itda.dto.proposal.AiInterviewSkillChangeAction;
+import com.generic4.itda.dto.proposal.AiInterviewSkillChangeResult;
 import com.generic4.itda.dto.proposal.ProposalForm;
 import com.generic4.itda.exception.AiBriefGenerationException;
 import java.util.ArrayList;
@@ -95,23 +97,32 @@ public class OpenAiAiInterviewGenerator implements AiInterviewGenerator {
             - 신규 모집 단위에서 headCount가 명확하지 않으면 1로 둔다.
 
             스킬 규칙:
+            - 기존 모집 단위의 스킬 변경은 가능하면 skillChanges로 표현한다.
+            - 신규 모집 단위의 초기 스킬은 skills로 표현한다.
+            - 기존 호환을 위해 기존 모집 단위에서 skills를 사용할 수 있지만, 스킬 삭제 의도는 skills로 표현하지 않는다.
+            - 기존 모집 단위에서 사용자가 스킬을 언급하지 않았다면 skills와 skillChanges는 빈 배열로 반환한다.
+            - 기존 모집 단위에서 skills 빈 배열과 skillChanges 빈 배열은 기존 스킬 삭제가 아니라 기존 스킬 유지 의미로 처리된다.
             - skills.importance는 ESSENTIAL 또는 PREFERENCE만 사용한다.
             - importance를 확신할 수 없으면 PREFERENCE를 사용한다.
             - position별 skills는 최대 4개까지만 반환한다.
             - skills.skillName은 반드시 아래 정규 Skill 목록 중 하나만 사용한다.
+            - skillChanges.skillName은 반드시 아래 정규 Skill 목록 중 하나만 사용한다.
+            - skillChanges.action은 ADD, REMOVE, UPDATE_IMPORTANCE 중 하나만 사용한다.
+            - ADD는 기존 모집 단위에 새 스킬을 추가할 때 사용한다.
+            - REMOVE는 사용자가 특정 기존 스킬을 명시적으로 제거/삭제/빼달라고 한 경우에만 사용한다.
+            - UPDATE_IMPORTANCE는 사용자가 기존 스킬의 필수/우대 여부 변경을 요청한 경우에만 사용한다.
+            - ADD의 importance가 명확하지 않으면 PREFERENCE를 사용한다.
+            - REMOVE의 importance는 null로 반환한다.
+            - UPDATE_IMPORTANCE의 importance는 ESSENTIAL 또는 PREFERENCE 중 하나로 반환한다.
+            - action에 포함되지 않은 기존 스킬은 유지 대상으로 본다.
             - 정규 Skill 목록에 없는 스킬은 절대 생성, 제안, 추가, 반환하지 않는다.
-            - 사용자가 정규 Skill 목록에 없는 스킬을 요청해도 skills에는 포함하지 않는다.
+            - 사용자가 정규 Skill 목록에 없는 스킬을 요청해도 skills와 skillChanges에는 포함하지 않는다.
             - 사용자가 정규 Skill 목록에 없는 스킬을 요청하면 description에 억지로 넣지 않는다.
             - 비슷한 표현은 가장 가까운 정규 Skill 이름으로 변환한다. 예: 리액트, React.js, reactjs는 React로 반환한다.
             - assistantMessage에서도 정규 Skill 목록에 없는 스킬을 먼저 제안하거나 추가해드릴지 묻지 않는다.
             - 사용자가 정규 Skill 목록에 없는 스킬 추가를 요청한 경우, assistantMessage에는 등록된 스킬 목록에 없어 추가하지 않았다고 짧게 안내한다.
-            - 기존 모집 단위에서 사용자가 스킬을 언급하지 않았다면 skills는 빈 배열로 반환한다.
-            - 기존 모집 단위에서 skills 빈 배열은 기존 스킬 삭제가 아니라 기존 스킬 유지 의미로 처리된다.
-            - 기존 모집 단위에서 사용자가 새 스킬 추가를 요청한 경우 추가할 스킬만 skills에 담아 반환한다.
-            - 기존 모집 단위에서 사용자가 기존 스킬 중요도 변경을 요청한 경우 해당 스킬만 skills에 담아 반환한다.
-            - 기존 모집 단위에서 skills에 포함되지 않은 기존 스킬은 서버에서 삭제하지 않는다.
-            - 스킬 개별 삭제, 전체 삭제, 전체 교체는 현재 응답 스키마에서 구조적으로 표현하지 않는다.
-            - 사용자가 스킬 삭제나 전체 교체를 요청하면 assistantMessage에서 현재는 삭제/교체 대상 확인이 필요하다고 짧게 안내하고, 기존 스킬을 임의로 제거하지 않는다.
+            - 스킬 전체 삭제, 전체 교체는 현재 응답 스키마에서 표현하지 않는다.
+            - 사용자가 스킬 전체 삭제나 전체 교체를 요청하면 assistantMessage에서 현재는 전체 삭제/교체 대상 확인이 필요하다고 짧게 안내하고, 기존 스킬을 임의로 제거하지 않는다.
 
             정규 Skill 목록:
             - React
@@ -350,7 +361,8 @@ public class OpenAiAiInterviewGenerator implements AiInterviewGenerator {
                 "careerMinYears",
                 "careerMaxYears",
                 "workPlace",
-                "skills"
+                "skills",
+                "skillChanges"
         ));
 
         Map<String, Object> properties = new LinkedHashMap<>();
@@ -369,6 +381,10 @@ public class OpenAiAiInterviewGenerator implements AiInterviewGenerator {
                 "type", "array",
                 "items", buildSkillSchema()
         ));
+        properties.put("skillChanges", Map.of(
+                "type", "array",
+                "items", buildSkillChangeSchema()
+        ));
 
         schema.put("properties", properties);
         return schema;
@@ -378,6 +394,17 @@ public class OpenAiAiInterviewGenerator implements AiInterviewGenerator {
         Map<String, Object> schema = objectSchema();
         schema.put("required", List.of("skillName", "importance"));
         schema.put("properties", Map.of(
+                "skillName", Map.of("type", "string"),
+                "importance", nullableEnumSchema("ESSENTIAL", "PREFERENCE")
+        ));
+        return schema;
+    }
+
+    private Map<String, Object> buildSkillChangeSchema() {
+        Map<String, Object> schema = objectSchema();
+        schema.put("required", List.of("action", "skillName", "importance"));
+        schema.put("properties", Map.of(
+                "action", enumSchema(List.of("ADD", "REMOVE", "UPDATE_IMPORTANCE")),
                 "skillName", Map.of("type", "string"),
                 "importance", nullableEnumSchema("ESSENTIAL", "PREFERENCE")
         ));
@@ -553,7 +580,8 @@ public class OpenAiAiInterviewGenerator implements AiInterviewGenerator {
                     asInteger(positionNode.get("careerMinYears")),
                     asInteger(positionNode.get("careerMaxYears")),
                     normalizeText(positionNode.get("workPlace")),
-                    parseSkills(positionNode.get("skills"))
+                    parseSkills(positionNode.get("skills")),
+                    parseSkillChanges(positionNode.get("skillChanges"))
             ));
         }
         return positions;
@@ -572,6 +600,34 @@ public class OpenAiAiInterviewGenerator implements AiInterviewGenerator {
             ));
         }
         return skills;
+    }
+
+    private List<AiInterviewSkillChangeResult> parseSkillChanges(JsonNode skillChangesNode) {
+        if (skillChangesNode == null || skillChangesNode.isNull() || !skillChangesNode.isArray()) {
+            return List.of();
+        }
+
+        List<AiInterviewSkillChangeResult> skillChanges = new ArrayList<>();
+        for (JsonNode skillChangeNode : skillChangesNode) {
+            skillChanges.add(AiInterviewSkillChangeResult.of(
+                    parseSkillChangeAction(skillChangeNode.get("action")),
+                    normalizeRequiredText(skillChangeNode.get("skillName"), "AI 인터뷰 스킬 변경 스킬명은 필수값입니다."),
+                    parseImportance(skillChangeNode.get("importance"))
+            ));
+        }
+        return skillChanges;
+    }
+
+    private AiInterviewSkillChangeAction parseSkillChangeAction(JsonNode node) {
+        String value = normalizeText(node);
+        if (!StringUtils.hasText(value)) {
+            throw new AiBriefGenerationException("AI 인터뷰 스킬 변경 action은 필수값입니다.");
+        }
+        try {
+            return AiInterviewSkillChangeAction.valueOf(value.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            throw new AiBriefGenerationException("지원하지 않는 스킬 변경 action입니다. value=" + value, exception);
+        }
     }
 
     private ProposalWorkType parseWorkType(JsonNode node) {
