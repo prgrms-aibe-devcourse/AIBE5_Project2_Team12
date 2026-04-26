@@ -746,6 +746,75 @@ class AiBriefProposalMapperTest {
     }
 
     @Test
+    @DisplayName("AI 인터뷰에서 같은 category에 여러 title이 있을 때 category만 삭제 요청하면 기존 모집 단위를 유지하고 같은 category 신규 추가를 막는다")
+    void applyForInterview_preservesSameCategorySiblingsWhenCategoryOnlyDeletionIsAmbiguous() {
+        Proposal proposal = createProposal();
+        Position backend = Position.create("백엔드 개발자");
+
+        ProposalPosition paymentBackendPosition = proposal.addPosition(
+                backend,
+                "결제 서버 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                3_000_000L,
+                4_000_000L,
+                3L,
+                3,
+                6,
+                null
+        );
+        ProposalPosition settlementBackendPosition = proposal.addPosition(
+                backend,
+                "정산 서버 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                3_500_000L,
+                4_500_000L,
+                3L,
+                3,
+                6,
+                null
+        );
+
+        given(positionResolver.resolve("백엔드 개발자")).willReturn(Optional.of(backend));
+
+        AiBriefResult aiBriefResult = AiBriefResult.of(
+                "커머스 백엔드 개발",
+                "백엔드 모집 단위 삭제 요청을 확인합니다.",
+                null,
+                null,
+                3L,
+                List.of(
+                        AiBriefPositionResult.of(
+                                "백엔드 개발자",
+                                "플랫폼 백엔드 개발자",
+                                ProposalWorkType.REMOTE,
+                                1L,
+                                3_000_000L,
+                                4_000_000L,
+                                3L,
+                                3,
+                                6,
+                                null,
+                                List.of()
+                        )
+                )
+        );
+
+        aiBriefProposalMapper.applyForInterview(
+                proposal,
+                aiBriefResult,
+                "백엔드 개발자는 빼자."
+        );
+
+        List<String> titles = positionTitles(proposal);
+
+        assertThat(titles).containsExactly("결제 서버 백엔드 개발자", "정산 서버 백엔드 개발자");
+        assertThat(findProposalPositionByTitle(proposal, "결제 서버 백엔드 개발자")).isSameAs(paymentBackendPosition);
+        assertThat(findProposalPositionByTitle(proposal, "정산 서버 백엔드 개발자")).isSameAs(settlementBackendPosition);
+    }
+
+    @Test
     @DisplayName("AI가 기존 Position 마스터에 없는 카테고리를 반환하면 저장하지 않고 기존 모집 단위를 유지한다")
     void apply_skipsUnknownPositionCategoryWithoutRemovingExistingPositions() {
         Proposal proposal = createProposal();

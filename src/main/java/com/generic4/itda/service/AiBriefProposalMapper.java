@@ -38,14 +38,14 @@ public class AiBriefProposalMapper {
         Assert.notNull(aiBriefResult, "AI 브리프 결과는 필수값입니다.");
 
         applyProposalFields(proposal, aiBriefResult);
-        mergePositions(proposal, aiBriefResult.getPositions(), true, Set.of());
+        mergePositions(proposal, aiBriefResult.getPositions(), true, DeletedPositionKeys.empty());
     }
 
     public void applyForInterview(Proposal proposal, AiBriefResult aiBriefResult, String userMessage) {
         Assert.notNull(proposal, "제안서는 필수값입니다.");
         Assert.notNull(aiBriefResult, "AI 브리프 결과는 필수값입니다.");
 
-        Set<String> deletedPositionKeys = removeExplicitlyDeletedPositions(proposal, userMessage);
+        DeletedPositionKeys deletedPositionKeys = removeExplicitlyDeletedPositions(proposal, userMessage);
         applyProposalFields(proposal, aiBriefResult);
         mergePositions(proposal, aiBriefResult.getPositions(), false, deletedPositionKeys);
     }
@@ -65,7 +65,7 @@ public class AiBriefProposalMapper {
             Proposal proposal,
             List<AiBriefPositionResult> positionResults,
             boolean removePositionsNotInAiResult,
-            Set<String> ignoredPositionKeys
+            DeletedPositionKeys ignoredPositionKeys
     ) {
         if (positionResults == null || positionResults.isEmpty()) {
             return;
@@ -83,7 +83,9 @@ public class AiBriefProposalMapper {
 
         for (PositionApplication application : applications) {
             String positionKey = positionKey(application.position(), application.result().getTitle());
-            if (ignoredPositionKeys.contains(positionKey)) {
+            String categoryKey = categoryKey(application.position());
+            if (ignoredPositionKeys.positionKeys().contains(positionKey)
+                    || ignoredPositionKeys.categoryKeys().contains(categoryKey)) {
                 continue;
             }
 
@@ -134,28 +136,40 @@ public class AiBriefProposalMapper {
         }
     }
 
-    private Set<String> removeExplicitlyDeletedPositions(Proposal proposal, String userMessage) {
+    private DeletedPositionKeys removeExplicitlyDeletedPositions(Proposal proposal, String userMessage) {
         Set<String> deletedPositionKeys = new HashSet<>();
+        Set<String> deletedCategoryKeys = new HashSet<>();
         if (!StringUtils.hasText(userMessage)) {
-            return deletedPositionKeys;
+            return new DeletedPositionKeys(deletedPositionKeys, deletedCategoryKeys);
         }
 
         List<String> messageParts = splitMessageParts(userMessage);
         List<ProposalPosition> existingPositions = new ArrayList<>(proposal.getPositions());
+        Map<String, List<ProposalPosition>> existingByCategoryKey = existingPositionsByCategoryKey(proposal);
 
         for (ProposalPosition existingPosition : existingPositions) {
-            if (isExplicitlyDeleted(existingPosition, messageParts)) {
+            DeleteDecision deleteDecision = decideDeletion(existingPosition, existingByCategoryKey, messageParts);
+            if (deleteDecision.ignoreCategory()) {
+                deletedCategoryKeys.add(categoryKey(existingPosition));
+            }
+            if (deleteDecision.deletePosition()) {
                 deletedPositionKeys.add(positionKey(existingPosition));
                 proposal.removePosition(existingPosition);
             }
         }
 
-        return deletedPositionKeys;
+        return new DeletedPositionKeys(deletedPositionKeys, deletedCategoryKeys);
     }
 
-    private boolean isExplicitlyDeleted(ProposalPosition existingPosition, List<String> messageParts) {
+    private DeleteDecision decideDeletion(
+            ProposalPosition existingPosition,
+            Map<String, List<ProposalPosition>> existingByCategoryKey,
+            List<String> messageParts
+    ) {
+        String categoryKey = categoryKey(existingPosition);
         String positionName = existingPosition.getPosition() == null ? "" : existingPosition.getPosition().getName();
         String title = existingPosition.getTitle();
+        int sameCategoryCount = existingByCategoryKey.getOrDefault(categoryKey, List.of()).size();
 
         for (String messagePart : messageParts) {
             if (!hasDeleteIntent(messagePart)) {
@@ -166,12 +180,19 @@ public class AiBriefProposalMapper {
             boolean titleMatched = containsNormalized(normalizedMessagePart, title);
             boolean positionNameMatched = containsNormalized(normalizedMessagePart, positionName);
 
-            if (titleMatched || positionNameMatched) {
-                return true;
+            if (titleMatched) {
+                return new DeleteDecision(true, false);
+            }
+
+            if (positionNameMatched) {
+                if (sameCategoryCount == 1) {
+                    return new DeleteDecision(true, true);
+                }
+                return new DeleteDecision(false, true);
             }
         }
 
-        return false;
+        return new DeleteDecision(false, false);
     }
 
     private List<String> splitMessageParts(String userMessage) {
@@ -413,8 +434,18 @@ public class AiBriefProposalMapper {
     }
 
     private String positionKey(Position position, String title) {
-        String categoryKey = position == null ? "" : normalizeKey(position.getName());
-        return categoryKey + "::" + normalizeKey(title);
+        return categoryKey(position) + "::" + normalizeKey(title);
+    }
+
+    private String categoryKey(ProposalPosition proposalPosition) {
+        if (proposalPosition == null || proposalPosition.getPosition() == null) {
+            return "";
+        }
+        return categoryKey(proposalPosition.getPosition());
+    }
+
+    private String categoryKey(Position position) {
+        return position == null ? "" : normalizeKey(position.getName());
     }
 
     private String normalizeKey(String value) {
@@ -425,5 +456,15 @@ public class AiBriefProposalMapper {
     }
 
     private record SkillApplication(Skill skill, ProposalPositionSkillImportance importance) {
+    }
+
+    private record DeletedPositionKeys(Set<String> positionKeys, Set<String> categoryKeys) {
+
+        private static DeletedPositionKeys empty() {
+            return new DeletedPositionKeys(Set.of(), Set.of());
+        }
+    }
+
+    private record DeleteDecision(boolean deletePosition, boolean ignoreCategory) {
     }
 }

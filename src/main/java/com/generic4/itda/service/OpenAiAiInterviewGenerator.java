@@ -46,6 +46,9 @@ public class OpenAiAiInterviewGenerator implements AiInterviewGenerator {
             - 기존 폼에 이미 있는 값은 사용자가 바꾸거나 삭제하라고 하지 않았다면 최대한 유지한다.
             - 사용자가 정정한 값은 최신 사용자 메시지를 우선한다.
             - 사용자가 제거/삭제/빼달라고 한 포지션은 positions에서 제외한다.
+            - 같은 positionCategoryName에 여러 title이 있는데 사용자가 category만 언급하며 제거/삭제/빼달라고 하면 바로 삭제하지 않는다.
+            - 이 경우 assistantMessage로 어떤 title의 모집 단위를 삭제할지 되묻고, aiBriefResult.positions에는 기존 모집 단위를 유지한다.
+            - 모호한 category 삭제 요청이 있을 때 같은 category의 새 title을 임의로 만들어 기존 모집 단위를 대체하지 않는다.
             - totalBudgetMin, totalBudgetMax, unitBudgetMin, unitBudgetMax는 원화 기준 정수로 반환한다.
             - expectedPeriod는 주 단위 기준 정수로 반환한다.
             - positions는 실제 모집 단위 배열이다.
