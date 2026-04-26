@@ -249,8 +249,8 @@ public class ProposalService {
                 .orElseThrow(() -> new ProposalNotFoundException("제안서를 찾을 수 없습니다. id=" + proposalId));
 
         for (ProposalPosition position : proposalWithPositions.getPositions()) {
+            rejectPendingMatchings(position.getId(), memberEmail, PROPOSAL_CLOSED_REJECTION_REASON);
             if (position.getStatus() != ProposalPositionStatus.CLOSED) {
-                rejectPendingMatchings(position.getId(), memberEmail, PROPOSAL_CLOSED_REJECTION_REASON);
                 position.changeStatus(ProposalPositionStatus.CLOSED);
             }
         }

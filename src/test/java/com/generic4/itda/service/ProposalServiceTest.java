@@ -1180,8 +1180,8 @@ class ProposalServiceTest {
     }
 
     @Test
-    @DisplayName("제안서 종료 시 이미 CLOSED인 포지션은 건너뛴다")
-    void completeProposal_skipsAlreadyClosedPositions() {
+    @DisplayName("제안서 종료 시 이미 CLOSED인 포지션의 PROPOSED 매칭도 거절하고 포지션 상태는 유지한다")
+    void completeProposal_rejectsPendingMatchingsForClosedPositionsToo() {
         Proposal proposal = createMatchingProposal(member);
         ProposalPosition closedPosition = proposal.addPosition(
                 Position.create("백엔드"), "백엔드 개발자",
@@ -1194,13 +1194,27 @@ class ProposalServiceTest {
                 ProposalWorkType.REMOTE, 1L, 1_000_000L, 2_000_000L, 4L, 1, 5, null);
         ReflectionTestUtils.setField(openPosition, "id", 20L);
 
+        Member freelancerA = createMember("freelancer-a@example.com", "hashed-password", "프리랜서A", "010-1111-1111");
+        Member freelancerB = createMember("freelancer-b@example.com", "hashed-password", "프리랜서B", "010-2222-2222");
+        Matching closedPositionProposed = Matching.create(null, closedPosition, member, freelancerA);
+        Matching openPositionProposed = Matching.create(null, openPosition, member, freelancerB);
+
         when(proposalRepository.findById(1L)).thenReturn(Optional.of(proposal));
         when(proposalRepository.findWithPositionsById(1L)).thenReturn(Optional.of(proposal));
+        when(matchingRepository.findByProposalPosition_IdAndClientMember_Email_Value(10L, EMAIL))
+                .thenReturn(List.of(closedPositionProposed));
+        when(matchingRepository.findByProposalPosition_IdAndClientMember_Email_Value(20L, EMAIL))
+                .thenReturn(List.of(openPositionProposed));
 
         proposalService.completeProposal(1L, EMAIL);
 
         assertThat(proposal.getStatus()).isEqualTo(ProposalStatus.COMPLETE);
-        then(matchingRepository).should(never()).findByProposalPosition_IdAndClientMember_Email_Value(eq(10L), any());
+        assertThat(closedPosition.getStatus()).isEqualTo(ProposalPositionStatus.CLOSED);
+        assertThat(closedPositionProposed.getStatus()).isEqualTo(MatchingStatus.REJECTED);
+        assertThat(closedPositionProposed.getCancellationReasonDetail())
+                .isEqualTo("클라이언트가 제안서 모집을 종료했습니다.");
+        assertThat(openPositionProposed.getStatus()).isEqualTo(MatchingStatus.REJECTED);
+        then(matchingRepository).should().findByProposalPosition_IdAndClientMember_Email_Value(10L, EMAIL);
         then(matchingRepository).should().findByProposalPosition_IdAndClientMember_Email_Value(20L, EMAIL);
     }
 
