@@ -123,7 +123,7 @@ class HeuristicV1RecommendationScorerTest {
             assertThat(scoredCandidate.similarityScore()).isEqualTo(0.6);
             assertThat(scoredCandidate.skillAdjustmentScore()).isEqualTo(0.10);
             assertThat(scoredCandidate.careerAdjustmentScore()).isEqualTo(0.08);
-            assertThat(scoredCandidate.finalScore()).isCloseTo(0.78, offset(1e-9));
+            assertThat(scoredCandidate.finalScore()).isCloseTo(0.655, offset(1e-9));
         });
 
         verify(recommendationQueryTextGenerator).generate(
@@ -371,9 +371,9 @@ class HeuristicV1RecommendationScorerTest {
     // -------------------------------------------------------------------------
 
     @Test
-    @DisplayName("embeddingScore와 보정치의 합이 1.0을 초과하면 finalScore는 1.0으로 clamp된다")
-    void score_ClampsFinalScore_ToOneWhenSumExceedsOne() {
-        // given — rawCosine(0.8) + skill(0.15) + career(0.08) = 1.03 → clamp 1.0
+    @DisplayName("높은 임베딩과 일반적인 최대 보정치 조합에서도 finalScore가 바로 1.0으로 포화되지 않는다")
+    void score_DoesNotImmediatelySaturateToOne_WithHighEmbeddingAndNormalAdjustments() {
+        // given — normalized embedding(0.9) + skill(0.15*0.35) + career(0.08*0.25) = 0.9725
         RecommendationScorableCandidate candidate = candidateWith(100L);
         List<Double> queryEmbedding = dummyQueryEmbedding();
         List<Double> resumeEmbedding = List.of(0.8, 0.2);
@@ -394,6 +394,33 @@ class HeuristicV1RecommendationScorerTest {
 
         // then
         assertThat(result).hasSize(1);
+        assertThat(result.get(0).scoreBreakdown().finalScore()).isCloseTo(0.9725, offset(1e-9));
+    }
+
+    @Test
+    @DisplayName("가중 반영 후 합이 1.0을 초과하면 finalScore는 1.0으로 clamp된다")
+    void score_ClampsFinalScore_ToOneWhenSumExceedsOne() {
+        // given — normalized embedding(0.9) + skill(0.50*0.35) + career(0.30*0.25) = 1.15 → clamp 1.0
+        RecommendationScorableCandidate candidate = candidateWith(100L);
+        List<Double> queryEmbedding = dummyQueryEmbedding();
+        List<Double> resumeEmbedding = List.of(0.8, 0.2);
+
+        given(recommendationQueryTextGenerator.generate(any(), any(), any(), any()))
+                .willReturn("query text");
+        given(queryEmbeddingGenerator.generate(anyString())).willReturn(queryEmbedding);
+        given(resumeEmbeddingReader.readEmbeddingsByResumeIds(any(), anyString()))
+                .willReturn(Map.of(100L, resumeEmbedding));
+        given(cosineSimilarityCalculator.calculate(queryEmbedding, resumeEmbedding)).willReturn(0.8);
+        given(skillAdjustmentCalculator.calculate(any(), any(), any())).willReturn(0.50);
+        given(careerAdjustmentCalculator.calculate(any(int.class), any(), any())).willReturn(0.30);
+
+        // when
+        List<ScoredCandidate> result = scorer.score(
+                proposal, proposalPosition, Set.of(), Set.of(), List.of(candidate), EMBEDDING_MODEL
+        );
+
+        // then
+        assertThat(result).hasSize(1);
         assertThat(result.get(0).scoreBreakdown().finalScore()).isEqualTo(1.0);
     }
 
@@ -402,9 +429,9 @@ class HeuristicV1RecommendationScorerTest {
     // -------------------------------------------------------------------------
 
     @Test
-    @DisplayName("embeddingScore와 보정치의 합이 0.0 미만이면 finalScore는 0.0으로 clamp된다")
+    @DisplayName("가중 반영 후 합이 0.0 미만이면 finalScore는 0.0으로 clamp된다")
     void score_ClampsFinalScore_ToZeroWhenSumBelowZero() {
-        // given — rawCosine(-0.8) + skill(-0.15) + career(-0.12) = -1.07 → clamp 0.0
+        // given — normalized embedding(0.1) + skill(-0.50*0.35) + career(-0.50*0.25) = -0.20 → clamp 0.0
         RecommendationScorableCandidate candidate = candidateWith(100L);
         List<Double> queryEmbedding = dummyQueryEmbedding();
         List<Double> resumeEmbedding = List.of(-0.8, 0.2);
@@ -415,8 +442,8 @@ class HeuristicV1RecommendationScorerTest {
         given(resumeEmbeddingReader.readEmbeddingsByResumeIds(any(), anyString()))
                 .willReturn(Map.of(100L, resumeEmbedding));
         given(cosineSimilarityCalculator.calculate(queryEmbedding, resumeEmbedding)).willReturn(-0.8);
-        given(skillAdjustmentCalculator.calculate(any(), any(), any())).willReturn(-0.15);
-        given(careerAdjustmentCalculator.calculate(any(int.class), any(), any())).willReturn(-0.12);
+        given(skillAdjustmentCalculator.calculate(any(), any(), any())).willReturn(-0.50);
+        given(careerAdjustmentCalculator.calculate(any(int.class), any(), any())).willReturn(-0.50);
 
         // when
         List<ScoredCandidate> result = scorer.score(
