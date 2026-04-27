@@ -10,6 +10,8 @@ import com.generic4.itda.domain.skill.Skill;
 import com.generic4.itda.dto.proposal.AiBriefPositionResult;
 import com.generic4.itda.dto.proposal.AiBriefResult;
 import com.generic4.itda.dto.proposal.AiBriefSkillResult;
+import com.generic4.itda.dto.proposal.AiInterviewSkillChangeAction;
+import com.generic4.itda.dto.proposal.AiInterviewSkillChangeResult;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -39,7 +41,7 @@ public class AiBriefProposalMapper {
         Assert.notNull(aiBriefResult, "AI 브리프 결과는 필수값입니다.");
 
         applyProposalFields(proposal, aiBriefResult);
-        mergePositions(proposal, aiBriefResult.getPositions(), PositionMergeMode.AI_BRIEF, DeletedPositionKeys.empty());
+        mergePositions(proposal, aiBriefResult.getPositions(), PositionMergeMode.AI_BRIEF, DeletedPositionKeys.empty(), null);
     }
 
     public void applyForInterview(Proposal proposal, AiBriefResult aiBriefResult, String userMessage) {
@@ -48,7 +50,7 @@ public class AiBriefProposalMapper {
 
         DeletedPositionKeys deletedPositionKeys = removeExplicitlyDeletedPositions(proposal, userMessage);
         applyProposalFields(proposal, aiBriefResult);
-        mergePositions(proposal, aiBriefResult.getPositions(), PositionMergeMode.AI_INTERVIEW, deletedPositionKeys);
+        mergePositions(proposal, aiBriefResult.getPositions(), PositionMergeMode.AI_INTERVIEW, deletedPositionKeys, userMessage);
     }
 
     private void applyProposalFields(Proposal proposal, AiBriefResult aiBriefResult) {
@@ -66,7 +68,8 @@ public class AiBriefProposalMapper {
             Proposal proposal,
             List<AiBriefPositionResult> positionResults,
             PositionMergeMode mergeMode,
-            DeletedPositionKeys ignoredPositionKeys
+            DeletedPositionKeys ignoredPositionKeys,
+            String userMessage
     ) {
         if (positionResults == null || positionResults.isEmpty()) {
             if (mergeMode == PositionMergeMode.AI_BRIEF) {
@@ -75,7 +78,7 @@ public class AiBriefProposalMapper {
             return;
         }
 
-        List<PositionApplication> applications = mergePositionApplicationsByPositionKey(positionResults);
+        List<PositionApplication> applications = mergePositionApplications(positionResults, mergeMode);
         if (applications.isEmpty()) {
             if (mergeMode == PositionMergeMode.AI_BRIEF) {
                 removePositionsNotInAiResult(proposal, Set.of());
@@ -83,6 +86,7 @@ public class AiBriefProposalMapper {
             return;
         }
 
+        Map<Long, ProposalPosition> existingById = existingPositionsById(proposal);
         Map<String, ProposalPosition> existingByPositionKey = existingPositionsByPositionKey(proposal);
         Map<String, List<ProposalPosition>> existingByCategoryKey = existingPositionsByCategoryKey(proposal);
         Map<String, Long> applicationCountByCategoryKey = applicationCountByCategoryKey(applications);
@@ -98,22 +102,35 @@ public class AiBriefProposalMapper {
 
             ProposalPosition proposalPosition = findExistingPosition(
                     application,
+                    mergeMode,
+                    existingById,
                     existingByPositionKey,
                     existingByCategoryKey,
                     applicationCountByCategoryKey
             );
 
+            if (proposalPosition == null && hasProposalPositionId(application)) {
+                continue;
+            }
+
+            String oldPositionKey = proposalPosition != null ? positionKey(proposalPosition) : null;
+
             if (proposalPosition == null) {
+                if (hasNewPositionTitleConflict(proposal, application)) {
+                    continue;
+                }
                 proposalPosition = addNewPosition(proposal, application);
                 replaceSkills(proposalPosition, application.result().getSkills());
             } else if (mergeMode == PositionMergeMode.AI_INTERVIEW) {
                 updateExistingPositionForInterview(proposal, proposalPosition, application);
                 mergeSkillsForInterview(proposalPosition, application.result().getSkills());
+                applySkillChangesForInterview(proposalPosition, application.result().getSkillChanges(), userMessage);
             } else {
                 updateExistingPositionForAiBrief(proposalPosition, application);
                 replaceSkills(proposalPosition, application.result().getSkills());
             }
 
+            updateLookupMaps(proposalPosition, oldPositionKey, existingByPositionKey, existingByCategoryKey);
             appliedPositions.add(proposalPosition);
         }
 
@@ -141,6 +158,34 @@ public class AiBriefProposalMapper {
         );
     }
 
+    private boolean hasNewPositionTitleConflict(Proposal proposal, PositionApplication application) {
+        String newPositionKey = positionKey(application.position(), application.result().getTitle());
+        for (ProposalPosition existingPosition : proposal.getPositions()) {
+            if (newPositionKey.equals(positionKey(existingPosition))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void updateLookupMaps(
+            ProposalPosition proposalPosition,
+            String oldPositionKey,
+            Map<String, ProposalPosition> existingByPositionKey,
+            Map<String, List<ProposalPosition>> existingByCategoryKey
+    ) {
+        if (oldPositionKey != null) {
+            existingByPositionKey.remove(oldPositionKey);
+        }
+        existingByPositionKey.put(positionKey(proposalPosition), proposalPosition);
+
+        if (oldPositionKey == null) {
+            existingByCategoryKey
+                    .computeIfAbsent(categoryKey(proposalPosition), ignored -> new ArrayList<>())
+                    .add(proposalPosition);
+        }
+    }
+
     private void updateExistingPositionForAiBrief(ProposalPosition proposalPosition, PositionApplication application) {
         AiBriefPositionResult result = application.result();
         ProposalWorkType workType = resolveWorkType(result);
@@ -166,12 +211,13 @@ public class AiBriefProposalMapper {
             PositionApplication application
     ) {
         AiBriefPositionResult result = application.result();
+        Position position = resolveInterviewPosition(proposalPosition, application);
         ProposalWorkType workType = resolveInterviewWorkType(proposalPosition, result);
         String workPlace = resolveInterviewWorkPlace(proposalPosition, result, workType);
 
         proposalPosition.update(
-                application.position(),
-                resolveInterviewTitle(proposalPosition, result),
+                position,
+                resolveInterviewTitle(proposal, proposalPosition, position, result, hasProposalPositionId(application)),
                 workType,
                 resolveInterviewHeadCount(proposalPosition, result),
                 resolveInterviewUnitBudgetMin(proposalPosition, result),
@@ -183,11 +229,54 @@ public class AiBriefProposalMapper {
         );
     }
 
-    private String resolveInterviewTitle(ProposalPosition proposalPosition, AiBriefPositionResult result) {
-        if (StringUtils.hasText(result.getTitle())) {
-            return result.getTitle();
+    private Position resolveInterviewPosition(ProposalPosition proposalPosition, PositionApplication application) {
+        if (hasProposalPositionId(application)) {
+            return proposalPosition.getPosition();
         }
-        return proposalPosition.getTitle();
+        return application.position();
+    }
+
+    private String resolveInterviewTitle(
+            Proposal proposal,
+            ProposalPosition proposalPosition,
+            Position position,
+            AiBriefPositionResult result,
+            boolean hasProposalPositionId
+    ) {
+        if (!hasProposalPositionId) {
+            return proposalPosition.getTitle();
+        }
+
+        if (!StringUtils.hasText(result.getTitle())) {
+            return proposalPosition.getTitle();
+        }
+
+        if (hasTitleConflict(proposal, proposalPosition, position, result.getTitle())) {
+            return proposalPosition.getTitle();
+        }
+
+        return result.getTitle();
+    }
+
+    private boolean hasTitleConflict(
+            Proposal proposal,
+            ProposalPosition targetPosition,
+            Position nextPosition,
+            String nextTitle
+    ) {
+        String nextPositionKey = positionKey(nextPosition, nextTitle);
+
+        for (ProposalPosition existingPosition : proposal.getPositions()) {
+            if (existingPosition == targetPosition) {
+                continue;
+            }
+
+            if (nextPositionKey.equals(positionKey(existingPosition))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private ProposalWorkType resolveInterviewWorkType(ProposalPosition proposalPosition, AiBriefPositionResult result) {
@@ -315,14 +404,14 @@ public class AiBriefProposalMapper {
             }
 
             String normalizedMessagePart = normalizeForContains(messagePart);
-            boolean titleMatched = containsNormalized(normalizedMessagePart, title);
-            boolean positionNameMatched = containsNormalized(normalizedMessagePart, positionName);
+            boolean titleDeleteMatched = hasTargetedDeleteIntent(normalizedMessagePart, title);
+            boolean positionNameDeleteMatched = hasTargetedDeleteIntent(normalizedMessagePart, positionName);
 
-            if (titleMatched) {
+            if (titleDeleteMatched) {
                 return new DeleteDecision(true, false);
             }
 
-            if (positionNameMatched) {
+            if (positionNameDeleteMatched) {
                 if (sameCategoryCount == 1) {
                     return new DeleteDecision(true, true);
                 }
@@ -357,11 +446,55 @@ public class AiBriefProposalMapper {
                 || normalized.contains("없애");
     }
 
-    private boolean containsNormalized(String normalizedSource, String target) {
+    private boolean hasTargetedDeleteIntent(String normalizedSource, String target) {
         if (!StringUtils.hasText(normalizedSource) || !StringUtils.hasText(target)) {
             return false;
         }
-        return normalizedSource.contains(normalizeForContains(target));
+
+        String normalizedTarget = normalizeForContains(target);
+        int targetIndex = normalizedSource.indexOf(normalizedTarget);
+        if (targetIndex < 0) {
+            return false;
+        }
+
+        return hasNearbyDeleteToken(normalizedSource, targetIndex, normalizedTarget.length());
+    }
+
+    private boolean hasNearbyDeleteToken(String normalizedSource, int targetIndex, int targetLength) {
+        int targetEndIndex = targetIndex + targetLength;
+
+        return isDeleteTokenNearTarget(normalizedSource, "빼", targetIndex, targetEndIndex)
+                || isDeleteTokenNearTarget(normalizedSource, "제외", targetIndex, targetEndIndex)
+                || isDeleteTokenNearTarget(normalizedSource, "삭제", targetIndex, targetEndIndex)
+                || isDeleteTokenNearTarget(normalizedSource, "제거", targetIndex, targetEndIndex)
+                || isDeleteTokenNearTarget(normalizedSource, "필요없", targetIndex, targetEndIndex)
+                || isDeleteTokenNearTarget(normalizedSource, "안뽑", targetIndex, targetEndIndex)
+                || isDeleteTokenNearTarget(normalizedSource, "안구", targetIndex, targetEndIndex)
+                || isDeleteTokenNearTarget(normalizedSource, "없애", targetIndex, targetEndIndex);
+    }
+
+    private boolean isDeleteTokenNearTarget(
+            String normalizedSource,
+            String deleteToken,
+            int targetIndex,
+            int targetEndIndex
+    ) {
+        int deleteTokenIndex = normalizedSource.indexOf(deleteToken);
+        while (deleteTokenIndex >= 0) {
+            int deleteTokenEndIndex = deleteTokenIndex + deleteToken.length();
+
+            if (deleteTokenIndex >= targetEndIndex && deleteTokenIndex - targetEndIndex <= 4) {
+                return true;
+            }
+
+            if (targetIndex >= deleteTokenEndIndex && targetIndex - deleteTokenEndIndex <= 4) {
+                return true;
+            }
+
+            deleteTokenIndex = normalizedSource.indexOf(deleteToken, deleteTokenIndex + 1);
+        }
+
+        return false;
     }
 
     private String normalizeForContains(String value) {
@@ -380,6 +513,16 @@ public class AiBriefProposalMapper {
                 proposal.removePosition(existingPosition);
             }
         }
+    }
+
+    private Map<Long, ProposalPosition> existingPositionsById(Proposal proposal) {
+        Map<Long, ProposalPosition> existingPositions = new LinkedHashMap<>();
+        for (ProposalPosition proposalPosition : proposal.getPositions()) {
+            if (proposalPosition.getId() != null) {
+                existingPositions.put(proposalPosition.getId(), proposalPosition);
+            }
+        }
+        return existingPositions;
     }
 
     private Map<String, ProposalPosition> existingPositionsByPositionKey(Proposal proposal) {
@@ -405,7 +548,10 @@ public class AiBriefProposalMapper {
         return existingPositions;
     }
 
-    private List<PositionApplication> mergePositionApplicationsByPositionKey(List<AiBriefPositionResult> positionResults) {
+    private List<PositionApplication> mergePositionApplications(
+            List<AiBriefPositionResult> positionResults,
+            PositionMergeMode mergeMode
+    ) {
         Map<String, PositionApplication> merged = new LinkedHashMap<>();
 
         for (AiBriefPositionResult positionResult : positionResults) {
@@ -415,10 +561,17 @@ public class AiBriefProposalMapper {
             }
 
             Position position = resolvedPosition.get();
-            merged.put(positionKey(position, positionResult.getTitle()), new PositionApplication(position, positionResult));
+            merged.put(applicationKey(position, positionResult, mergeMode), new PositionApplication(position, positionResult));
         }
 
         return new ArrayList<>(merged.values());
+    }
+
+    private String applicationKey(Position position, AiBriefPositionResult result, PositionMergeMode mergeMode) {
+        if (mergeMode == PositionMergeMode.AI_INTERVIEW && result.getProposalPositionId() != null) {
+            return "id::" + result.getProposalPositionId();
+        }
+        return "position::" + positionKey(position, result.getTitle());
     }
 
     private Map<String, Long> applicationCountByCategoryKey(List<PositionApplication> applications) {
@@ -434,10 +587,16 @@ public class AiBriefProposalMapper {
 
     private ProposalPosition findExistingPosition(
             PositionApplication application,
+            PositionMergeMode mergeMode,
+            Map<Long, ProposalPosition> existingById,
             Map<String, ProposalPosition> existingByPositionKey,
             Map<String, List<ProposalPosition>> existingByCategoryKey,
             Map<String, Long> applicationCountByCategoryKey
     ) {
+        if (mergeMode == PositionMergeMode.AI_INTERVIEW && hasProposalPositionId(application)) {
+            return existingById.get(application.result().getProposalPositionId());
+        }
+
         String positionKey = positionKey(application.position(), application.result().getTitle());
         ProposalPosition exactMatch = existingByPositionKey.get(positionKey);
         if (exactMatch != null) {
@@ -453,6 +612,10 @@ public class AiBriefProposalMapper {
         }
 
         return null;
+    }
+
+    private boolean hasProposalPositionId(PositionApplication application) {
+        return application.result().getProposalPositionId() != null;
     }
 
     private Long resolveHeadCount(AiBriefPositionResult result) {
@@ -500,6 +663,116 @@ public class AiBriefProposalMapper {
         for (SkillApplication desiredSkill : desiredSkills.values()) {
             proposalPosition.addSkill(desiredSkill.skill(), desiredSkill.importance());
         }
+    }
+
+    private void applySkillChangesForInterview(
+            ProposalPosition proposalPosition,
+            List<AiInterviewSkillChangeResult> skillChanges,
+            String userMessage
+    ) {
+        if (skillChanges == null || skillChanges.isEmpty()) {
+            return;
+        }
+
+        for (AiInterviewSkillChangeResult skillChange : skillChanges) {
+            if (skillChange == null || !StringUtils.hasText(skillChange.getSkillName())) {
+                continue;
+            }
+
+            Optional<Skill> resolvedSkill = skillResolver.resolve(skillChange.getSkillName());
+            if (resolvedSkill.isEmpty()) {
+                continue;
+            }
+
+            applySkillChangeForInterview(proposalPosition, resolvedSkill.get(), skillChange, userMessage);
+        }
+    }
+
+    private void applySkillChangeForInterview(
+            ProposalPosition proposalPosition,
+            Skill skill,
+            AiInterviewSkillChangeResult skillChange,
+            String userMessage
+    ) {
+        if (skillChange.getAction() == AiInterviewSkillChangeAction.ADD) {
+            addSkillForInterview(proposalPosition, skill, skillChange.getImportance());
+            return;
+        }
+
+        if (skillChange.getAction() == AiInterviewSkillChangeAction.REMOVE) {
+            if (canRemoveSkill(userMessage, skillChange.getSkillName())) {
+                removeSkillForInterview(proposalPosition, skill);
+            }
+            return;
+        }
+
+        if (skillChange.getAction() == AiInterviewSkillChangeAction.UPDATE_IMPORTANCE) {
+            updateSkillImportanceForInterview(proposalPosition, skill, skillChange.getImportance());
+        }
+    }
+
+    private boolean canRemoveSkill(String userMessage, String skillName) {
+        if (!StringUtils.hasText(userMessage) || !StringUtils.hasText(skillName)) {
+            return false;
+        }
+
+        return hasTargetedDeleteIntent(normalizeForContains(userMessage), skillName);
+    }
+
+    private void addSkillForInterview(
+            ProposalPosition proposalPosition,
+            Skill skill,
+            ProposalPositionSkillImportance importance
+    ) {
+        ProposalPositionSkill existingSkill = findExistingSkill(proposalPosition, skill);
+        ProposalPositionSkillImportance resolvedImportance = importance == null
+                ? ProposalPositionSkillImportance.PREFERENCE
+                : importance;
+
+        if (existingSkill != null) {
+            existingSkill.changeImportance(resolvedImportance);
+            return;
+        }
+
+        proposalPosition.addSkill(skill, resolvedImportance);
+    }
+
+    private void removeSkillForInterview(ProposalPosition proposalPosition, Skill skill) {
+        ProposalPositionSkill existingSkill = findExistingSkill(proposalPosition, skill);
+        if (existingSkill == null) {
+            return;
+        }
+
+        proposalPosition.removeSkill(existingSkill.getSkill());
+    }
+
+    private void updateSkillImportanceForInterview(
+            ProposalPosition proposalPosition,
+            Skill skill,
+            ProposalPositionSkillImportance importance
+    ) {
+        if (importance == null) {
+            return;
+        }
+
+        ProposalPositionSkill existingSkill = findExistingSkill(proposalPosition, skill);
+        if (existingSkill == null) {
+            return;
+        }
+
+        existingSkill.changeImportance(importance);
+    }
+
+    private ProposalPositionSkill findExistingSkill(ProposalPosition proposalPosition, Skill skill) {
+        String skillKey = normalizeKey(skill.getName());
+
+        for (ProposalPositionSkill existingSkill : proposalPosition.getSkills()) {
+            if (skillKey.equals(normalizeKey(existingSkill.getSkill().getName()))) {
+                return existingSkill;
+            }
+        }
+
+        return null;
     }
 
     private void replaceSkills(ProposalPosition proposalPosition, List<AiBriefSkillResult> skills) {
