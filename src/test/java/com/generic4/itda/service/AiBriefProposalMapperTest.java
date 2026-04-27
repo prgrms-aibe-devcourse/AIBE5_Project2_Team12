@@ -838,9 +838,9 @@ class AiBriefProposalMapperTest {
         );
 
         assertThat(proposal.getPositions()).hasSize(2);
-        assertThat(paymentBackendPosition.getTitle()).isEqualTo("결제서버백엔드개발자");
+        assertThat(paymentBackendPosition.getTitle()).isEqualTo("결제 서버 백엔드 개발자");
         assertThat(paymentBackendPosition.getHeadCount()).isEqualTo(2L);
-        assertThat(findProposalPositionByTitle(proposal, "결제서버백엔드개발자")).isSameAs(paymentBackendPosition);
+        assertThat(findProposalPositionByTitle(proposal, "결제 서버 백엔드 개발자")).isSameAs(paymentBackendPosition);
         assertThat(findProposalPositionByTitle(proposal, "정산 서버 백엔드 개발자")).isSameAs(settlementBackendPosition);
     }
 
@@ -2108,6 +2108,154 @@ class AiBriefProposalMapperTest {
         assertThat(titles).containsExactly("결제 서버 백엔드 개발자", "정산 서버 백엔드 개발자");
         assertThat(findProposalPositionByTitle(proposal, "결제 서버 백엔드 개발자")).isSameAs(paymentBackendPosition);
         assertThat(findProposalPositionByTitle(proposal, "정산 서버 백엔드 개발자")).isSameAs(settlementBackendPosition);
+    }
+
+    @Test
+    @DisplayName("AI 인터뷰 적용은 proposalPositionId가 없으면 category fallback으로 매칭되어도 title을 변경하지 않는다")
+    void applyForInterview_keepsTitleWhenCategoryFallbackMatchesWithoutProposalPositionId() {
+        Proposal proposal = createProposal();
+        Position backend = Position.create("백엔드 개발자");
+
+        ProposalPosition backendPosition = proposal.addPosition(
+                backend,
+                "결제 서버 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                3_000_000L,
+                4_000_000L,
+                3L,
+                3,
+                6,
+                null
+        );
+        setProposalPositionId(backendPosition, 101L);
+
+        given(positionResolver.resolve("백엔드 개발자")).willReturn(Optional.of(backend));
+
+        AiBriefResult aiBriefResult = AiBriefResult.of(
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(
+                        AiBriefPositionResult.of(
+                                null,
+                                "백엔드 개발자",
+                                "새로운 백엔드 개발자",
+                                null,
+                                2L,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                List.of()
+                        )
+                )
+        );
+
+        aiBriefProposalMapper.applyForInterview(
+                proposal,
+                aiBriefResult,
+                "백엔드 개발자 인원을 2명으로 늘려줘."
+        );
+
+        assertThat(proposal.getPositions()).hasSize(1);
+        assertThat(backendPosition.getTitle()).isEqualTo("결제 서버 백엔드 개발자");
+        assertThat(backendPosition.getHeadCount()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("AI 인터뷰 적용에서 앞선 항목의 title 변경 후 뒤따르는 항목이 변경 전 title로 중복 매칭되지 않는다")
+    void applyForInterview_preventsStaleKeyMatchAfterTitleChangeInSameResponse() {
+        Proposal proposal = createProposal();
+        Position backend = Position.create("백엔드 개발자");
+
+        ProposalPosition paymentBackendPosition = proposal.addPosition(
+                backend,
+                "결제 서버 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                3_000_000L,
+                4_000_000L,
+                3L,
+                3,
+                6,
+                null
+        );
+        ProposalPosition settlementBackendPosition = proposal.addPosition(
+                backend,
+                "정산 서버 백엔드 개발자",
+                ProposalWorkType.REMOTE,
+                1L,
+                3_500_000L,
+                4_500_000L,
+                3L,
+                3,
+                6,
+                null
+        );
+        setProposalPositionId(paymentBackendPosition, 101L);
+        setProposalPositionId(settlementBackendPosition, 102L);
+
+        given(positionResolver.resolve("백엔드 개발자")).willReturn(Optional.of(backend));
+
+        AiBriefResult aiBriefResult = AiBriefResult.of(
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(
+                        AiBriefPositionResult.of(
+                                101L,
+                                "백엔드 개발자",
+                                "결제 플랫폼 백엔드 개발자",
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                List.of()
+                        ),
+                        AiBriefPositionResult.of(
+                                null,
+                                "백엔드 개발자",
+                                "결제 서버 백엔드 개발자",
+                                null,
+                                3L,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                List.of()
+                        )
+                )
+        );
+
+        aiBriefProposalMapper.applyForInterview(
+                proposal,
+                aiBriefResult,
+                "결제 서버 백엔드 개발자 제목을 결제 플랫폼 백엔드 개발자로 바꾸고 결제 서버 백엔드 개발자를 3명 추가해줘."
+        );
+
+        assertThat(proposal.getPositions()).hasSize(3);
+        assertThat(paymentBackendPosition.getTitle()).isEqualTo("결제 플랫폼 백엔드 개발자");
+        assertThat(settlementBackendPosition.getTitle()).isEqualTo("정산 서버 백엔드 개발자");
+
+        ProposalPosition newPosition = proposal.getPositions().stream()
+                .filter(p -> "결제 서버 백엔드 개발자".equals(p.getTitle()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(newPosition).isNotSameAs(paymentBackendPosition);
+        assertThat(newPosition.getHeadCount()).isEqualTo(3L);
     }
 
     private ProposalPosition findProposalPosition(Proposal proposal, String positionName) {

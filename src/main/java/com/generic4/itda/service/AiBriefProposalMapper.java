@@ -113,7 +113,12 @@ public class AiBriefProposalMapper {
                 continue;
             }
 
+            String oldPositionKey = proposalPosition != null ? positionKey(proposalPosition) : null;
+
             if (proposalPosition == null) {
+                if (hasNewPositionTitleConflict(proposal, application)) {
+                    continue;
+                }
                 proposalPosition = addNewPosition(proposal, application);
                 replaceSkills(proposalPosition, application.result().getSkills());
             } else if (mergeMode == PositionMergeMode.AI_INTERVIEW) {
@@ -125,6 +130,7 @@ public class AiBriefProposalMapper {
                 replaceSkills(proposalPosition, application.result().getSkills());
             }
 
+            updateLookupMaps(proposalPosition, oldPositionKey, existingByPositionKey, existingByCategoryKey);
             appliedPositions.add(proposalPosition);
         }
 
@@ -150,6 +156,34 @@ public class AiBriefProposalMapper {
                 result.getCareerMaxYears(),
                 workPlace
         );
+    }
+
+    private boolean hasNewPositionTitleConflict(Proposal proposal, PositionApplication application) {
+        String newPositionKey = positionKey(application.position(), application.result().getTitle());
+        for (ProposalPosition existingPosition : proposal.getPositions()) {
+            if (newPositionKey.equals(positionKey(existingPosition))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void updateLookupMaps(
+            ProposalPosition proposalPosition,
+            String oldPositionKey,
+            Map<String, ProposalPosition> existingByPositionKey,
+            Map<String, List<ProposalPosition>> existingByCategoryKey
+    ) {
+        if (oldPositionKey != null) {
+            existingByPositionKey.remove(oldPositionKey);
+        }
+        existingByPositionKey.put(positionKey(proposalPosition), proposalPosition);
+
+        if (oldPositionKey == null) {
+            existingByCategoryKey
+                    .computeIfAbsent(categoryKey(proposalPosition), ignored -> new ArrayList<>())
+                    .add(proposalPosition);
+        }
     }
 
     private void updateExistingPositionForAiBrief(ProposalPosition proposalPosition, PositionApplication application) {
@@ -183,7 +217,7 @@ public class AiBriefProposalMapper {
 
         proposalPosition.update(
                 position,
-                resolveInterviewTitle(proposal, proposalPosition, position, result),
+                resolveInterviewTitle(proposal, proposalPosition, position, result, hasProposalPositionId(application)),
                 workType,
                 resolveInterviewHeadCount(proposalPosition, result),
                 resolveInterviewUnitBudgetMin(proposalPosition, result),
@@ -206,8 +240,13 @@ public class AiBriefProposalMapper {
             Proposal proposal,
             ProposalPosition proposalPosition,
             Position position,
-            AiBriefPositionResult result
+            AiBriefPositionResult result,
+            boolean hasProposalPositionId
     ) {
+        if (!hasProposalPositionId) {
+            return proposalPosition.getTitle();
+        }
+
         if (!StringUtils.hasText(result.getTitle())) {
             return proposalPosition.getTitle();
         }
