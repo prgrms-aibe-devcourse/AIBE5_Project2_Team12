@@ -51,14 +51,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @Slf4j
-@Profile({"local", "demo"})
 @Transactional
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "app.seed", name = "enabled", havingValue = "true")
@@ -127,9 +125,9 @@ public class SeedDataInitializer implements ApplicationRunner {
         Resume backendResume = ensureResume(
                 backend,
                 """
-                추천/매칭과 B2B SaaS 도메인에서 Java/Spring 기반 API, 배치, 캐시 전략을 설계해 온 백엔드 개발자입니다.
-                운영 장애 분석, 데이터 모델링, 성능 튜닝을 함께 맡으며 트래픽이 큰 서비스의 안정성을 높여왔습니다.
-                """,
+                        추천/매칭과 B2B SaaS 도메인에서 Java/Spring 기반 API, 배치, 캐시 전략을 설계해 온 백엔드 개발자입니다.
+                        운영 장애 분석, 데이터 모델링, 성능 튜닝을 함께 맡으며 트래픽이 큰 서비스의 안정성을 높여왔습니다.
+                        """,
                 (byte) 6,
                 careerPayload(
                         careerItem(
@@ -187,9 +185,9 @@ public class SeedDataInitializer implements ApplicationRunner {
         Resume fullstackResume = ensureResume(
                 fullstack,
                 """
-                관리자 백오피스, 고객용 웹, API 서버를 함께 개발해 온 풀스택 개발자입니다.
-                프론트엔드 생산성과 백엔드 운영을 같이 챙기며 초기 제품의 기능 실험과 운영 고도화에 익숙합니다.
-                """,
+                        관리자 백오피스, 고객용 웹, API 서버를 함께 개발해 온 풀스택 개발자입니다.
+                        프론트엔드 생산성과 백엔드 운영을 같이 챙기며 초기 제품의 기능 실험과 운영 고도화에 익숙합니다.
+                        """,
                 (byte) 5,
                 careerPayload(
                         careerItem(
@@ -247,9 +245,9 @@ public class SeedDataInitializer implements ApplicationRunner {
         Resume aiResume = ensureResume(
                 aiEngineer,
                 """
-                LLM 기반 추천, RAG, 추론 API 운영을 맡아 온 AI 엔지니어입니다.
-                프롬프트 실험 설계부터 FastAPI 배포, 로그 수집, 평가 지표 설계까지 제품화 흐름을 경험했습니다.
-                """,
+                        LLM 기반 추천, RAG, 추론 API 운영을 맡아 온 AI 엔지니어입니다.
+                        프롬프트 실험 설계부터 FastAPI 배포, 로그 수집, 평가 지표 설계까지 제품화 흐름을 경험했습니다.
+                        """,
                 (byte) 4,
                 careerPayload(
                         careerItem(
@@ -294,9 +292,9 @@ public class SeedDataInitializer implements ApplicationRunner {
         Resume platformBackendResume = ensureResume(
                 platformBackend,
                 """
-                플랫폼/인프라와 서비스 백엔드를 함께 맡아 온 하이브리드형 백엔드 개발자입니다.
-                추천 API처럼 읽기 부하가 높은 서비스에서 캐시, 메시징, 배포 자동화를 설계하는 일을 주로 해왔습니다.
-                """,
+                        플랫폼/인프라와 서비스 백엔드를 함께 맡아 온 하이브리드형 백엔드 개발자입니다.
+                        추천 API처럼 읽기 부하가 높은 서비스에서 캐시, 메시징, 배포 자동화를 설계하는 일을 주로 해왔습니다.
+                        """,
                 (byte) 8,
                 careerPayload(
                         careerItem(
@@ -353,9 +351,9 @@ public class SeedDataInitializer implements ApplicationRunner {
         Resume dataBackendResume = ensureResume(
                 dataBackend,
                 """
-                데이터 집약형 서비스에서 조회 성능, 검색 품질, 배치 처리까지 담당해 온 백엔드 개발자입니다.
-                SQL 최적화와 Elasticsearch 연동, Querydsl 기반 검색 기능 구현 경험이 강점입니다.
-                """,
+                        데이터 집약형 서비스에서 조회 성능, 검색 품질, 배치 처리까지 담당해 온 백엔드 개발자입니다.
+                        SQL 최적화와 Elasticsearch 연동, Querydsl 기반 검색 기능 구현 경험이 강점입니다.
+                        """,
                 (byte) 5,
                 careerPayload(
                         careerItem(
@@ -401,9 +399,9 @@ public class SeedDataInitializer implements ApplicationRunner {
         Resume frontendResume = ensureResume(
                 frontend,
                 """
-                React/TypeScript 기반 운영 화면과 고객용 웹을 주로 구축해 온 프론트엔드 개발자입니다.
-                복잡한 폼, 데이터 테이블, 디자인 시스템 정리와 같은 운영자 경험 개선 작업에 강점이 있습니다.
-                """,
+                        React/TypeScript 기반 운영 화면과 고객용 웹을 주로 구축해 온 프론트엔드 개발자입니다.
+                        복잡한 폼, 데이터 테이블, 디자인 시스템 정리와 같은 운영자 경험 개선 작업에 강점이 있습니다.
+                        """,
                 (byte) 4,
                 careerPayload(
                         careerItem(
@@ -449,9 +447,9 @@ public class SeedDataInitializer implements ApplicationRunner {
         Resume designSystemResume = ensureResume(
                 designSystem,
                 """
-                프론트엔드와 디자인 시스템 구축을 함께 경험한 UI 플랫폼 개발자입니다.
-                운영 화면의 일관성을 높이기 위한 공통 컴포넌트와 토큰 관리, QA 협업 흐름에 익숙합니다.
-                """,
+                        프론트엔드와 디자인 시스템 구축을 함께 경험한 UI 플랫폼 개발자입니다.
+                        운영 화면의 일관성을 높이기 위한 공통 컴포넌트와 토큰 관리, QA 협업 흐름에 익숙합니다.
+                        """,
                 (byte) 6,
                 careerPayload(
                         careerItem(
@@ -497,9 +495,9 @@ public class SeedDataInitializer implements ApplicationRunner {
         Resume mlopsResume = ensureResume(
                 mlops,
                 """
-                LLM 추론 서비스와 운영 자동화를 함께 맡아 온 MLOps 성향의 AI 엔지니어입니다.
-                FastAPI 추론 서버, 실험 로그 파이프라인, 배포 자동화를 연결해 모델 기능을 서비스로 안착시키는 일을 해왔습니다.
-                """,
+                        LLM 추론 서비스와 운영 자동화를 함께 맡아 온 MLOps 성향의 AI 엔지니어입니다.
+                        FastAPI 추론 서버, 실험 로그 파이프라인, 배포 자동화를 연결해 모델 기능을 서비스로 안착시키는 일을 해왔습니다.
+                        """,
                 (byte) 6,
                 careerPayload(
                         careerItem(
@@ -546,9 +544,9 @@ public class SeedDataInitializer implements ApplicationRunner {
         Resume aiProductResume = ensureResume(
                 aiProduct,
                 """
-                LLM 기능을 실제 제품 플로우에 녹여내는 데 강점이 있는 AI 애플리케이션 엔지니어입니다.
-                추천 설명 생성, 관리자 검수 화면, 실험 도구를 함께 만들며 AI 기능의 제품화를 주도했습니다.
-                """,
+                        LLM 기능을 실제 제품 플로우에 녹여내는 데 강점이 있는 AI 애플리케이션 엔지니어입니다.
+                        추천 설명 생성, 관리자 검수 화면, 실험 도구를 함께 만들며 AI 기능의 제품화를 주도했습니다.
+                        """,
                 (byte) 3,
                 careerPayload(
                         careerItem(
@@ -594,9 +592,9 @@ public class SeedDataInitializer implements ApplicationRunner {
         Resume juniorBackendResume = ensureResume(
                 juniorBackend,
                 """
-                Java/Spring 기반 API 개발을 막 시작한 주니어 백엔드 개발자입니다.
-                운영 경험은 짧지만 기본 CRUD, 테스트 코드, 배포 자동화 학습 프로젝트를 수행했습니다.
-                """,
+                        Java/Spring 기반 API 개발을 막 시작한 주니어 백엔드 개발자입니다.
+                        운영 경험은 짧지만 기본 CRUD, 테스트 코드, 배포 자동화 학습 프로젝트를 수행했습니다.
+                        """,
                 (byte) 1,
                 careerPayload(
                         careerItem(
@@ -628,9 +626,9 @@ public class SeedDataInitializer implements ApplicationRunner {
         Resume siteOnlyBackendResume = ensureResume(
                 siteOnlyBackend,
                 """
-                오프라인 협업과 현장 대응이 많은 프로젝트를 주로 수행해 온 온사이트 중심 백엔드 개발자입니다.
-                시스템 운영과 고객사 커뮤니케이션에는 강하지만, 원격/하이브리드 선호도는 낮은 편입니다.
-                """,
+                        오프라인 협업과 현장 대응이 많은 프로젝트를 주로 수행해 온 온사이트 중심 백엔드 개발자입니다.
+                        시스템 운영과 고객사 커뮤니케이션에는 강하지만, 원격/하이브리드 선호도는 낮은 편입니다.
+                        """,
                 (byte) 7,
                 careerPayload(
                         careerItem(
@@ -674,9 +672,9 @@ public class SeedDataInitializer implements ApplicationRunner {
         Resume optOutResume = ensureResume(
                 optOut,
                 """
-                추천/매칭 도메인 경험은 충분하지만, 현재는 수동 제안만 받고 있어 AI 추천 노출을 꺼둔 백엔드 개발자입니다.
-                후보 풀 필터 동작을 확인하기 위한 옵트아웃 케이스입니다.
-                """,
+                        추천/매칭 도메인 경험은 충분하지만, 현재는 수동 제안만 받고 있어 AI 추천 노출을 꺼둔 백엔드 개발자입니다.
+                        후보 풀 필터 동작을 확인하기 위한 옵트아웃 케이스입니다.
+                        """,
                 (byte) 5,
                 careerPayload(
                         careerItem(
@@ -719,9 +717,9 @@ public class SeedDataInitializer implements ApplicationRunner {
         Resume hiddenResume = ensureResume(
                 hidden,
                 """
-                화면 구현 경험은 충분하지만 아직 외부 공개 전 검수 중인 프론트엔드 개발자입니다.
-                공개 여부와 AI 추천 허용 여부 필터를 확인하기 위한 비공개 케이스입니다.
-                """,
+                        화면 구현 경험은 충분하지만 아직 외부 공개 전 검수 중인 프론트엔드 개발자입니다.
+                        공개 여부와 AI 추천 허용 여부 필터를 확인하기 위한 비공개 케이스입니다.
+                        """,
                 (byte) 2,
                 careerPayload(
                         careerItem(
@@ -793,9 +791,9 @@ public class SeedDataInitializer implements ApplicationRunner {
                 client,
                 MATCHING_PROPOSAL_TITLE,
                 """
-                AI로 프로젝트 요구사항을 브리프화하고 프리랜서 추천까지 연결하는 플랫폼을 고도화하려고 합니다.
-                추천 설명, 필터링, 결과 비교 흐름까지 한 번에 다듬을 수 있는 팀이 필요합니다.
-                """,
+                        AI로 프로젝트 요구사항을 브리프화하고 프리랜서 추천까지 연결하는 플랫폼을 고도화하려고 합니다.
+                        추천 설명, 필터링, 결과 비교 흐름까지 한 번에 다듬을 수 있는 팀이 필요합니다.
+                        """,
                 "추천 엔진 MVP를 운영 가능한 수준으로 끌어올리는 고도화 프로젝트",
                 19_000_000L,
                 25_000_000L,
@@ -846,9 +844,9 @@ public class SeedDataInitializer implements ApplicationRunner {
                 client,
                 WRITING_PROPOSAL_TITLE,
                 """
-                내부 운영 대시보드의 프론트 개편을 준비 중입니다.
-                아직 초안 단계라 추천 실행 전 상태로 테스트할 수 있어야 합니다.
-                """,
+                        내부 운영 대시보드의 프론트 개편을 준비 중입니다.
+                        아직 초안 단계라 추천 실행 전 상태로 테스트할 수 있어야 합니다.
+                        """,
                 "운영자용 프론트 대시보드 개편 제안서 초안",
                 12_000_000L,
                 18_000_000L,
@@ -879,7 +877,7 @@ public class SeedDataInitializer implements ApplicationRunner {
         // matchingProposal의 포지션에 프리랜서 매칭 이력 생성
         // → seed.backend / seed.ai 로그인 시 해당 제안서 상세 페이지 접근 가능
         ensureMatching(backendResume, backendPos1, client, backend, MatchingStatus.PROPOSED);
-        ensureMatching(aiResume,      aiPos,       client, aiEngineer, MatchingStatus.ACCEPTED);
+        ensureMatching(aiResume, aiPos, client, aiEngineer, MatchingStatus.ACCEPTED);
 
         // ── Recommendation 시드 ────────────────────────────────
         // backendPos1 기준 추천 결과 Top 3가 항상 노출되도록 실행(run) + 결과(result)를 준비한다.
@@ -890,12 +888,12 @@ public class SeedDataInitializer implements ApplicationRunner {
 
         log.info(
                 """
-                Seed data is ready.
-                Seed client email={} matchingProposalId={} writingProposalId={}
-                Freelancer resume seeds total={} strong={} medium={} low={} diverse={} filteredOut={}
-                Backend recommendation pool={} top3=[{}, {}, {}]
-                Matching seeds: backend→backendPos1(PROPOSED), ai→aiPos(ACCEPTED)
-                """,
+                        Seed data is ready.
+                        Seed client email={} matchingProposalId={} writingProposalId={}
+                        Freelancer resume seeds total={} strong={} medium={} low={} diverse={} filteredOut={}
+                        Backend recommendation pool={} top3=[{}, {}, {}]
+                        Matching seeds: backend→backendPos1(PROPOSED), ai→aiPos(ACCEPTED)
+                        """,
                 client.getEmail().getValue(),
                 matchingProposal.getId(),
                 writingProposal.getId(),
@@ -1451,9 +1449,9 @@ public class SeedDataInitializer implements ApplicationRunner {
                 phone,
                 "백엔드 개발자",
                 """
-                Java/Spring 기반 %s 경험을 중심으로 API와 운영 안정화를 맡아 온 백엔드 개발자입니다.
-                추천, 조회, 데이터 접근 패턴을 실무에서 함께 다뤄왔습니다.
-                """.formatted(specialty).trim(),
+                        Java/Spring 기반 %s 경험을 중심으로 API와 운영 안정화를 맡아 온 백엔드 개발자입니다.
+                        추천, 조회, 데이터 접근 패턴을 실무에서 함께 다뤄왔습니다.
+                        """.formatted(specialty).trim(),
                 careerYears,
                 "%s 관련 서비스 API와 운영 이슈 대응을 담당했습니다.".formatted(specialty),
                 workType,
@@ -1511,9 +1509,9 @@ public class SeedDataInitializer implements ApplicationRunner {
                 phone,
                 "풀스택 개발자",
                 """
-                운영 화면과 API 서버를 함께 다루는 풀스택 개발자입니다.
-                %s 경험을 바탕으로 백엔드와 프론트엔드 사이의 협업 비용을 줄여왔습니다.
-                """.formatted(specialty).trim(),
+                        운영 화면과 API 서버를 함께 다루는 풀스택 개발자입니다.
+                        %s 경험을 바탕으로 백엔드와 프론트엔드 사이의 협업 비용을 줄여왔습니다.
+                        """.formatted(specialty).trim(),
                 careerYears,
                 "%s 과정을 프론트엔드와 백엔드 양쪽에서 구현했습니다.".formatted(specialty),
                 workType,
@@ -1542,9 +1540,9 @@ public class SeedDataInitializer implements ApplicationRunner {
                 phone,
                 roleTitle,
                 """
-                %s 경험을 중심으로 협업해 온 %s입니다.
-                핵심 주력은 다르지만 Java/Spring 연동 경험으로 백엔드 팀과의 협업 접점이 있습니다.
-                """.formatted(specialty, roleTitle).trim(),
+                        %s 경험을 중심으로 협업해 온 %s입니다.
+                        핵심 주력은 다르지만 Java/Spring 연동 경험으로 백엔드 팀과의 협업 접점이 있습니다.
+                        """.formatted(specialty, roleTitle).trim(),
                 careerYears,
                 "%s 중심 기능 구현과 운영 협업을 담당했습니다.".formatted(specialty),
                 WorkType.HYBRID,
@@ -1640,6 +1638,7 @@ public class SeedDataInitializer implements ApplicationRunner {
             boolean aiMatchingEnabled,
             List<SeedSkillLevel> skillLevels
     ) {
+
     }
 
     private Map<String, Position> ensurePositions() {
@@ -2193,10 +2192,10 @@ public class SeedDataInitializer implements ApplicationRunner {
                             "장애 대응 및 지표 기반 성능 튜닝 경험"
                     ),
                     """
-                    %s 후보는 %s 포지션에 필요한 Java/Spring 기반의 백엔드 설계·운영 경험이 풍부합니다.
-                    특히 추천/매칭 API를 운영 환경에서 튜닝한 경험이 있어 트래픽 증가 구간에서도 안정적으로 대응할 가능성이 높습니다.
-                    PostgreSQL/Redis를 함께 사용한 이력이 있어 데이터 접근 패턴 설계와 캐시 전략 수립에도 강점이 있습니다. (경력 %s년)
-                    """.formatted(name, positionTitle, years).trim()
+                            %s 후보는 %s 포지션에 필요한 Java/Spring 기반의 백엔드 설계·운영 경험이 풍부합니다.
+                            특히 추천/매칭 API를 운영 환경에서 튜닝한 경험이 있어 트래픽 증가 구간에서도 안정적으로 대응할 가능성이 높습니다.
+                            PostgreSQL/Redis를 함께 사용한 이력이 있어 데이터 접근 패턴 설계와 캐시 전략 수립에도 강점이 있습니다. (경력 %s년)
+                            """.formatted(name, positionTitle, years).trim()
             );
         }
 
@@ -2209,10 +2208,10 @@ public class SeedDataInitializer implements ApplicationRunner {
                             "PostgreSQL 튜닝과 플랫폼 운영 협업 경험"
                     ),
                     """
-                    %s 후보는 %s 포지션에서 필요한 백엔드 구현 역량에 더해 플랫폼 운영 관점까지 함께 가져갈 수 있는 인력입니다.
-                    Redis/Kafka를 활용한 비동기 처리와 캐시 설계 경험이 있어, 추천 API 고도화 과정에서 병목 구간을 구조적으로 개선할 가능성이 높습니다.
-                    배포 자동화와 운영 안정화 경험까지 갖추고 있어 초기 고도화 이후의 운영 단계까지 연결해 기여할 수 있습니다. (경력 %s년)
-                    """.formatted(name, positionTitle, years).trim()
+                            %s 후보는 %s 포지션에서 필요한 백엔드 구현 역량에 더해 플랫폼 운영 관점까지 함께 가져갈 수 있는 인력입니다.
+                            Redis/Kafka를 활용한 비동기 처리와 캐시 설계 경험이 있어, 추천 API 고도화 과정에서 병목 구간을 구조적으로 개선할 가능성이 높습니다.
+                            배포 자동화와 운영 안정화 경험까지 갖추고 있어 초기 고도화 이후의 운영 단계까지 연결해 기여할 수 있습니다. (경력 %s년)
+                            """.formatted(name, positionTitle, years).trim()
             );
         }
 
@@ -2225,10 +2224,10 @@ public class SeedDataInitializer implements ApplicationRunner {
                             "백엔드(Spring)와 프론트(React/TS) 협업 관점 강점"
                     ),
                     """
-                    %s 후보는 백엔드(Spring)와 프론트(React/TypeScript)를 모두 경험해 팀 협업/커뮤니케이션 비용을 낮출 수 있습니다.
-                    추천 API 자체 개발뿐 아니라 운영/배포 파이프라인(Docker) 관점에서도 도움을 줄 수 있어, 초기 고도화 단계에서 유연하게 역할을 확장할 수 있습니다.
-                    핵심 백엔드 스킬셋(Java/Spring)을 보유하고 있어 포지션 요구사항과의 기본 적합도도 충분합니다. (경력 %s년)
-                    """.formatted(name, years).trim()
+                            %s 후보는 백엔드(Spring)와 프론트(React/TypeScript)를 모두 경험해 팀 협업/커뮤니케이션 비용을 낮출 수 있습니다.
+                            추천 API 자체 개발뿐 아니라 운영/배포 파이프라인(Docker) 관점에서도 도움을 줄 수 있어, 초기 고도화 단계에서 유연하게 역할을 확장할 수 있습니다.
+                            핵심 백엔드 스킬셋(Java/Spring)을 보유하고 있어 포지션 요구사항과의 기본 적합도도 충분합니다. (경력 %s년)
+                            """.formatted(name, years).trim()
             );
         }
 
@@ -2241,10 +2240,10 @@ public class SeedDataInitializer implements ApplicationRunner {
                             "PostgreSQL 기반 데이터 모델링 및 분석 경험"
                     ),
                     """
-                    %s 후보는 LLM/추천 파이프라인 경험이 있어, 추천 품질 개선(설명 생성/실험/지표 설계) 측면에서 강점을 보입니다.
-                    이번 포지션이 순수 백엔드 중심이라면 매칭 강도는 다소 낮을 수 있으나, 추천 기능 고도화/실험을 병행한다면 기여도가 커질 수 있습니다.
-                    데이터 저장소(PostgreSQL) 경험이 있어 백엔드팀과의 협업 접점도 확보 가능합니다. (경력 %s년)
-                    """.formatted(name, years).trim()
+                            %s 후보는 LLM/추천 파이프라인 경험이 있어, 추천 품질 개선(설명 생성/실험/지표 설계) 측면에서 강점을 보입니다.
+                            이번 포지션이 순수 백엔드 중심이라면 매칭 강도는 다소 낮을 수 있으나, 추천 기능 고도화/실험을 병행한다면 기여도가 커질 수 있습니다.
+                            데이터 저장소(PostgreSQL) 경험이 있어 백엔드팀과의 협업 접점도 확보 가능합니다. (경력 %s년)
+                            """.formatted(name, years).trim()
             );
         }
 
@@ -2257,9 +2256,9 @@ public class SeedDataInitializer implements ApplicationRunner {
                             "프로젝트 초반 적응이 빠른 범용 기술 스택"
                     ),
                     """
-                    %s 후보는 %s 포지션의 핵심 요구사항과 직접 맞닿는 경험을 갖고 있어 빠르게 전력화될 가능성이 높습니다.
-                    운영 환경에서 기능 개선과 안정화 작업을 함께 수행한 이력이 있어 실무 투입 이후의 리스크도 낮은 편입니다. (경력 %s년)
-                    """.formatted(name, positionTitle, years).trim()
+                            %s 후보는 %s 포지션의 핵심 요구사항과 직접 맞닿는 경험을 갖고 있어 빠르게 전력화될 가능성이 높습니다.
+                            운영 환경에서 기능 개선과 안정화 작업을 함께 수행한 이력이 있어 실무 투입 이후의 리스크도 낮은 편입니다. (경력 %s년)
+                            """.formatted(name, positionTitle, years).trim()
             );
         }
 
@@ -2271,9 +2270,9 @@ public class SeedDataInitializer implements ApplicationRunner {
                         "협업 비용이 낮은 범용 기술 스택"
                 ),
                 """
-                %s 후보는 특정 단일 역할에만 한정되지 않고, 기능 개발과 운영을 함께 수행할 수 있는 범용 역량을 갖추고 있습니다.
-                현재 %s 포지션이 요구하는 핵심 기술과의 직접 접점이 있어 온보딩 부담이 낮고, 주변 업무까지 유연하게 확장할 수 있습니다. (경력 %s년)
-                """.formatted(name, positionTitle, years).trim()
+                        %s 후보는 특정 단일 역할에만 한정되지 않고, 기능 개발과 운영을 함께 수행할 수 있는 범용 역량을 갖추고 있습니다.
+                        현재 %s 포지션이 요구하는 핵심 기술과의 직접 접점이 있어 온보딩 부담이 낮고, 주변 업무까지 유연하게 확장할 수 있습니다. (경력 %s년)
+                        """.formatted(name, positionTitle, years).trim()
         );
     }
 
@@ -2282,6 +2281,7 @@ public class SeedDataInitializer implements ApplicationRunner {
             List<String> highlights,
             String llmReason
     ) {
+
     }
 
     private Position ensurePosition(String name) {
@@ -2352,8 +2352,10 @@ public class SeedDataInitializer implements ApplicationRunner {
     }
 
     private record SeedSkillLevel(String skillName, Proficiency proficiency) {
+
     }
 
     private record SeedSkillRequirement(String skillName, ProposalPositionSkillImportance importance) {
+
     }
 }
