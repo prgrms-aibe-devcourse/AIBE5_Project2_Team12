@@ -204,8 +204,9 @@ class RecommendationRunProcessorIntegrationTest {
 
     private RunFixture createRunningRunFixture(String ownerEmail, String fingerprint) {
         Member owner = memberRepository.save(createMember(ownerEmail, "pw", "제안자", "010-0000-0001"));
-        Position position = persist(Position.create("백엔드 개발자"));
-        Skill java = persist(Skill.create("Java", null));
+        String suffix = fingerprint.replaceAll("[^a-zA-Z0-9]", "-");
+        Position position = persist(Position.create("Proc 백엔드 개발자 " + suffix));
+        Skill java = persist(Skill.create("Proc Java " + suffix, null));
 
         Proposal proposal = Proposal.create(owner, "AI 추천 테스트 제안서", "원본 입력", "설명", 5_000_000L, 10_000_000L, 6L);
         ProposalPosition proposalPosition = proposal.addPosition(position, "백엔드 개발자", null, 2L, 1_000_000L, 2_000_000L, null, null, null, null);

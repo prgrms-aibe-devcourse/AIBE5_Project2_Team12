@@ -10,3 +10,7 @@ spring:
 file:
   upload:
     base-path: build/test-uploads
+
+app:
+  seed:
+    enabled: false

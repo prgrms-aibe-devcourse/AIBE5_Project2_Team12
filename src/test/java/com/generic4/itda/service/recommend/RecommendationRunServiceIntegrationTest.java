@@ -106,9 +106,12 @@ class RecommendationRunServiceIntegrationTest {
                 DEFAULT_ALGORITHM,
                 DEFAULT_TOP_K
         );
+        long runCountForPosition = recommendationRunRepository
+                .findAllByProposalPosition_IdOrderByCreatedAtDescIdDesc(proposalPositionId)
+                .size();
 
         assertThat(reusedRunId).isEqualTo(firstRunId);
-        assertThat(recommendationRunRepository.count()).isEqualTo(1);
+        assertThat(runCountForPosition).isEqualTo(1);
         assertThat(persistedRun.getProposalPosition().getId()).isEqualTo(proposalPositionId);
         assertThat(persistedRun.getRequestFingerprint()).isEqualTo(expectedFingerprint);
         assertThat(persistedRun.getAlgorithm()).isEqualTo(DEFAULT_ALGORITHM);
@@ -181,9 +184,12 @@ class RecommendationRunServiceIntegrationTest {
 
         RecommendationRun firstRun = recommendationRunRepository.findById(firstRunId).orElseThrow();
         RecommendationRun secondRun = recommendationRunRepository.findById(secondRunId).orElseThrow();
+        long runCountForPosition = recommendationRunRepository
+                .findAllByProposalPosition_IdOrderByCreatedAtDescIdDesc(proposalPositionId)
+                .size();
 
         assertThat(secondRunId).isNotEqualTo(firstRunId);
-        assertThat(recommendationRunRepository.count()).isEqualTo(2);
+        assertThat(runCountForPosition).isEqualTo(2);
         assertThat(firstRun.getRequestFingerprint()).isNotEqualTo(secondRun.getRequestFingerprint());
     }
 
@@ -227,7 +233,9 @@ class RecommendationRunServiceIntegrationTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("OPEN 상태의 모집 포지션만 추천을 실행할 수 있습니다.");
 
-        assertThat(recommendationRunRepository.count()).isZero();
+        assertThat(recommendationRunRepository.findAllByProposalPosition_IdOrderByCreatedAtDescIdDesc(
+                proposalPosition.getId()
+        )).isEmpty();
     }
 
     private Proposal loadProposalDetail(Long proposalId) {
