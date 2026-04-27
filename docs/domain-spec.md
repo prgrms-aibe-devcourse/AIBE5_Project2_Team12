@@ -1,6 +1,6 @@
 # IT-da 도메인 상세 명세
 
-이 문서는 2026-04-19 기준 `ERDCloud` 초안과 이번에 함께 반영하는 추천 도메인 테이블(`5.16 ~ 5.18`)을 기준으로
+이 문서는 2026-04-27 기준 `ERDCloud` 초안과 현재 리포지토리 구현 상태를 기준으로
 `member`, `resume`, `file`, `skill`, `proposal`, `proposal_position`, `position`, `matching` 도메인을 다시 정렬한 명세다.
 이전 대화에서 나온 확장 설계 중 ERD에 아직 반영되지 않은 항목은 현재 모델로 취급하지 않고, 문서 마지막의 `추후 재논의`로 내린다.
 
@@ -38,17 +38,25 @@
 - 인증은 세션 기반 Spring Security 폼 로그인이다.
 - `Resume`는 `Member`와 1:1 관계다.
 - `Resume`는 `careerYears`, `career` JSON, `preferredWorkType`, `publiclyVisible`, `aiMatchingEnabled`를 가진다.
+- `Resume`는 `writingStatus`, `status`, `portfolioUrl`까지 코드에 반영돼 있다.
 - `Skill`은 별도 엔티티이며 `name`이 유니크하다.
 - 파일은 로컬 저장 + `StoredFile` 메타데이터 저장 패턴을 사용한다.
 - `ProfileImage`는 `StoredFile`을 감싸는 별도 엔티티이며, 현재 ERD와 코드 모두 `Member`를 1:1 연관관계 주인으로 둔다.
+- `ResumeAttachment` 엔티티가 구현돼 있고, 현재 코드에서는 첨부 순서를 `display_order` 컬럼이 아니라 `createdAt asc`로 해석한다.
+- `ProposalAiInterviewMessage`가 구현돼 있으며 AI 인터뷰 대화 이력을 제안서 단위로 순차 저장한다.
+- `Matching`은 계약 시작 확인, 취소 요청/철회/확인, 후기 작성, 완료 확인 시각을 모두 같은 집합 안에서 관리한다.
+- `RecommendationRun`, `RecommendationResult`, `ResumeEmbedding`이 구현돼 있고 스케줄러 기반 추천 실행 흐름이 연결돼 있다.
 
-현재 ERD와 코드가 완전히 일치하지 않는 부분도 있다.
+현재 ERD와 코드 사이에 추가 정리가 필요한 부분도 있다.
 
 - `members.memo`는 현재 코드에도 반영되어 있다.
 - `resumes.status`, `resumes.writing_status`, `resumes.portfolio_url`도 현재 코드에 반영되어 있다.
 - ERD는 `resumes.career`를 nullable로 볼 여지가 있지만 현재 코드는 필수로 검증한다.
 - `resume_attachments`와 `profile_image`는 현재 코드 엔티티가 존재한다.
+- `resume_attachments.display_order`는 현재 코드에 없고, 정렬은 `createdAt asc`로 처리한다.
 - `stored_file.content_type`은 ERDCloud 표기와 별개로 현재 구현 기준 MIME 문자열(`String` / `varchar`)로 본다.
+- 추천 도메인의 `hard_filter_stats`, `reason_facts`, `embedding_vector`는 현재 코드에서 `jsonb` 대신 JSON 직렬화 `TEXT` 컬럼으로 저장한다.
+- `proposal_ai_interview_message`는 현재 코드에 있지만 ERDCloud 반영 여부를 별도로 맞춰야 한다.
 
 따라서 신규 도메인은 현재 패턴을 깨지 않는 선에서 추가하는 것이 우선이다.
 
@@ -86,7 +94,7 @@
 - `resume.ai_matching_enabled`는 그 전제 조건을 만족한 이력서 중 AI 추천 후보군 포함 여부만 추가로 제어한다.
 - MVP 추천 엔진을 위해 `recommendation_runs`, `recommendation_results`, `resume_embeddings`를 ERD에 추가한다.
 - `proposal_position_embeddings`는 MVP에서 추가하지 않는다.
-- MVP에서는 `resume_embeddings.embedding_vector`를 `jsonb`로 저장하고 `pgvector` extension은 도입하지 않는다.
+- MVP에서는 `resume_embeddings.embedding_vector`를 JSON 직렬화 `TEXT`로 저장하고 `pgvector` extension은 도입하지 않는다.
 - MVP에서는 외부 MQ를 두지 않고 `recommendation_results.llm_status` 상태 전이로 설명 생성 흐름을 관리한다.
 
 ## 4. 권장 집합 경계
@@ -197,7 +205,7 @@
 - `email`은 값 객체에서 형식을 검증하고 유니크하게 취급한다.
 - `phone`은 지원 가능한 국내 전화번호 형식만 허용하고, 하이픈을 제거한 값으로 정규화해 저장한다.
 - `delete()`와 `restore()`는 물리 삭제가 아니라 `status` 변경 기반 soft delete / restore다.
-- `memo`는 현재 ERD에는 있지만 현재 코드 엔티티에는 아직 없다.
+- `memo`는 현재 코드 엔티티에도 반영돼 있고 `Member.updateProfile()`에서 함께 갱신한다.
 - 현재 ERD와 코드 모두 `profile_image_id` FK로 `ProfileImage`를 참조하고, `Member`가 1:1 연관관계 주인이다.
 - `profile_image_id`는 optional이며, 회원이 프로필 이미지를 등록한 경우에만 값을 가진다.
 - 회원당 대표 프로필 이미지는 1개이므로 `members.profile_image_id` 1:1 제약으로 관리한다.
@@ -231,7 +239,7 @@
 - `publicly_visible`, `ai_matching_enabled` 기본값은 `true`다.
 - 현재 코드 기준으로 `introduction`, `career_years`, `career`는 모두 필수다.
 - 현재 코드 기준으로 `career_years >= 0`이어야 한다.
-- 현재 ERD에는 `writing_status`, `status`, `portfolio_url`이 있지만 현재 코드 엔티티에는 아직 없다.
+- `writing_status`, `status`, `portfolio_url`은 현재 코드 엔티티와 폼/서비스까지 반영돼 있다.
 
 ### 5.3 profile_images
 
@@ -281,21 +289,21 @@
 
 이력서에 연결된 첨부 파일 목록이다.
 
-| 필드              | 타입        | 필수 | 설명           |
-|-----------------|-----------|----|--------------|
-| `id`            | bigint    | Y  | PK           |
-| `resume_id`     | bigint    | Y  | 이력서          |
-| `file_id`       | bigint    | Y  | 파일 메타데이터     |
-| `display_order` | integer   | Y  | 0-indexed 정렬 |
-| `created_at`    | timestamp | Y  | 생성 시각        |
-| `modified_at`   | timestamp | Y  | 수정 시각        |
+| 필드           | 타입        | 필수 | 설명           |
+|--------------|-----------|----|--------------|
+| `id`         | bigint    | Y  | PK           |
+| `resume_id`  | bigint    | Y  | 이력서          |
+| `file_id`    | bigint    | Y  | 파일 메타데이터     |
+| `created_at` | timestamp | Y  | 생성 시각        |
+| `modified_at` | timestamp | Y  | 수정 시각        |
 
 규칙은 아래와 같다.
 
 - 첨부파일은 이력서당 여러 개를 가질 수 있다.
-- `display_order`는 현재 ERD 주석 기준 0-indexed다.
-- `UNIQUE (resume_id, display_order)`를 강제한다.
-- 현재 ERD에는 존재하지만 현재 코드 엔티티는 아직 없다.
+- 현재 코드 기준 첨부파일은 `createdAt asc` 순서로 조회한다.
+- 현재 코드 기준 이력서당 첨부파일은 최대 10개까지 허용한다.
+- 현재 코드에는 `ResumeAttachment` 엔티티가 존재한다.
+- `display_order`와 중복 첨부 방지 제약은 ERD/서비스 정책을 다시 맞춰야 한다.
 
 ### 5.6 skills
 
@@ -385,6 +393,7 @@
 - 현재 구현에서는 `total_budget_*`를 직접 입력하지 않고 포지션별 인원과 최소/최대 예산 합산값으로 계산해 저장한다.
 - 현재 ERD 기준으로 추천과 모집 시작 상태는 `MATCHING`이다.
 - `COMPLETE`는 제안서 단위의 종료 상태다.
+- AI 인터뷰 대화 이력은 현재 코드에서 별도 `proposal_ai_interview_message` 엔티티로 저장하고, 누적 대화 내용을 `raw_input_text`에 다시 동기화한다.
 
 ### 5.10 proposal_positions
 
@@ -598,9 +607,9 @@ MVP에서는 캐시 키와 실행 이력을 함께 담당한다.
 | `proposal_position_id` | bigint                                               | Y  | 추천 대상 모집 단위           |
 | `request_fingerprint`  | varchar(128)                                         | Y  | 추천 입력 해시              |
 | `algorithm_version`    | varchar(50)                                          | Y  | 추천 알고리즘 버전            |
-| `candidate_count`      | integer                                              | Y  | 하드 필터 통과 후 점수 계산 대상 수 |
+| `candidate_count`      | integer                                              | N  | 하드 필터 통과 후 점수 계산 대상 수 |
 | `top_k`                | integer                                              | Y  | 저장 결과 개수, MVP 기본값 3    |
-| `hard_filter_stats`    | jsonb                                                | N  | 필터별 통과/탈락 집계          |
+| `hard_filter_stats`    | text(JSON serialize)                                 | N  | 필터별 통과/탈락 집계          |
 | `status`               | enum(`PENDING`, `RUNNING`, `COMPUTED`, `FAILED`)     | Y  | 실행 상태                 |
 | `error_message`        | text                                                 | N  | 실패 사유                 |
 | `created_at`           | timestamp                                            | Y  | 생성 시각                 |
@@ -612,10 +621,11 @@ MVP에서는 캐시 키와 실행 이력을 함께 담당한다.
 
 - `UNIQUE (proposal_position_id, request_fingerprint, algorithm_version)`를 강제한다.
 - 같은 `proposal_position`, 같은 fingerprint, 같은 알고리즘 버전이면 기존 실행 결과를 재사용한다.
-- `request_fingerprint`는 최소한 `proposal`, `proposal_position`, `proposal_position_skills`, 추천 파라미터를 반영해야 한다.
+- 현재 구현의 `request_fingerprint`는 `proposal_position` 핵심 필드, 요구 스킬, 알고리즘 버전, `topK`를 반영한다.
+- 추가 추천의 fingerprint에는 기존 추천 결과에서 제외할 `excludedResumeIds`도 포함한다.
 - MVP에서는 `created_at`을 추천 실행 시작 시각, `modified_at`을 최종 상태 반영 시각으로 사용하고 별도 `started_at`, `finished_at` 컬럼은 두지 않는다.
 - MVP에서는 `input_snapshot_json`, `stale` 플래그, 프롬프트 버전 컬럼을 두지 않고 캐시 키와 재계산 규칙으로 단순화한다.
-- `resumes`, `resume_skills`, `publicly_visible`, `ai_matching_enabled` 변경 시 해당 이력서가 포함된 기존 추천 실행은 재사용하지 않고 새로 계산한다.
+- 후보군 변화는 fingerprint 자체보다 실행 시점의 `ResumeQueryRepository` 조회 결과에 반영된다.
 
 ### 5.17 recommendation_results
 
@@ -630,7 +640,7 @@ MVP에서는 전체 후보 랭킹이 아니라 응답에 노출할 결과만 저
 | `rank`                  | integer                                      | Y  | 추천 순위              |
 | `final_score`           | numeric(5,4)                                 | Y  | 최종 점수              |
 | `embedding_score`       | numeric(5,4)                                 | Y  | 임베딩 유사도 점수         |
-| `reason_facts`          | jsonb                                        | Y  | 추천 근거 구조화 데이터      |
+| `reason_facts`          | text(JSON serialize)                         | Y  | 추천 근거 구조화 데이터      |
 | `llm_reason`            | text                                         | N  | 사용자 노출용 추천 설명       |
 | `llm_status`            | enum(`PENDING`, `READY`, `FAILED`)           | Y  | 설명 생성 상태           |
 | `created_at`            | timestamp                                    | Y  | 생성 시각, 최초 결과 저장 시각  |
@@ -661,7 +671,7 @@ MVP에서는 반복 비용이 큰 이력서 쪽만 영속화하고, `proposal_po
 | `resume_id`       | bigint      | Y  | 대상 이력서     |
 | `source_hash`     | varchar(128)| Y  | 임베딩 원문 해시  |
 | `embedding_model` | varchar(100)| Y  | 임베딩 모델     |
-| `embedding_vector`| jsonb       | Y  | 임베딩 벡터 값   |
+| `embedding_vector`| text(JSON serialize) | Y  | 임베딩 벡터 값   |
 | `created_at`      | timestamp   | Y  | 생성 시각      |
 | `modified_at`     | timestamp   | Y  | 수정 시각      |
 | `created_by`      | varchar     | N  | 감사 정보      |
@@ -673,7 +683,7 @@ MVP에서는 반복 비용이 큰 이력서 쪽만 영속화하고, `proposal_po
 - MVP에서는 `resume_id + embedding_model` 기준 최신 임베딩 캐시 한 줄만 유지하고, `created_at`은 캐시 레코드 최초 생성 시각, `modified_at`은 마지막 임베딩 재생성 시각으로 사용한다. 별도 `generated_at` 컬럼은 두지 않는다.
 - `source_hash`는 `introduction`, `career`, `preferred_work_type`, `portfolio_url`, `resume_skills`를 기준으로 계산한다.
 - 현재 source hash와 저장된 hash가 다르면 임베딩을 재생성한다.
-- MVP에서는 `embedding_vector`를 `jsonb`로 저장하고, `pgvector` extension과 ANN 인덱스는 도입하지 않는다.
+- MVP에서는 `embedding_vector`를 JSON 직렬화 `TEXT`로 저장하고, `pgvector` extension과 ANN 인덱스는 도입하지 않는다.
 - `proposal_position_embeddings` 테이블은 MVP에서 만들지 않는다. 현재는 `proposal_position` 입력을 요청 시 임베딩하고, 최종 추천 결과만 `recommendation_runs`와 `recommendation_results`로 재사용한다.
 
 ## 6. 상태 모델
@@ -717,7 +727,8 @@ OPEN -> FULL -> CLOSED
 ```text
 PROPOSED -> ACCEPTED -> IN_PROGRESS -> COMPLETED
 PROPOSED -> REJECTED
-PROPOSED -> CANCELED
+ACCEPTED -> CANCELED
+IN_PROGRESS -> CANCELED
 ```
 
 단, 정확한 enum literal은 코드 생성 전 ERDCloud 원본에서 한 번 더 확정하는 편이 안전하다.
