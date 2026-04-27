@@ -114,10 +114,10 @@ SPRING_DOCKER_COMPOSE_ENABLED=false ./gradlew bootRun
 - 클라이언트 대시보드: `http://localhost:8080/client/dashboard`
 - 제안서 작성: `http://localhost:8080/proposals/new`
 
-기본 시드 데이터는 기본값으로 활성화되어 있습니다.
+시드 데이터는 기본값으로 활성화됩니다.
 
 - 클라이언트: `seed.client@itda.local`
-- 프리랜서: `seed.backend@itda.local`, `seed.fullstack@itda.local`, `seed.ai@itda.local`, `seed.hidden@itda.local`
+- 주요 프리랜서: `seed.backend@itda.local`, `seed.platform@itda.local`, `seed.data@itda.local`, `seed.fullstack@itda.local`
 - 기본 비밀번호: `demo1234`
 
 ### 5. 테스트 실행
