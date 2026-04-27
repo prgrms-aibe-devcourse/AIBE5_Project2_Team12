@@ -19,6 +19,9 @@ import org.springframework.util.Assert;
 @RequiredArgsConstructor
 public class HeuristicV1RecommendationScorer {
 
+    private static final double SKILL_ADJUSTMENT_CONTRIBUTION_WEIGHT = 0.35;
+    private static final double CAREER_ADJUSTMENT_CONTRIBUTION_WEIGHT = 0.25;
+
     private final AiEmbeddingProperties properties;
     private final RecommendationQueryTextGenerator recommendationQueryTextGenerator;
     private final QueryEmbeddingGenerator queryEmbeddingGenerator;
@@ -115,7 +118,11 @@ public class HeuristicV1RecommendationScorer {
                 proposalPosition.getCareerMaxYears()
         );
 
-        double finalScore = clampScore(embeddingScore + skillAdjustmentScore + careerAdjustmentScore);
+        double finalScore = clampScore(
+                embeddingScore
+                        + (skillAdjustmentScore * SKILL_ADJUSTMENT_CONTRIBUTION_WEIGHT)
+                        + (careerAdjustmentScore * CAREER_ADJUSTMENT_CONTRIBUTION_WEIGHT)
+        );
 
         return new ScoredCandidate(
                 candidate,
