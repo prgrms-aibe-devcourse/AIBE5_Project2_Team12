@@ -51,20 +51,18 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @Slf4j
-@Profile({"local", "demo"})
 @Transactional
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "app.seed", name = "enabled", havingValue = "true")
 public class SeedDataInitializer implements ApplicationRunner {
 
-    private static final int EXPECTED_FREELANCER_SEED_COUNT = 50;
+    private static final int EXPECTED_FREELANCER_SEED_COUNT = 29;
 
     private static final String SEED_CLIENT_EMAIL = "seed.client@itda.local";
     private static final String SEED_BACKEND_EMAIL = "seed.backend@itda.local";
@@ -199,8 +197,8 @@ public class SeedDataInitializer implements ApplicationRunner {
                                 "2022-05",
                                 null,
                                 true,
-                                "운영 대시보드와 고객용 웹을 함께 개발하면서 React/TypeScript 프론트와 Spring API 서버를 동시에 운영했습니다.",
-                                List.of("React", "TypeScript", "Next.js", "Java", "Spring", "Docker")
+                                "운영 대시보드와 고객용 웹을 함께 개발하면서 React SPA 프론트와 Spring API 서버를 동시에 운영했습니다.",
+                                List.of("React", "TypeScript", "JavaScript", "Java", "Spring", "Docker")
                         ),
                         careerItem(
                                 "Commerce Tools",
@@ -223,7 +221,7 @@ public class SeedDataInitializer implements ApplicationRunner {
                                 List.of("JavaScript", "HTML", "CSS", "REST API")
                         )
                 ),
-                WorkType.HYBRID,
+                WorkType.REMOTE,
                 ResumeWritingStatus.DONE,
                 "https://fullstack.seed.itda.local",
                 true,
@@ -233,7 +231,6 @@ public class SeedDataInitializer implements ApplicationRunner {
                         skillLevel("Spring", Proficiency.INTERMEDIATE),
                         skillLevel("React", Proficiency.ADVANCED),
                         skillLevel("TypeScript", Proficiency.ADVANCED),
-                        skillLevel("Next.js", Proficiency.INTERMEDIATE),
                         skillLevel("JavaScript", Proficiency.ADVANCED),
                         skillLevel("HTML", Proficiency.ADVANCED),
                         skillLevel("CSS", Proficiency.INTERMEDIATE),
@@ -365,8 +362,8 @@ public class SeedDataInitializer implements ApplicationRunner {
                                 "2022-01",
                                 null,
                                 true,
-                                "추천/검색 API를 개발하며 Elasticsearch 색인 구조와 PostgreSQL 조회 성능을 함께 튜닝했습니다.",
-                                List.of("Java", "Spring Boot", "PostgreSQL", "Elasticsearch", "Querydsl")
+                                "추천/검색 API를 개발하며 Elasticsearch 색인 구조와 MySQL 조회 성능을 함께 튜닝했습니다.",
+                                List.of("Java", "Spring Boot", "MySQL", "Elasticsearch", "Querydsl")
                         ),
                         careerItem(
                                 "Growth Data Team",
@@ -388,7 +385,7 @@ public class SeedDataInitializer implements ApplicationRunner {
                         skillLevel("Java", Proficiency.ADVANCED),
                         skillLevel("Spring", Proficiency.ADVANCED),
                         skillLevel("Spring Boot", Proficiency.INTERMEDIATE),
-                        skillLevel("PostgreSQL", Proficiency.ADVANCED),
+                        skillLevel("MySQL", Proficiency.ADVANCED),
                         skillLevel("Elasticsearch", Proficiency.INTERMEDIATE),
                         skillLevel("Querydsl", Proficiency.INTERMEDIATE),
                         skillLevel("JPA", Proficiency.INTERMEDIATE),
@@ -832,7 +829,7 @@ public class SeedDataInitializer implements ApplicationRunner {
                 9_000_000L,
                 16L,
                 3,
-                5,
+                6,
                 "서울 강남 / 주 2회 협업",
                 skillRequirements(
                         skillRequirement("Python", ProposalPositionSkillImportance.ESSENTIAL),
@@ -960,7 +957,7 @@ public class SeedDataInitializer implements ApplicationRunner {
                 ),
                 backendCandidate(
                         "seed.match.backend-02@itda.local", "김도윤", "도윤플랫폼", seedPhone(2002), (byte) 7,
-                        "Kafka 이벤트 처리와 운영 자동화",
+                        "이벤트 처리와 운영 자동화",
                         skillLevels(
                                 skillLevel("Java", Proficiency.ADVANCED),
                                 skillLevel("Spring", Proficiency.ADVANCED),
@@ -972,21 +969,8 @@ public class SeedDataInitializer implements ApplicationRunner {
                         )
                 ),
                 backendCandidate(
-                        "seed.match.backend-03@itda.local", "박서준", "서준데이터", seedPhone(2003), (byte) 6,
-                        "검색/조회 API와 Querydsl 최적화",
-                        skillLevels(
-                                skillLevel("Java", Proficiency.ADVANCED),
-                                skillLevel("Spring", Proficiency.ADVANCED),
-                                skillLevel("Spring Boot", Proficiency.ADVANCED),
-                                skillLevel("PostgreSQL", Proficiency.ADVANCED),
-                                skillLevel("JPA", Proficiency.ADVANCED),
-                                skillLevel("Querydsl", Proficiency.INTERMEDIATE),
-                                skillLevel("REST API", Proficiency.ADVANCED)
-                        )
-                ),
-                backendCandidate(
                         "seed.match.backend-04@itda.local", "이현우", "현우캐시", seedPhone(2004), (byte) 5,
-                        "운영 배치와 Redis 캐시 최적화",
+                        "운영 배치와 캐시 최적화",
                         skillLevels(
                                 skillLevel("Java", Proficiency.ADVANCED),
                                 skillLevel("Spring", Proficiency.ADVANCED),
@@ -1010,51 +994,15 @@ public class SeedDataInitializer implements ApplicationRunner {
                         )
                 ),
                 backendCandidate(
-                        "seed.match.backend-06@itda.local", "정우진", "우진이벤트", seedPhone(2006), (byte) 4,
-                        "이벤트 기반 주문/추천 연동",
-                        skillLevels(
-                                skillLevel("Java", Proficiency.ADVANCED),
-                                skillLevel("Spring", Proficiency.ADVANCED),
-                                skillLevel("Spring Boot", Proficiency.ADVANCED),
-                                skillLevel("PostgreSQL", Proficiency.ADVANCED),
-                                skillLevel("Kafka", Proficiency.INTERMEDIATE),
-                                skillLevel("Docker", Proficiency.INTERMEDIATE)
-                        )
-                ),
-                backendCandidate(
-                        "seed.match.backend-07@itda.local", "한지민", "지민멀티", seedPhone(2007), (byte) 7,
-                        "멀티테넌트 SaaS와 Querydsl 검색 고도화",
-                        skillLevels(
-                                skillLevel("Java", Proficiency.ADVANCED),
-                                skillLevel("Spring", Proficiency.ADVANCED),
-                                skillLevel("Spring Boot", Proficiency.ADVANCED),
-                                skillLevel("PostgreSQL", Proficiency.ADVANCED),
-                                skillLevel("Querydsl", Proficiency.ADVANCED),
-                                skillLevel("Redis", Proficiency.INTERMEDIATE)
-                        )
-                ),
-                backendCandidate(
                         "seed.match.backend-08@itda.local", "오세훈", "세훈운영", seedPhone(2008), (byte) 6,
                         "운영 도구와 관리자 워크플로 API 개선",
                         skillLevels(
                                 skillLevel("Java", Proficiency.ADVANCED),
                                 skillLevel("Spring", Proficiency.ADVANCED),
                                 skillLevel("Spring Boot", Proficiency.ADVANCED),
-                                skillLevel("PostgreSQL", Proficiency.ADVANCED),
+                                skillLevel("MySQL", Proficiency.ADVANCED),
                                 skillLevel("Redis", Proficiency.ADVANCED),
                                 skillLevel("GitHub Actions", Proficiency.INTERMEDIATE)
-                        )
-                ),
-                backendCandidate(
-                        "seed.match.backend-09@itda.local", "윤태성", "태성리포트", seedPhone(2009), (byte) 5,
-                        "리포팅 API와 데이터 집계 배치 구현",
-                        skillLevels(
-                                skillLevel("Java", Proficiency.ADVANCED),
-                                skillLevel("Spring", Proficiency.ADVANCED),
-                                skillLevel("Spring Boot", Proficiency.ADVANCED),
-                                skillLevel("PostgreSQL", Proficiency.ADVANCED),
-                                skillLevel("JPA", Proficiency.ADVANCED),
-                                skillLevel("Docker", Proficiency.INTERMEDIATE)
                         )
                 )
         );
@@ -1064,7 +1012,7 @@ public class SeedDataInitializer implements ApplicationRunner {
         return List.of(
                 fullstackCandidate(
                         "seed.match.medium-01@itda.local", "강예린", "예린풀스택", seedPhone(2101), (byte) 5,
-                        "운영 대시보드와 API 서버를 함께 개선",
+                        "관리자 웹과 API 서버를 함께 개선",
                         skillLevels(
                                 skillLevel("Java", Proficiency.ADVANCED),
                                 skillLevel("Spring", Proficiency.INTERMEDIATE),
@@ -1076,156 +1024,51 @@ public class SeedDataInitializer implements ApplicationRunner {
                 ),
                 fullstackCandidate(
                         "seed.match.medium-02@itda.local", "김하늘", "하늘웹앱", seedPhone(2102), (byte) 4,
-                        "고객용 웹과 내부 API를 함께 운영",
+                        "고객용 웹과 운영 프론트를 함께 운영",
+                        WorkType.REMOTE,
+                        ResumeWritingStatus.DONE,
+                        ResumeStatus.ACTIVE,
+                        true,
+                        true,
                         skillLevels(
-                                skillLevel("Java", Proficiency.INTERMEDIATE),
-                                skillLevel("Spring", Proficiency.INTERMEDIATE),
                                 skillLevel("React", Proficiency.ADVANCED),
+                                skillLevel("TypeScript", Proficiency.ADVANCED),
                                 skillLevel("Next.js", Proficiency.INTERMEDIATE),
-                                skillLevel("TypeScript", Proficiency.ADVANCED),
-                                skillLevel("Redis", Proficiency.BEGINNER)
+                                skillLevel("Tailwind CSS", Proficiency.INTERMEDIATE),
+                                skillLevel("Figma", Proficiency.INTERMEDIATE)
                         )
                 ),
-                fullstackCandidate(
-                        "seed.match.medium-03@itda.local", "박준호", "준호하이브리드", seedPhone(2103), (byte) 6,
-                        "관리자 화면과 백엔드 API를 동시에 담당",
+                specialistCandidate(
+                        "seed.match.medium-03@itda.local", "박준호", "준호에이아이", seedPhone(2103), "AI 엔지니어", (byte) 5,
+                        "검색/요약 어시스턴트와 추론 API 운영",
                         skillLevels(
-                                skillLevel("Java", Proficiency.INTERMEDIATE),
-                                skillLevel("Spring", Proficiency.ADVANCED),
-                                skillLevel("React", Proficiency.ADVANCED),
-                                skillLevel("JavaScript", Proficiency.ADVANCED),
-                                skillLevel("Docker", Proficiency.BEGINNER)
+                                skillLevel("Python", Proficiency.ADVANCED),
+                                skillLevel("FastAPI", Proficiency.ADVANCED),
+                                skillLevel("LLM", Proficiency.ADVANCED),
+                                skillLevel("AWS", Proficiency.INTERMEDIATE),
+                                skillLevel("PostgreSQL", Proficiency.INTERMEDIATE)
                         )
                 ),
-                fullstackCandidate(
-                        "seed.match.medium-04@itda.local", "이소영", "소영프로덕트", seedPhone(2104), (byte) 7,
-                        "프로덕트 실험용 웹과 운영 API를 빠르게 개발",
+                backendCandidate(
+                        "seed.match.medium-04@itda.local", "이소영", "소영백오피스", seedPhone(2104), (byte) 6,
+                        "회원/권한 API와 운영 백오피스 개선",
                         skillLevels(
                                 skillLevel("Java", Proficiency.ADVANCED),
-                                skillLevel("Spring", Proficiency.INTERMEDIATE),
+                                skillLevel("Spring", Proficiency.ADVANCED),
+                                skillLevel("Spring Boot", Proficiency.INTERMEDIATE),
+                                skillLevel("JPA", Proficiency.INTERMEDIATE),
+                                skillLevel("REST API", Proficiency.ADVANCED)
+                        )
+                ),
+                specialistCandidate(
+                        "seed.match.medium-05@itda.local", "최다은", "다은프로덕트AI", seedPhone(2105), "AI 엔지니어", (byte) 4,
+                        "문서 기반 업무 자동화와 LLM 기능 제품화",
+                        skillLevels(
+                                skillLevel("Python", Proficiency.ADVANCED),
+                                skillLevel("LangChain", Proficiency.INTERMEDIATE),
+                                skillLevel("LLM", Proficiency.ADVANCED),
                                 skillLevel("React", Proficiency.INTERMEDIATE),
-                                skillLevel("TypeScript", Proficiency.ADVANCED),
-                                skillLevel("REST API", Proficiency.ADVANCED)
-                        )
-                ),
-                fullstackCandidate(
-                        "seed.match.medium-05@itda.local", "최다은", "다은어드민", seedPhone(2105), (byte) 5,
-                        "운영 어드민과 회원/권한 API를 함께 고도화",
-                        skillLevels(
-                                skillLevel("Java", Proficiency.INTERMEDIATE),
-                                skillLevel("Spring", Proficiency.INTERMEDIATE),
-                                skillLevel("React", Proficiency.ADVANCED),
-                                skillLevel("TypeScript", Proficiency.ADVANCED),
-                                skillLevel("PostgreSQL", Proficiency.BEGINNER)
-                        )
-                ),
-                backendCandidate(
-                        "seed.match.medium-06@itda.local", "정승민", "승민코어", seedPhone(2106), (byte) 6,
-                        "회원/권한 API와 배치 운영",
-                        skillLevels(
-                                skillLevel("Java", Proficiency.ADVANCED),
-                                skillLevel("Spring", Proficiency.ADVANCED),
-                                skillLevel("Spring Boot", Proficiency.INTERMEDIATE),
-                                skillLevel("JPA", Proficiency.INTERMEDIATE),
-                                skillLevel("REST API", Proficiency.ADVANCED)
-                        )
-                ),
-                backendCandidate(
-                        "seed.match.medium-07@itda.local", "조유진", "유진백오피스", seedPhone(2107), (byte) 4,
-                        "백오피스 API와 운영 배포 자동화",
-                        skillLevels(
-                                skillLevel("Java", Proficiency.ADVANCED),
-                                skillLevel("Spring", Proficiency.INTERMEDIATE),
-                                skillLevel("Spring Boot", Proficiency.INTERMEDIATE),
-                                skillLevel("MySQL", Proficiency.ADVANCED),
-                                skillLevel("Docker", Proficiency.INTERMEDIATE)
-                        )
-                ),
-                backendCandidate(
-                        "seed.match.medium-08@itda.local", "한수아", "수아테스트", seedPhone(2108), (byte) 5,
-                        "테스트 코드와 운영 API 안정화",
-                        skillLevels(
-                                skillLevel("Java", Proficiency.ADVANCED),
-                                skillLevel("Spring", Proficiency.ADVANCED),
-                                skillLevel("JPA", Proficiency.INTERMEDIATE),
-                                skillLevel("GitHub Actions", Proficiency.INTERMEDIATE),
-                                skillLevel("Linux", Proficiency.INTERMEDIATE)
-                        )
-                ),
-                backendCandidate(
-                        "seed.match.medium-09@itda.local", "임재원", "재원서버", seedPhone(2109), (byte) 7,
-                        "B2B 서버와 배치성 알림 기능 유지보수",
-                        skillLevels(
-                                skillLevel("Java", Proficiency.INTERMEDIATE),
-                                skillLevel("Spring", Proficiency.ADVANCED),
-                                skillLevel("Spring Boot", Proficiency.INTERMEDIATE),
-                                skillLevel("REST API", Proficiency.ADVANCED),
-                                skillLevel("Git", Proficiency.INTERMEDIATE)
-                        )
-                ),
-                backendCandidate(
-                        "seed.match.medium-10@itda.local", "서지우", "지우데이터", seedPhone(2110), (byte) 5,
-                        "조회 API와 ORM 기반 데이터 접근 계층 유지보수",
-                        skillLevels(
-                                skillLevel("Java", Proficiency.ADVANCED),
-                                skillLevel("Spring", Proficiency.INTERMEDIATE),
-                                skillLevel("PostgreSQL", Proficiency.INTERMEDIATE),
-                                skillLevel("JPA", Proficiency.INTERMEDIATE)
-                        )
-                ),
-                specialistCandidate(
-                        "seed.match.medium-11@itda.local", "문태현", "태현검색", seedPhone(2111), "데이터 백엔드 엔지니어", (byte) 6,
-                        "로그 적재와 검색 API를 함께 운영",
-                        skillLevels(
-                                skillLevel("Java", Proficiency.ADVANCED),
-                                skillLevel("Spring", Proficiency.INTERMEDIATE),
-                                skillLevel("Kafka", Proficiency.INTERMEDIATE),
-                                skillLevel("Elasticsearch", Proficiency.INTERMEDIATE),
-                                skillLevel("REST API", Proficiency.ADVANCED)
-                        )
-                ),
-                specialistCandidate(
-                        "seed.match.medium-12@itda.local", "배시은", "시은쿼리", seedPhone(2112), "데이터 애플리케이션 엔지니어", (byte) 4,
-                        "리포트 API와 동적 조회 쿼리를 구현",
-                        skillLevels(
-                                skillLevel("Java", Proficiency.INTERMEDIATE),
-                                skillLevel("Spring", Proficiency.ADVANCED),
-                                skillLevel("PostgreSQL", Proficiency.INTERMEDIATE),
-                                skillLevel("Querydsl", Proficiency.BEGINNER),
-                                skillLevel("REST API", Proficiency.ADVANCED)
-                        )
-                ),
-                specialistCandidate(
-                        "seed.match.medium-13@itda.local", "송도현", "도현옵스", seedPhone(2113), "DevOps 엔지니어", (byte) 7,
-                        "배포 자동화와 백엔드 서비스 운영을 병행",
-                        skillLevels(
-                                skillLevel("Java", Proficiency.INTERMEDIATE),
-                                skillLevel("Spring", Proficiency.ADVANCED),
-                                skillLevel("AWS", Proficiency.ADVANCED),
-                                skillLevel("Docker", Proficiency.ADVANCED),
-                                skillLevel("Kubernetes", Proficiency.INTERMEDIATE)
-                        )
-                ),
-                specialistCandidate(
-                        "seed.match.medium-14@itda.local", "양세린", "세린파이프", seedPhone(2114), "플랫폼 엔지니어", (byte) 5,
-                        "백엔드 서비스와 CI/CD 파이프라인을 함께 개선",
-                        skillLevels(
-                                skillLevel("Java", Proficiency.ADVANCED),
-                                skillLevel("Spring", Proficiency.INTERMEDIATE),
-                                skillLevel("GitHub Actions", Proficiency.ADVANCED),
-                                skillLevel("Docker", Proficiency.ADVANCED),
-                                skillLevel("Linux", Proficiency.ADVANCED)
-                        )
-                ),
-                specialistCandidate(
-                        "seed.match.medium-15@itda.local", "유정원", "정원품질", seedPhone(2115), "QA 자동화 엔지니어", (byte) 4,
-                        "API 회귀 테스트와 배포 전 검증 자동화를 담당",
-                        skillLevels(
-                                skillLevel("Java", Proficiency.INTERMEDIATE),
-                                skillLevel("Spring", Proficiency.INTERMEDIATE),
-                                skillLevel("REST API", Proficiency.ADVANCED),
-                                skillLevel("GitHub Actions", Proficiency.INTERMEDIATE),
-                                skillLevel("CI/CD", Proficiency.INTERMEDIATE)
+                                skillLevel("TypeScript", Proficiency.INTERMEDIATE)
                         )
                 )
         );
@@ -1235,29 +1078,17 @@ public class SeedDataInitializer implements ApplicationRunner {
         return List.of(
                 specialistCandidate(
                         "seed.match.low-01@itda.local", "강채린", "채린프론트", seedPhone(2201), "프론트엔드 개발자", (byte) 5,
-                        "운영 화면 구현이 주력이지만 Spring 기반 백엔드와 협업 경험이 있습니다.",
+                        "운영 화면과 공통 UI 컴포넌트 구현",
                         skillLevels(
-                                skillLevel("Spring", Proficiency.INTERMEDIATE),
                                 skillLevel("React", Proficiency.ADVANCED),
                                 skillLevel("TypeScript", Proficiency.ADVANCED),
-                                skillLevel("Next.js", Proficiency.INTERMEDIATE),
+                                skillLevel("Tailwind CSS", Proficiency.INTERMEDIATE),
                                 skillLevel("Figma", Proficiency.INTERMEDIATE)
                         )
                 ),
                 specialistCandidate(
-                        "seed.match.low-02@itda.local", "김세아", "세아퍼블리싱", seedPhone(2202), "프론트엔드 개발자", (byte) 4,
-                        "퍼블리싱과 화면 개선 중심이지만 Spring MVC 화면 유지보수 경험이 있습니다.",
-                        skillLevels(
-                                skillLevel("Spring", Proficiency.BEGINNER),
-                                skillLevel("React", Proficiency.ADVANCED),
-                                skillLevel("JavaScript", Proficiency.ADVANCED),
-                                skillLevel("HTML", Proficiency.ADVANCED),
-                                skillLevel("CSS", Proficiency.ADVANCED)
-                        )
-                ),
-                specialistCandidate(
                         "seed.match.low-03@itda.local", "박지안", "지안모바일", seedPhone(2203), "모바일 앱 개발자", (byte) 6,
-                        "모바일 앱이 주력이지만 Java 기반 API 연동과 서버 협업 경험이 있습니다.",
+                        "안드로이드 앱과 백엔드 API 연동",
                         skillLevels(
                                 skillLevel("Java", Proficiency.INTERMEDIATE),
                                 skillLevel("Kotlin", Proficiency.ADVANCED),
@@ -1267,17 +1098,27 @@ public class SeedDataInitializer implements ApplicationRunner {
                 ),
                 specialistCandidate(
                         "seed.match.low-04@itda.local", "서민재", "민재앱", seedPhone(2204), "모바일 앱 개발자", (byte) 4,
-                        "크로스플랫폼 앱 구현과 간단한 Java 연동 백엔드를 함께 다뤘습니다.",
+                        "크로스플랫폼 앱 MVP 구현",
                         skillLevels(
-                                skillLevel("Java", Proficiency.INTERMEDIATE),
                                 skillLevel("Flutter", Proficiency.ADVANCED),
                                 skillLevel("REST API", Proficiency.INTERMEDIATE),
                                 skillLevel("AWS", Proficiency.BEGINNER)
                         )
                 ),
                 specialistCandidate(
+                        "seed.match.low-02@itda.local", "김세아", "세아리액트네이티브", seedPhone(2202), "모바일 앱 개발자", (byte) 5,
+                        "React Native 기반 모바일 화면과 API 연동",
+                        skillLevels(
+                                skillLevel("React Native", Proficiency.ADVANCED),
+                                skillLevel("TypeScript", Proficiency.INTERMEDIATE),
+                                skillLevel("JavaScript", Proficiency.ADVANCED),
+                                skillLevel("REST API", Proficiency.INTERMEDIATE),
+                                skillLevel("Figma", Proficiency.BEGINNER)
+                        )
+                ),
+                specialistCandidate(
                         "seed.match.low-05@itda.local", "윤시후", "시후인프라", seedPhone(2205), "DevOps 엔지니어", (byte) 7,
-                        "인프라 자동화가 주력이지만 Spring 서비스 운영을 함께 맡았습니다.",
+                        "인프라 자동화와 서비스 운영 안정화",
                         skillLevels(
                                 skillLevel("Spring", Proficiency.INTERMEDIATE),
                                 skillLevel("AWS", Proficiency.ADVANCED),
@@ -1288,121 +1129,19 @@ public class SeedDataInitializer implements ApplicationRunner {
                 ),
                 specialistCandidate(
                         "seed.match.low-06@itda.local", "임가은", "가은품질", seedPhone(2206), "QA 자동화 엔지니어", (byte) 5,
-                        "품질 자동화가 주력이지만 Java 기반 API 테스트 도구를 유지보수했습니다.",
+                        "API 회귀 테스트와 배포 전 검증 자동화",
                         skillLevels(
                                 skillLevel("Java", Proficiency.INTERMEDIATE),
                                 skillLevel("REST API", Proficiency.ADVANCED),
                                 skillLevel("GitHub Actions", Proficiency.INTERMEDIATE),
                                 skillLevel("CI/CD", Proficiency.INTERMEDIATE)
                         )
-                ),
-                specialistCandidate(
-                        "seed.match.low-07@itda.local", "전시온", "시온데이터", seedPhone(2207), "데이터 애플리케이션 엔지니어", (byte) 4,
-                        "데이터 분석 워크플로가 주력이지만 Spring 기반 연동 API를 다룬 경험이 있습니다.",
-                        skillLevels(
-                                skillLevel("Spring", Proficiency.BEGINNER),
-                                skillLevel("PostgreSQL", Proficiency.ADVANCED),
-                                skillLevel("AWS", Proficiency.INTERMEDIATE),
-                                skillLevel("React", Proficiency.BEGINNER)
-                        )
                 )
         );
     }
 
     private List<SeedFreelancerSpec> createFilteredOutSpecs() {
-        return List.of(
-                backendCandidate(
-                        "seed.filter.writing-01@itda.local", "고은호", "은호드래프트", seedPhone(2301), (byte) 6,
-                        "추천 API 초안 작성과 스키마 설계",
-                        WorkType.HYBRID,
-                        ResumeWritingStatus.WRITING,
-                        ResumeStatus.ACTIVE,
-                        true,
-                        true,
-                        skillLevels(
-                                skillLevel("Java", Proficiency.ADVANCED),
-                                skillLevel("Spring", Proficiency.ADVANCED),
-                                skillLevel("Spring Boot", Proficiency.INTERMEDIATE),
-                                skillLevel("PostgreSQL", Proficiency.ADVANCED),
-                                skillLevel("Redis", Proficiency.INTERMEDIATE)
-                        )
-                ),
-                backendCandidate(
-                        "seed.filter.inactive-01@itda.local", "김연호", "연호비활성", seedPhone(2302), (byte) 7,
-                        "운영 API와 캐시 전략 개선",
-                        WorkType.HYBRID,
-                        ResumeWritingStatus.DONE,
-                        ResumeStatus.INACTIVE,
-                        true,
-                        true,
-                        skillLevels(
-                                skillLevel("Java", Proficiency.ADVANCED),
-                                skillLevel("Spring", Proficiency.ADVANCED),
-                                skillLevel("Spring Boot", Proficiency.INTERMEDIATE),
-                                skillLevel("PostgreSQL", Proficiency.ADVANCED),
-                                skillLevel("Redis", Proficiency.INTERMEDIATE)
-                        )
-                ),
-                backendCandidate(
-                        "seed.filter.remote-01@itda.local", "문지후", "지후리모트", seedPhone(2303), (byte) 5,
-                        "완전 원격 기반 백엔드 운영",
-                        WorkType.REMOTE,
-                        ResumeWritingStatus.DONE,
-                        ResumeStatus.ACTIVE,
-                        true,
-                        true,
-                        skillLevels(
-                                skillLevel("Java", Proficiency.ADVANCED),
-                                skillLevel("Spring", Proficiency.ADVANCED),
-                                skillLevel("Spring Boot", Proficiency.INTERMEDIATE),
-                                skillLevel("PostgreSQL", Proficiency.ADVANCED),
-                                skillLevel("Redis", Proficiency.INTERMEDIATE)
-                        )
-                ),
-                backendCandidate(
-                        "seed.filter.senior-01@itda.local", "배도윤", "도윤시니어", seedPhone(2304), (byte) 10,
-                        "장기 운영 시스템 리드와 아키텍처 개선",
-                        skillLevels(
-                                skillLevel("Java", Proficiency.ADVANCED),
-                                skillLevel("Spring", Proficiency.ADVANCED),
-                                skillLevel("Spring Boot", Proficiency.ADVANCED),
-                                skillLevel("PostgreSQL", Proficiency.ADVANCED),
-                                skillLevel("Redis", Proficiency.ADVANCED)
-                        )
-                ),
-                fullstackCandidate(
-                        "seed.filter.junior-01@itda.local", "서나윤", "나윤주니어", seedPhone(2305), (byte) 2,
-                        "사내 툴 화면과 간단한 Spring API 구현",
-                        WorkType.HYBRID,
-                        ResumeWritingStatus.DONE,
-                        ResumeStatus.ACTIVE,
-                        true,
-                        true,
-                        skillLevels(
-                                skillLevel("Java", Proficiency.INTERMEDIATE),
-                                skillLevel("Spring", Proficiency.INTERMEDIATE),
-                                skillLevel("React", Proficiency.INTERMEDIATE),
-                                skillLevel("TypeScript", Proficiency.INTERMEDIATE),
-                                skillLevel("PostgreSQL", Proficiency.BEGINNER)
-                        )
-                ),
-                backendCandidate(
-                        "seed.filter.hidden-01@itda.local", "양민서", "민서비공개", seedPhone(2306), (byte) 6,
-                        "매칭 플랫폼 API 운영과 캐시 전략 개선",
-                        WorkType.HYBRID,
-                        ResumeWritingStatus.DONE,
-                        ResumeStatus.ACTIVE,
-                        false,
-                        true,
-                        skillLevels(
-                                skillLevel("Java", Proficiency.ADVANCED),
-                                skillLevel("Spring", Proficiency.ADVANCED),
-                                skillLevel("Spring Boot", Proficiency.INTERMEDIATE),
-                                skillLevel("PostgreSQL", Proficiency.ADVANCED),
-                                skillLevel("Redis", Proficiency.INTERMEDIATE)
-                        )
-                )
-        );
+        return List.of();
     }
 
     private SeedFreelancerSpec backendCandidate(
